@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8"/>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 12px; color: #333; background: white; }
+        .container { max-width: 680px; margin: 0 auto; padding: 30px; }
+
+        /* Header */
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; padding-bottom: 20px; }
+        .logo { font-weight: 800; font-size: 28px; }
+        .logo-sub { font-size: 10px; color: #888; margin-top: 2px; }
+        .biz-info { font-size: 10px; color: #888; margin-top: 6px; line-height: 1.5; }
+        .invoice-title { text-align: right; }
+        .invoice-title h1 { font-size: 24px; color: #333; margin-bottom: 4px; }
+        .invoice-number { font-weight: 700; font-size: 14px; }
+        .invoice-date { font-size: 11px; color: #888; margin-top: 2px; }
+
+        /* Status Badge */
+        .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .status-draft { background: #f3f4f6; color: #6b7280; }
+        .status-sent { background: #dbeafe; color: #1d4ed8; }
+        .status-partially_paid { background: #fef3c7; color: #d97706; }
+        .status-paid { background: #dcfce7; color: #15803d; }
+        .status-overdue { background: #fee2e2; color: #dc2626; }
+
+        /* Client info */
+        .client-section { margin-bottom: 24px; }
+        .client-label { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .client-name { font-size: 16px; font-weight: 700; color: #333; }
+        .client-email { font-size: 12px; color: #666; }
+
+        /* Table */
+        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        .items-table thead th { background: #f8f9fa; padding: 10px 12px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #666; border-bottom: 2px solid #e5e7eb; }
+        .items-table tbody td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; }
+        .items-table .text-right { text-align: right; }
+        .items-table .qty-cell { text-align: center; }
+
+        /* Totals */
+        .totals-section { display: flex; justify-content: flex-end; margin-bottom: 24px; }
+        .totals-table { width: 280px; }
+        .totals-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 12px; }
+        .totals-row.grand-total { border-top: 2px solid #333; padding-top: 10px; margin-top: 4px; font-size: 16px; font-weight: 800; }
+
+        /* DP Info Box */
+        .dp-info-box { background: linear-gradient(135deg, #fef3c7, #fde68a); border-radius: 10px; padding: 16px 20px; margin-bottom: 20px; border-left: 4px solid #d97706; }
+        .dp-info-title { font-size: 13px; font-weight: 700; color: #92400e; margin-bottom: 8px; }
+        .dp-info-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; color: #78350f; }
+        .dp-info-row.highlight { font-weight: 700; font-size: 14px; padding-top: 6px; border-top: 1px dashed #d97706; margin-top: 4px; }
+
+        /* Payment section */
+        .payment-section { border-radius: 10px; padding: 20px; text-align: center; margin-bottom: 20px; background: linear-gradient(135deg, rgba(0,0,0,0.02), rgba(0,0,0,0.05)); }
+        .payment-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+        .payment-desc { font-size: 11px; color: #666; margin-bottom: 12px; }
+        .payment-btn { display: inline-block; color: white; padding: 10px 30px; border-radius: 6px; text-decoration: none; font-weight: 700; font-size: 13px; }
+        .payment-url { margin-top: 8px; font-size: 9px; color: #999; word-break: break-all; }
+
+        /* Notes */
+        .notes-section { background: #f8f9fa; border-radius: 8px; padding: 14px; margin-bottom: 20px; }
+        .notes-label { font-size: 10px; text-transform: uppercase; color: #999; margin-bottom: 4px; }
+
+        /* Footer */
+        .footer { text-align: center; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #999; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header" style="border-bottom: 3px solid {{.AccentColor}}">
+            <div>
+                {{if .LogoURL}}
+                <div>
+                    <img src="{{.LogoURL}}" style="max-height: 48px; max-width: 160px;" alt="Logo"/>
+                </div>
+                {{else}}
+                <div class="logo" style="color: {{.AccentColor}}">{{.BusinessName}}</div>
+                {{end}}
+
+                {{if or (ne .BusinessEmail "") (ne .BusinessPhone "")}}
+                <div class="biz-info">
+                    {{if ne .BusinessEmail ""}}<span>{{.BusinessEmail}}</span>{{end}}
+                    {{if and (ne .BusinessEmail "") (ne .BusinessPhone "")}} · {{end}}
+                    {{if ne .BusinessPhone ""}}<span>{{.BusinessPhone}}</span>{{end}}
+                </div>
+                {{end}}
+                {{if ne .BusinessAddress ""}}<div class="biz-info">{{.BusinessAddress}}</div>{{end}}
+                {{if ne .BusinessWebsite ""}}<div class="biz-info">{{.BusinessWebsite}}</div>{{end}}
+            </div>
+            <div class="invoice-title">
+                <h1>INVOICE</h1>
+                <div class="invoice-number" style="color: {{.AccentColor}}">{{.InvoiceNumber}}</div>
+                <div class="invoice-date">Tanggal: {{.CreatedAt}}</div>
+                <div style="margin-top: 6px;">
+                    <span class="status-badge status-{{.Status}}">{{.Status}}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Client Info -->
+        <div class="client-section">
+            <div class="client-label">Ditagihkan kepada</div>
+            <div class="client-name">{{.ClientName}}</div>
+            <div class="client-email">{{.ClientEmail}}</div>
+            <div style="font-size: 11px; color: #888; margin-top: 2px;">Jatuh tempo: {{.DueDate}}</div>
+        </div>
+
+        <!-- Items Table -->
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th style="width: 45%;">Deskripsi</th>
+                    <th class="qty-cell" style="width: 15%;">Qty</th>
+                    <th class="text-right" style="width: 20%;">Harga</th>
+                    <th class="text-right" style="width: 20%;">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Items}}
+                <tr>
+                    <td>{{.Description}}</td>
+                    <td class="qty-cell">{{.Quantity}}</td>
+                    <td class="text-right">{{.PriceFormatted}}</td>
+                    <td class="text-right">{{.TotalFormatted}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+
+        <!-- Totals -->
+        <div class="totals-section">
+            <div class="totals-table">
+                <div class="totals-row">
+                    <span>Subtotal</span>
+                    <span>{{.SubtotalFormatted}}</span>
+                </div>
+                <div class="totals-row">
+                    <span>Pajak</span>
+                    <span>{{.TaxFormatted}}</span>
+                </div>
+                {{if gt .DiscountValue 0.0}}
+                <div class="totals-row">
+                    <span>Diskon</span>
+                    <span>-{{.DiscountFormatted}}</span>
+                </div>
+                {{end}}
+                <div class="totals-row grand-total" style="color: {{.AccentColor}}">
+                    <span>Grand Total</span>
+                    <span>{{.TotalFormatted}}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- DP Info Box -->
+        {{if .IsDp}}
+        <div class="dp-info-box">
+            <div class="dp-info-title">📋 Informasi Pembayaran DP</div>
+            <div class="dp-info-row">
+                <span>Tipe Pembayaran</span>
+                <span>Down Payment ({{.DpPercentage}}%)</span>
+            </div>
+            <div class="dp-info-row">
+                <span>Nominal DP</span>
+                <span>{{.DpAmountFormatted}}</span>
+            </div>
+            <div class="dp-info-row">
+                <span>Sudah Dibayar</span>
+                <span>{{.AmountPaidFormatted}}</span>
+            </div>
+            <div class="dp-info-row highlight" style="color: {{.AccentColor}}">
+                <span>Sisa Bayar</span>
+                <span>{{.AmountRemainingFormatted}}</span>
+            </div>
+        </div>
+        {{end}}
+
+        <!-- Payment Link -->
+        {{if ne .PaymentLink ""}}
+        <div class="payment-section">
+            <div class="payment-title" style="color: {{.AccentColor}}">{{if .IsDp}}💳 Bayar DP Sekarang{{else}}💳 Bayar Invoice Ini{{end}}</div>
+            <div class="payment-desc">{{if .IsDp}}Klik tombol di bawah untuk membayar Down Payment{{else}}Klik tombol di bawah untuk melakukan pembayaran secara online{{end}}</div>
+            <a class="payment-btn" href="{{.PaymentLink}}" style="background: {{.AccentColor}}">Bayar Sekarang</a>
+            <div class="payment-url">{{.PaymentLink}}</div>
+        </div>
+        {{end}}
+
+        <!-- Remaining Payment Link -->
+        {{if ne .RemainingPaymentLink ""}}
+        <div class="payment-section" style="background: linear-gradient(135deg, #f0fdf4, #dcfce7);">
+            <div class="payment-title" style="color: #15803d;">💰 Bayar Pelunasan</div>
+            <div class="payment-desc">Klik tombol di bawah untuk melunasi sisa pembayaran</div>
+            <a class="payment-btn" href="{{.RemainingPaymentLink}}" style="background: #15803d;">Lunasi Sekarang</a>
+            <div class="payment-url">{{.RemainingPaymentLink}}</div>
+        </div>
+        {{end}}
+
+        <!-- Notes -->
+        {{if ne .Notes ""}}
+        <div class="notes-section">
+            <div class="notes-label">Catatan</div>
+            <div>{{.Notes}}</div>
+        </div>
+        {{end}}
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>{{.FooterText}}</p>
+            <p style="margin-top: 4px;">Powered by <strong style="color: {{.AccentColor}}">{{.BusinessName}}</strong></p>
+        </div>
+    </div>
+</body>
+</html>

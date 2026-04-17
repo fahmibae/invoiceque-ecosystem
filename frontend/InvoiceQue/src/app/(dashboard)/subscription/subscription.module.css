@@ -1,0 +1,246 @@
+.currentPlan {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  background: var(--gradient-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  margin-bottom: 28px;
+}
+
+.currentIcon { font-size: 24px; }
+.currentLabel { font-size: 12px; color: var(--text-tertiary); }
+.currentName { font-size: 16px; font-weight: 700; }
+
+/* Plans Grid */
+.plansGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.planCard {
+  background: var(--card-bg);
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: all var(--transition-fast);
+}
+
+.planCard:hover {
+  border-color: var(--red-300);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.1);
+}
+
+.popular {
+  border-color: var(--red-500);
+  background: var(--gradient-subtle);
+}
+
+.activePlan {
+  border-color: var(--green-500, #10B981);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.popularBadge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--gradient-primary);
+  color: white;
+  padding: 4px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Plan Header */
+.planHeader {
+  text-align: center;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 20px;
+}
+
+.planName {
+  font-size: 20px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.planPrice { display: flex; align-items: baseline; justify-content: center; gap: 4px; }
+.priceAmount { font-size: 28px; font-weight: 800; color: var(--red-500); }
+.pricePeriod { font-size: 14px; color: var(--text-tertiary); }
+
+/* Limits */
+.planLimits {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+}
+
+.limitItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Features */
+.planFeatures {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.featureItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.featureCheck {
+  color: var(--green-500, #10B981);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* Button */
+.planBtn {
+  width: 100%;
+  padding: 12px !important;
+  font-weight: 700 !important;
+}
+
+/* Spinner */
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--red-500);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Xendit Setup Card */
+.xenditCard {
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-top: 12px;
+}
+
+.xenditActive {
+  border-color: var(--green-500, #10B981);
+  background: rgba(16, 185, 129, 0.04);
+}
+
+.xenditHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.xenditIcon { font-size: 28px; }
+
+.xenditTitle { font-size: 16px; font-weight: 700; }
+.xenditSubtitle { font-size: 12px; color: var(--text-tertiary); }
+
+.xenditInfo {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.xenditInfoRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.xenditInfoLabel { color: var(--text-secondary); }
+.xenditInfoValue { font-weight: 600; }
+
+.xenditBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(16, 185, 129, 0.1);
+  color: #10B981;
+}
+
+/* Usage Bar */
+.usageCard {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.usageRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.usageLabel {
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.usageCount {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.usageBarBg {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-secondary);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+
+.usageBarBg:last-child { margin-bottom: 0; }
+
+.usageBarFill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--gradient-primary);
+  transition: width 0.5s ease;
+}
+
+.usageBarWarning { background: #F59E0B; }
+.usageBarDanger { background: #EF4444; }

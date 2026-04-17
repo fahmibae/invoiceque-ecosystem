@@ -1,0 +1,266 @@
+.detailGrid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.invoiceDoc {
+  padding: 32px;
+}
+
+.docHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 3px solid var(--red-500);
+}
+
+.docLogo {
+  width: 44px;
+  height: 44px;
+  background: var(--gradient-primary);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 16px;
+  color: white;
+  margin-bottom: 8px;
+}
+
+.docTitle {
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.docMeta {
+  text-align: right;
+}
+
+.docNumber {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.docDate {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.docLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.docClientSection {
+  margin-bottom: 24px;
+}
+
+.docClientCard {
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--red-500);
+}
+
+.docTable {
+  margin-bottom: 20px;
+}
+
+.itemTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.itemTable th {
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: white;
+  background: var(--gradient-primary);
+  letter-spacing: 0.5px;
+}
+
+.itemTable th:first-child {
+  border-radius: var(--radius-sm) 0 0 0;
+}
+
+.itemTable th:last-child {
+  border-radius: 0 var(--radius-sm) 0 0;
+  text-align: right;
+}
+
+.itemTable td {
+  padding: 14px;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.itemTable td:last-child {
+  text-align: right;
+}
+
+.docTotals {
+  margin-left: auto;
+  max-width: 300px;
+  padding: 16px 0;
+}
+
+.totalLine {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.grandTotal {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-primary);
+  padding-top: 12px;
+  margin-top: 8px;
+  border-top: 2px solid var(--red-500);
+}
+
+.docNotes {
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.docFooter {
+  text-align: center;
+  padding-top: 24px;
+  margin-top: 24px;
+  border-top: 1px solid var(--border-light);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* Side Info */
+.sideInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: calc(var(--header-height) + 24px);
+}
+
+.sideTitle {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+.actionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.infoList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.infoRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.infoLabel {
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+/* Timeline */
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-left: 16px;
+  border-left: 2px solid var(--border-color);
+}
+
+.timelineItem {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  position: relative;
+}
+
+.timelineDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+  position: absolute;
+  left: -21px;
+}
+
+.timelineTitle {
+  font-size: 13px;
+  font-weight: 600;
+  margin-left: 2px;
+}
+
+.timelineDate {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-left: 2px;
+}
+
+@media (max-width: 1024px) {
+  .detailGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .sideInfo {
+    position: relative;
+    top: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .invoiceDoc {
+    padding: 20px;
+  }
+
+  .docHeader {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .docMeta {
+    text-align: left;
+  }
+
+  .docTotals {
+    max-width: 100%;
+  }
+}

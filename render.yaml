@@ -1,0 +1,174 @@
+# ============================================================
+# InvoiceQue Ecosystem — Render Blueprint
+# Deploy semua microservices ke Render.com
+# ============================================================
+#
+# LANGKAH DEPLOY:
+#   1. Push repo ini ke GitHub
+#   2. Daftar gratis di cloudamqp.com → buat instance → copy AMQP URL
+#   3. Buka render.com → New Blueprint → connect GitHub repo
+#   4. Render akan membaca file ini dan membuat semua services
+#   5. Set env vars bertanda "sync: false" di Render Dashboard
+#
+# ============================================================
+
+services:
+  # ── API Gateway ──────────────────────────────────────────
+  - type: web
+    name: invoiceque-gateway
+    runtime: docker
+    dockerfilePath: ./api_gateway/Dockerfile
+    dockerContext: ./api_gateway
+    region: singapore
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: JWT_SECRET
+        sync: false  # Set di Render Dashboard
+      - key: ALLOWED_ORIGINS
+        value: "https://invoiceque.onrender.com,http://localhost:3000"
+      # --- Service URLs (set setelah semua service terdeploy) ---
+      - key: AUTH_SERVICE_URL
+        sync: false  # https://invoiceque-auth.onrender.com
+      - key: CLIENT_SERVICE_URL
+        sync: false  # https://invoiceque-client.onrender.com
+      - key: INVOICE_SERVICE_URL
+        sync: false  # https://invoiceque-invoice.onrender.com
+      - key: PAYMENT_SERVICE_URL
+        sync: false  # https://invoiceque-payment.onrender.com
+      - key: NOTIFICATION_SERVICE_URL
+        sync: false  # https://invoiceque-notification.onrender.com
+      - key: SUBSCRIPTION_SERVICE_URL
+        sync: false  # https://invoiceque-subscription.onrender.com
+
+  # ── Auth Service ──────────────────────────────────────────
+  - type: web
+    name: invoiceque-auth
+    runtime: docker
+    dockerfilePath: ./services/auth-service/Dockerfile
+    dockerContext: ./services/auth-service
+    region: singapore
+    plan: free
+    envVars:
+      - key: PORT
+        value: "8001"
+      - key: DB_URL
+        sync: false  # Neon Cloud: AUTH_DB_URL
+      - key: JWT_SECRET
+        sync: false
+      - key: RABBITMQ_URL
+        sync: false  # CloudAMQP URL
+
+  # ── Client Service ───────────────────────────────────────
+  - type: web
+    name: invoiceque-client
+    runtime: docker
+    dockerfilePath: ./services/client-service/Dockerfile
+    dockerContext: ./services/client-service
+    region: singapore
+    plan: free
+    envVars:
+      - key: PORT
+        value: "8002"
+      - key: DB_URL
+        sync: false  # Neon Cloud: CLIENT_DB_URL
+      - key: RABBITMQ_URL
+        sync: false
+
+  # ── Invoice Service ──────────────────────────────────────
+  - type: web
+    name: invoiceque-invoice
+    runtime: docker
+    dockerfilePath: ./services/invoice-service/Dockerfile
+    dockerContext: ./services/invoice-service
+    region: singapore
+    plan: free
+    envVars:
+      - key: PORT
+        value: "8003"
+      - key: DB_URL
+        sync: false  # Neon Cloud: INVOICE_DB_URL
+      - key: RABBITMQ_URL
+        sync: false
+      - key: PAYMENT_SERVICE_URL
+        sync: false  # https://invoiceque-payment.onrender.com
+
+  # ── Payment Service (Rust) ───────────────────────────────
+  - type: web
+    name: invoiceque-payment
+    runtime: docker
+    dockerfilePath: ./services/payment-service/Dockerfile
+    dockerContext: ./services/payment-service
+    region: singapore
+    plan: free
+    envVars:
+      - key: PORT
+        value: "8004"
+      - key: DATABASE_URL
+        sync: false  # Neon Cloud: PAYMENT_DB_URL
+      - key: RABBITMQ_URL
+        sync: false
+      - key: XENDIT_API_KEY
+        sync: false
+      - key: XENDIT_CALLBACK_TOKEN
+        sync: false
+      - key: XENDIT_BASE_URL
+        value: "https://api.xendit.co"
+      - key: BASE_PAYMENT_URL
+        value: "https://invoiceque.onrender.com/pay"
+
+  # ── Notification Service ─────────────────────────────────
+  - type: web
+    name: invoiceque-notification
+    runtime: docker
+    dockerfilePath: ./services/notification-service/Dockerfile
+    dockerContext: ./services/notification-service
+    region: singapore
+    plan: free
+    envVars:
+      - key: PORT
+        value: "8005"
+      - key: RABBITMQ_URL
+        sync: false
+      - key: SMTP_HOST
+        value: "smtp.gmail.com"
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false  # invoicequee@gmail.com
+      - key: SMTP_PASS
+        sync: false  # Gmail App Password
+      - key: FROM_EMAIL
+        value: "invoicequee@gmail.com"
+
+  # ── Subscription Service ─────────────────────────────────
+  - type: web
+    name: invoiceque-subscription
+    runtime: docker
+    dockerfilePath: ./services/subscription-service/Dockerfile
+    dockerContext: ./services/subscription-service
+    region: singapore
+    plan: free
+    envVars:
+      - key: PORT
+        value: "8006"
+      - key: DB_URL
+        sync: false  # Neon Cloud: SUBSCRIPTION_DB_URL
+      - key: RABBITMQ_URL
+        sync: false
+
+  # ── Frontend (Next.js) ──────────────────────────────────
+  - type: web
+    name: invoiceque
+    runtime: docker
+    dockerfilePath: ./frontend/InvoiceQue/Dockerfile
+    dockerContext: ./frontend/InvoiceQue
+    region: singapore
+    plan: free
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: NEXT_PUBLIC_API_URL
+        value: "https://invoiceque-gateway.onrender.com/api/v1"

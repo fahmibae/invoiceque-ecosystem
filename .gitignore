@@ -1,0 +1,53 @@
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Java
+*.class
+*.jar
+*.war
+target/
+.mvn/
+!.mvn/wrapper/maven-wrapper.jar
+
+# Rust
+/services/payment-service/target/
+
+# Node
+node_modules/
+.next/
+dist/
+
+# Docker
+docker-compose.override.yml
+
+# Environment
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Fly.io (migrated to Render)
+fly.toml
+**/fly.toml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Data volumes
+postgres_data/
+rabbitmq_data/
