@@ -43,12 +43,12 @@ func main() {
 	// Start consumers
 	invoiceConsumer := consumers.NewInvoiceConsumer(emailSvc)
 	if err := invoiceConsumer.Start(conn); err != nil {
-		log.Fatalf("[NOTIFICATION] Failed to start invoice consumer: %v", err)
+		log.Printf("[NOTIFICATION] Warning: invoice consumer not started: %v", err)
 	}
 
 	paymentConsumer := consumers.NewPaymentConsumer(emailSvc)
 	if err := paymentConsumer.Start(conn); err != nil {
-		log.Fatalf("[NOTIFICATION] Failed to start payment consumer: %v", err)
+		log.Printf("[NOTIFICATION] Warning: payment consumer not started: %v", err)
 	}
 
 	// HTTP server for health check and notification logs

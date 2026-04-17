@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { notificationApi } from '@/lib/api';
@@ -60,10 +61,10 @@ export default function Header() {
         >
           {theme === 'light' ? '🌙' : '☀️'}
         </button>
-        <button className={styles.notifBtn} title="Notifikasi">
+        <Link href="/notifications" className={styles.notifBtn} title="Notifikasi">
           <span>🔔</span>
           {notifCount > 0 && <span className={styles.notifBadge}>{notifCount}</span>}
-        </button>
+        </Link>
         <div
           className={styles.profileBtn}
           onClick={() => setShowMenu(!showMenu)}
