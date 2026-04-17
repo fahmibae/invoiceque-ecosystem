@@ -25,33 +25,21 @@ func (r *InvoiceRepository) FindByUserID(userID, status string, page, size int) 
 
 	offset := page * size
 
-	if status != "" {
-		err = r.db.QueryRow("SELECT COUNT(*) FROM invoices WHERE user_id = $1 AND status = $2", userID, status).Scan(&total)
-		if err != nil {
-			return nil, 0, err
-		}
-		rows, err = r.db.Query(`
-			SELECT id, invoice_number, user_id, client_id, client_name, client_email,
-			       subtotal, tax, discount, total, status, payment_type, dp_percentage,
-			       dp_amount, amount_paid, amount_remaining, due_date, created_at, paid_at,
-			       notes, payment_link, remaining_payment_link
-			FROM invoices WHERE user_id = $1 AND status = $2
-			ORDER BY created_at DESC LIMIT $3 OFFSET $4`,
-			userID, status, size, offset)
-	} else {
-		err = r.db.QueryRow("SELECT COUNT(*) FROM invoices WHERE user_id = $1", userID).Scan(&total)
-		if err != nil {
-			return nil, 0, err
-		}
-		rows, err = r.db.Query(`
-			SELECT id, invoice_number, user_id, client_id, client_name, client_email,
-			       subtotal, tax, discount, total, status, payment_type, dp_percentage,
-			       dp_amount, amount_paid, amount_remaining, due_date, created_at, paid_at,
-			       notes, payment_link, remaining_payment_link
-			FROM invoices WHERE user_id = $1
-			ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
-			userID, size, offset)
+	// Always use the same number of params to avoid PgBouncer prepared statement conflicts
+	err = r.db.QueryRow(
+		"SELECT COUNT(*) FROM invoices WHERE user_id = $1 AND ($2 = '' OR status = $2)",
+		userID, status).Scan(&total)
+	if err != nil {
+		return nil, 0, err
 	}
+	rows, err = r.db.Query(`
+		SELECT id, invoice_number, user_id, client_id, client_name, client_email,
+		       subtotal, tax, discount, total, status, payment_type, dp_percentage,
+		       dp_amount, amount_paid, amount_remaining, due_date, created_at, paid_at,
+		       notes, payment_link, remaining_payment_link
+		FROM invoices WHERE user_id = $1 AND ($2 = '' OR status = $2)
+		ORDER BY created_at DESC LIMIT $3 OFFSET $4`,
+		userID, status, size, offset)
 	if err != nil {
 		return nil, 0, err
 	}
