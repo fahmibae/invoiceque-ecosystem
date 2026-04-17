@@ -11,6 +11,7 @@ const navItems = [
   { href: '/invoices', label: 'Invoice', icon: '📄' },
   { href: '/payments', label: 'Payment Links', icon: '🔗' },
   { href: '/clients', label: 'Klien', icon: '👥' },
+  { href: '/notifications', label: 'Notifikasi', icon: '🔔' },
   { href: '/settings', label: 'Pengaturan', icon: '⚙️' },
 ];
 

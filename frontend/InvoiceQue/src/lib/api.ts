@@ -339,6 +339,7 @@ export interface NotificationLog {
   type: string;
   recipient: string;
   subject: string;
+  message: string;
   status: string;
   created_at: string;
 }
