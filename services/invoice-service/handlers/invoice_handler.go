@@ -153,3 +153,24 @@ func (h *InvoiceHandler) Send(c *gin.Context) {
 
 	c.JSON(http.StatusOK, resp)
 }
+
+// BulkDelete handles POST /invoices/bulk-delete
+func (h *InvoiceHandler) BulkDelete(c *gin.Context) {
+	userID := c.GetHeader("X-User-ID")
+
+	var req struct {
+		IDs []string `json:"ids"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ids is required"})
+		return
+	}
+
+	deleted, err := h.repo.BulkDeleteByUserID(req.IDs, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Invoices deleted", "deleted": deleted})
+}

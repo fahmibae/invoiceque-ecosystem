@@ -14,20 +14,25 @@ export default function InvoicesPage() {
   const [statusFilter, setStatusFilter] = useState('Semua');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const fetchInvoices = async () => {
+    try {
+      setLoading(true);
+      const status = statusFilter === 'Semua' ? undefined : statusFilter;
+      const res = await invoiceApi.list(status, 0, 50);
+      setInvoices(res.data || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal memuat invoice');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function fetchInvoices() {
-      try {
-        const status = statusFilter === 'Semua' ? undefined : statusFilter;
-        const res = await invoiceApi.list(status, 0, 50);
-        setInvoices(res.data || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Gagal memuat invoice');
-      } finally {
-        setLoading(false);
-      }
-    }
     fetchInvoices();
+    setSelected(new Set());
   }, [statusFilter]);
 
   const filtered = invoices.filter((inv) => {
@@ -38,6 +43,39 @@ export default function InvoicesPage() {
   });
 
   const totalAmount = filtered.reduce((sum, inv) => sum + inv.total, 0);
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.size === filtered.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filtered.map((inv) => inv.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return;
+    if (!confirm(`Yakin ingin menghapus ${selected.size} invoice?`)) return;
+
+    setBulkDeleting(true);
+    try {
+      await invoiceApi.bulkDelete(Array.from(selected));
+      setSelected(new Set());
+      await fetchInvoices();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Gagal menghapus invoice');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -63,9 +101,21 @@ export default function InvoicesPage() {
           <h1 className="page-title">📄 Invoice</h1>
           <p className="page-subtitle">Kelola semua invoice Anda di sini</p>
         </div>
-        <Link href="/invoices/create" className="btn btn-primary">
-          <span>＋</span> Buat Invoice
-        </Link>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {selected.size > 0 && (
+            <button
+              className="btn btn-secondary"
+              style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+            >
+              {bulkDeleting ? '⏳ Menghapus...' : `🗑️ Hapus ${selected.size} Invoice`}
+            </button>
+          )}
+          <Link href="/invoices/create" className="btn btn-primary">
+            <span>＋</span> Buat Invoice
+          </Link>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -123,18 +173,33 @@ export default function InvoicesPage() {
           <table className="table">
             <thead>
               <tr>
+                <th style={{ width: 40 }}>
+                  <input
+                    type="checkbox"
+                    checked={selected.size === filtered.length && filtered.length > 0}
+                    onChange={toggleSelectAll}
+                    style={{ cursor: 'pointer' }}
+                  />
+                </th>
                 <th>No. Invoice</th>
                 <th>Klien</th>
                 <th>Jumlah</th>
                 <th>Status</th>
                 <th>Jatuh Tempo</th>
-                <th>Dibuat</th>
-                <th></th>
+                <th>Aksi</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((inv) => (
-                <tr key={inv.id}>
+                <tr key={inv.id} style={selected.has(inv.id) ? { background: 'rgba(99,102,241,0.06)' } : undefined}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(inv.id)}
+                      onChange={() => toggleSelect(inv.id)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                  </td>
                   <td>
                     <Link href={`/invoices/${inv.id}`} className="table-link">
                       {inv.number}
@@ -158,11 +223,24 @@ export default function InvoicesPage() {
                     </span>
                   </td>
                   <td style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{inv.due_date}</td>
-                  <td style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{inv.created_at}</td>
                   <td>
-                    <Link href={`/invoices/${inv.id}`} className="btn btn-ghost btn-sm">
-                      Detail →
-                    </Link>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <Link href={`/invoices/${inv.id}`} className="btn btn-ghost btn-sm" title="Detail">
+                        👁️
+                      </Link>
+                      {inv.status === 'draft' && (
+                        <Link href={`/invoices/${inv.id}/edit`} className="btn btn-ghost btn-sm" title="Edit">
+                          ✏️
+                        </Link>
+                      )}
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        title="Download PDF"
+                        onClick={() => invoiceApi.downloadPdf(inv.id, inv.number + '.pdf')}
+                      >
+                        📥
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

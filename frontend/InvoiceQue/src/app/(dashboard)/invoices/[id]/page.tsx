@@ -176,7 +176,10 @@ export default function InvoiceDetailPage() {
             <h3 className={styles.sideTitle}>⚡ Aksi</h3>
             <div className={styles.actionsList}>
               {invoice.status === 'draft' && (
-                <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleSend}>📤 Kirim ke Klien</button>
+                <>
+                  <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleSend}>📤 Kirim ke Klien</button>
+                  <Link href={`/invoices/${invoice.id}/edit`} className="btn btn-secondary" style={{ width: '100%', textAlign: 'center' }}>✏️ Edit Invoice</Link>
+                </>
               )}
               <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => invoiceApi.downloadPdf(invoice.id, invoice.number + '.pdf')}>📥 Download PDF</button>
               <button className="btn btn-ghost" style={{ width: '100%', color: 'var(--danger)' }} onClick={handleDelete}>

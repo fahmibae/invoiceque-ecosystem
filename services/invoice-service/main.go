@@ -101,9 +101,10 @@ func main() {
 	invoices := r.Group("/invoices")
 	{
 		invoices.GET("", invoiceHandler.List)
+		invoices.POST("", invoiceHandler.Create)
+		invoices.POST("/bulk-delete", invoiceHandler.BulkDelete)
 		invoices.GET("/:id", invoiceHandler.Get)
 		invoices.GET("/:id/pdf", invoiceHandler.DownloadPdf)
-		invoices.POST("", invoiceHandler.Create)
 		invoices.PUT("/:id", invoiceHandler.Update)
 		invoices.DELETE("/:id", invoiceHandler.Delete)
 		invoices.PUT("/:id/send", invoiceHandler.Send)

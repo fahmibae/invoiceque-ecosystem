@@ -399,3 +399,39 @@ func scanInvoiceRow(row *sql.Row) (*models.Invoice, error) {
 
 	return &inv, nil
 }
+
+// BulkDeleteByUserID deletes multiple invoices by IDs for a specific user
+func (r *InvoiceRepository) BulkDeleteByUserID(ids []string, userID string) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+
+	// Build placeholders: $1=userID, $2...$N=ids
+	args := []interface{}{userID}
+	placeholders := ""
+	for i, id := range ids {
+		if i > 0 {
+			placeholders += ","
+		}
+		placeholders += fmt.Sprintf("$%d", i+2)
+		args = append(args, id)
+	}
+
+	// Delete items first
+	_, err := r.db.Exec(
+		fmt.Sprintf("DELETE FROM invoice_items WHERE invoice_id IN (SELECT id FROM invoices WHERE id IN (%s) AND user_id = $1)", placeholders),
+		args...)
+	if err != nil {
+		return 0, err
+	}
+
+	// Delete invoices
+	result, err := r.db.Exec(
+		fmt.Sprintf("DELETE FROM invoices WHERE id IN (%s) AND user_id = $1", placeholders),
+		args...)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
+}

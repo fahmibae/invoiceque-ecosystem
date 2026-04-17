@@ -241,6 +241,12 @@ export const invoiceApi = {
     a.remove();
     window.URL.revokeObjectURL(url);
   },
+
+  bulkDelete: (ids: string[]) =>
+    request<{ message: string; deleted: number }>('/invoices/bulk-delete', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }),
 };
 
 // ── Dashboard API ─────────────────────────────────────
