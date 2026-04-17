@@ -41,7 +41,7 @@ func CORS(config CORSConfig) gin.HandlerFunc {
 
 		if allowed && origin != "" {
 			if config.AllowedOrigins[0] == "*" {
-				c.Header("Access-Control-Allow-Origin", "*")
+				c.Header("Access-Control-Allow-Origin", origin)
 			} else {
 				c.Header("Access-Control-Allow-Origin", origin)
 			}

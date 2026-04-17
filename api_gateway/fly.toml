@@ -11,6 +11,7 @@ primary_region = 'sin'
   PAYMENT_SERVICE_URL = 'https://invoiceque-payment.fly.dev'
   NOTIFICATION_SERVICE_URL = 'https://invoiceque-notification.fly.dev'
   SUBSCRIPTION_SERVICE_URL = 'https://invoiceque-subscription.fly.dev'
+  ALLOWED_ORIGINS = 'https://invoiceque-web.fly.dev,http://localhost:3000'
 
 [http_service]
   internal_port = 8080
