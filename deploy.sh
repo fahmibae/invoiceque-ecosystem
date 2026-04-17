@@ -80,11 +80,9 @@ set_secrets() {
 
   # Invoice
   fly secrets set \
-    SPRING_DATASOURCE_URL="$INVOICE_DB_URL" \
-    SPRING_DATASOURCE_USERNAME="$INVOICE_DB_USERNAME" \
-    SPRING_DATASOURCE_PASSWORD="$INVOICE_DB_PASSWORD" \
-    SPRING_RABBITMQ_USERNAME="invoiceque" \
-    SPRING_RABBITMQ_PASSWORD="$RABBITMQ_PASSWORD" \
+    DB_URL="$INVOICE_DB_URL" \
+    RABBITMQ_URL="amqp://invoiceque:${RABBITMQ_PASSWORD}@invoiceque-rabbitmq.internal:5672" \
+    PAYMENT_SERVICE_URL="http://invoiceque-payment.internal:8004" \
     --app invoiceque-invoice
 
   # Payment
@@ -98,11 +96,11 @@ set_secrets() {
   # Notification
   fly secrets set \
     RABBITMQ_URL="amqp://invoiceque:${RABBITMQ_PASSWORD}@invoiceque-rabbitmq.internal:5672" \
-    SMTP_HOST="$SMTP_HOST" \
-    SMTP_PORT="$SMTP_PORT" \
-    SMTP_USER="$SMTP_USERNAME" \
-    SMTP_PASS="$SMTP_PASSWORD" \
-    FROM_EMAIL="$SMTP_USERNAME" \
+    SMTP_HOST="${SMTP_HOST:-smtp.gmail.com}" \
+    SMTP_PORT="${SMTP_PORT:-587}" \
+    SMTP_USER="$SMTP_USER" \
+    SMTP_PASS="$SMTP_PASS" \
+    FROM_EMAIL="$SMTP_USER" \
     --app invoiceque-notification
 
   # Subscription
