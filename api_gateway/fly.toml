@@ -5,9 +5,9 @@ primary_region = 'sin'
   dockerfile = 'Dockerfile'
 
 [env]
-  AUTH_SERVICE_URL = 'http://invoiceque-auth.internal:8001'
-  CLIENT_SERVICE_URL = 'http://invoiceque-client.internal:8002'
-  INVOICE_SERVICE_URL = 'http://invoiceque-invoice.internal:8003'
+  AUTH_SERVICE_URL = 'https://invoiceque-auth.fly.dev'
+  CLIENT_SERVICE_URL = 'https://invoiceque-client.fly.dev'
+  INVOICE_SERVICE_URL = 'https://invoiceque-invoice.fly.dev'
   PAYMENT_SERVICE_URL = 'https://invoiceque-payment.fly.dev'
   NOTIFICATION_SERVICE_URL = 'https://invoiceque-notification.fly.dev'
   SUBSCRIPTION_SERVICE_URL = 'https://invoiceque-subscription.fly.dev'
