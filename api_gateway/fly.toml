@@ -1,0 +1,30 @@
+app = 'invoiceque-gateway'
+primary_region = 'sin'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  AUTH_SERVICE_URL = 'http://invoiceque-auth.internal:8001'
+  CLIENT_SERVICE_URL = 'http://invoiceque-client.internal:8002'
+  INVOICE_SERVICE_URL = 'http://invoiceque-invoice.internal:8003'
+  PAYMENT_SERVICE_URL = 'https://invoiceque-payment.fly.dev'
+  NOTIFICATION_SERVICE_URL = 'https://invoiceque-notification.fly.dev'
+  SUBSCRIPTION_SERVICE_URL = 'https://invoiceque-subscription.fly.dev'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = 'requests'
+    hard_limit = 250
+    soft_limit = 200
+
+[[vm]]
+  memory = '256mb'
+  cpu_kind = 'shared'
+  cpus = 1
