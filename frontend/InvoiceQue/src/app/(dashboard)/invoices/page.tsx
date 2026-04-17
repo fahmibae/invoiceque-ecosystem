@@ -6,6 +6,8 @@ import { invoiceApi, type Invoice } from '@/lib/api';
 import { formatCurrency, formatDate, getStatusColor } from '@/lib/utils';
 import styles from './invoices.module.css';
 
+import ConfirmModal from '@/components/ui/ConfirmModal';
+
 const statusFilters = ['Semua', 'draft', 'sent', 'paid', 'overdue', 'cancelled'];
 
 export default function InvoicesPage() {
@@ -16,6 +18,7 @@ export default function InvoicesPage() {
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
   const fetchInvoices = async () => {
     try {
@@ -54,25 +57,27 @@ export default function InvoicesPage() {
   };
 
   const toggleSelectAll = () => {
-    if (selected.size === filtered.length) {
+    if (selected.size === filtered.length && filtered.length > 0) {
       setSelected(new Set());
     } else {
       setSelected(new Set(filtered.map((inv) => inv.id)));
     }
   };
 
-  const handleBulkDelete = async () => {
+  const confirmBulkDelete = () => {
     if (selected.size === 0) return;
-    if (!confirm(`Yakin ingin menghapus ${selected.size} invoice?`)) return;
+    setShowBulkDeleteModal(true);
+  };
 
+  const handleBulkDelete = async () => {
     setBulkDeleting(true);
     try {
       await invoiceApi.bulkDelete(Array.from(selected));
       setSelected(new Set());
+      setShowBulkDeleteModal(false);
       await fetchInvoices();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Gagal menghapus invoice');
-    } finally {
       setBulkDeleting(false);
     }
   };
@@ -96,6 +101,16 @@ export default function InvoicesPage() {
 
   return (
     <div className="animate-fade-in">
+      <ConfirmModal
+        isOpen={showBulkDeleteModal}
+        title="Hapus Invoice"
+        message={`Apakah Anda yakin ingin menghapus ${selected.size} invoice terpilih? Tindakan ini tidak dapat dibatalkan.`}
+        confirmText={`Hapus ${selected.size} Invoice`}
+        onConfirm={handleBulkDelete}
+        onCancel={() => setShowBulkDeleteModal(false)}
+        isLoading={bulkDeleting}
+        type="danger"
+      />
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">📄 Invoice</h1>
@@ -106,10 +121,10 @@ export default function InvoicesPage() {
             <button
               className="btn btn-secondary"
               style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
-              onClick={handleBulkDelete}
+              onClick={confirmBulkDelete}
               disabled={bulkDeleting}
             >
-              {bulkDeleting ? '⏳ Menghapus...' : `🗑️ Hapus ${selected.size} Invoice`}
+              🗑️ Hapus {selected.size} Invoice
             </button>
           )}
           <Link href="/invoices/create" className="btn btn-primary">

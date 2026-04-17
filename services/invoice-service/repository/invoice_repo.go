@@ -176,7 +176,12 @@ func (r *InvoiceRepository) SaveItems(invoiceID string, items []models.InvoiceIt
 
 // Delete deletes an invoice and its items (CASCADE)
 func (r *InvoiceRepository) Delete(id string) error {
-	_, err := r.db.Exec("DELETE FROM invoices WHERE id = $1", id)
+	// Delete items first (foreign key constraint)
+	_, err := r.db.Exec("DELETE FROM invoice_items WHERE invoice_id = $1", id)
+	if err != nil {
+		return err
+	}
+	_, err = r.db.Exec("DELETE FROM invoices WHERE id = $1", id)
 	return err
 }
 

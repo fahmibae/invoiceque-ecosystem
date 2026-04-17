@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { invoiceApi, type Invoice } from '@/lib/api';
 import { formatCurrency, formatDate, getStatusColor } from '@/lib/utils';
 import styles from './detail.module.css';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 export default function InvoiceDetailPage() {
   const params = useParams();
@@ -13,6 +14,8 @@ export default function InvoiceDetailPage() {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     async function fetchInvoice() {
@@ -38,13 +41,20 @@ export default function InvoiceDetailPage() {
     }
   };
 
+  const confirmDelete = () => {
+    setShowDeleteModal(true);
+  };
+
   const handleDelete = async () => {
-    if (!invoice || !confirm('Yakin ingin menghapus invoice ini?')) return;
+    if (!invoice) return;
+    setIsDeleting(true);
     try {
       await invoiceApi.delete(invoice.id);
       router.push('/invoices');
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Gagal menghapus invoice');
+      setIsDeleting(false);
+      setShowDeleteModal(false);
     }
   };
 
@@ -71,6 +81,16 @@ export default function InvoiceDetailPage() {
 
   return (
     <div className="animate-fade-in">
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        title="Hapus Invoice"
+        message="Apakah Anda yakin ingin menghapus invoice ini? Tindakan ini tidak dapat dibatalkan."
+        confirmText="Ya, Hapus"
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteModal(false)}
+        isLoading={isDeleting}
+        type="danger"
+      />
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">📄 {invoice.number}</h1>
@@ -182,7 +202,7 @@ export default function InvoiceDetailPage() {
                 </>
               )}
               <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => invoiceApi.downloadPdf(invoice.id, invoice.number + '.pdf')}>📥 Download PDF</button>
-              <button className="btn btn-ghost" style={{ width: '100%', color: 'var(--danger)' }} onClick={handleDelete}>
+              <button className="btn btn-ghost" style={{ width: '100%', color: 'var(--danger)' }} onClick={confirmDelete}>
                 🗑️ Hapus Invoice
               </button>
             </div>
