@@ -60,11 +60,9 @@ func (s *InvoiceService) FindByID(id, userID string) (*models.InvoiceResponse, e
 
 func (s *InvoiceService) Create(req models.InvoiceRequest, userID string) (*models.InvoiceResponse, error) {
 	invoiceID := generateShortID()
-	count, err := s.repo.CountByUserID(userID)
-	if err != nil {
-		return nil, err
-	}
-	invoiceNumber := fmt.Sprintf("INV-%d-%03d", time.Now().Year(), count+1)
+	// Use timestamp-based invoice number to avoid duplicates after deletes
+	now := time.Now()
+	invoiceNumber := fmt.Sprintf("INV-%s-%s", now.Format("20060102"), invoiceID[:6])
 
 	// Determine payment type
 	paymentType := "full"
@@ -89,7 +87,6 @@ func (s *InvoiceService) Create(req models.InvoiceRequest, userID string) (*mode
 		status = req.Status
 	}
 
-	now := time.Now()
 	inv := &models.Invoice{
 		ID:           invoiceID,
 		Number:       invoiceNumber,
