@@ -100,8 +100,18 @@ export default function EditInvoicePage() {
       setError('Pilih klien terlebih dahulu');
       return;
     }
-    if (!items.some((i) => i.description && i.price > 0)) {
-      setError('Tambahkan minimal 1 item');
+    if (!dueDate) {
+      setError('Tanggal jatuh tempo wajib diisi');
+      return;
+    }
+    const validItems = items.filter((i) => i.description.trim());
+    if (validItems.length === 0) {
+      setError('Tambahkan minimal 1 item dengan deskripsi');
+      return;
+    }
+    const invalidItem = validItems.find((i) => !i.description.trim() || i.quantity <= 0 || i.price <= 0);
+    if (invalidItem) {
+      setError('Setiap item harus memiliki deskripsi, jumlah > 0, dan harga > 0');
       return;
     }
 

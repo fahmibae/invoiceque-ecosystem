@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { invoiceApi, type Invoice } from '@/lib/api';
-import { formatCurrency, getStatusColor } from '@/lib/utils';
+import { formatCurrency, formatDate, getStatusColor } from '@/lib/utils';
 import styles from './invoices.module.css';
 
 const statusFilters = ['Semua', 'draft', 'sent', 'paid', 'overdue', 'cancelled'];
@@ -222,7 +222,7 @@ export default function InvoicesPage() {
                       {inv.status.charAt(0).toUpperCase() + inv.status.slice(1)}
                     </span>
                   </td>
-                  <td style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{inv.due_date}</td>
+                  <td style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{inv.due_date ? formatDate(inv.due_date) : '-'}</td>
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
                       <Link href={`/invoices/${inv.id}`} className="btn btn-ghost btn-sm" title="Detail">

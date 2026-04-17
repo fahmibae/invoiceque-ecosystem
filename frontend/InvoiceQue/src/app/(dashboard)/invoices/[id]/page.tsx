@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { invoiceApi, type Invoice } from '@/lib/api';
-import { formatCurrency, getStatusColor } from '@/lib/utils';
+import { formatCurrency, formatDate, getStatusColor } from '@/lib/utils';
 import styles from './detail.module.css';
 
 export default function InvoiceDetailPage() {
@@ -95,8 +95,8 @@ export default function InvoiceDetailPage() {
             </div>
             <div className={styles.docMeta}>
               <div className={styles.docNumber}>{invoice.number}</div>
-              <div className={styles.docDate}>Tanggal: {invoice.created_at}</div>
-              <div className={styles.docDate}>Jatuh Tempo: {invoice.due_date}</div>
+              <div className={styles.docDate}>Tanggal: {formatDate(invoice.created_at)}</div>
+              <div className={styles.docDate}>Jatuh Tempo: {invoice.due_date ? formatDate(invoice.due_date) : '-'}</div>
               <span className={`badge ${getStatusColor(invoice.status)}`} style={{ marginTop: 8 }}>
                 {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
               </span>
@@ -241,16 +241,16 @@ export default function InvoiceDetailPage() {
 
               <div className={styles.infoRow}>
                 <span className={styles.infoLabel}>Dibuat</span>
-                <span>{invoice.created_at}</span>
+                <span>{formatDate(invoice.created_at)}</span>
               </div>
               <div className={styles.infoRow}>
                 <span className={styles.infoLabel}>Jatuh Tempo</span>
-                <span>{invoice.due_date}</span>
+                <span>{invoice.due_date ? formatDate(invoice.due_date) : '-'}</span>
               </div>
               {invoice.paid_at && (
                 <div className={styles.infoRow}>
                   <span className={styles.infoLabel}>Lunas</span>
-                  <span style={{ color: 'var(--success)' }}>{invoice.paid_at}</span>
+                  <span style={{ color: 'var(--success)' }}>{formatDate(invoice.paid_at)}</span>
                 </div>
               )}
               {invoice.payment_link && (
@@ -279,7 +279,7 @@ export default function InvoiceDetailPage() {
                 <div className={styles.timelineDot} style={{ background: 'var(--info)' }} />
                 <div>
                   <div className={styles.timelineTitle}>Invoice dibuat</div>
-                  <div className={styles.timelineDate}>{invoice.created_at}</div>
+                  <div className={styles.timelineDate}>{formatDate(invoice.created_at)}</div>
                 </div>
               </div>
               {invoice.status !== 'draft' && (
@@ -287,7 +287,7 @@ export default function InvoiceDetailPage() {
                   <div className={styles.timelineDot} style={{ background: 'var(--warning)' }} />
                   <div>
                     <div className={styles.timelineTitle}>Invoice dikirim</div>
-                    <div className={styles.timelineDate}>{invoice.created_at}</div>
+                    <div className={styles.timelineDate}>{formatDate(invoice.created_at)}</div>
                   </div>
                 </div>
               )}
@@ -296,7 +296,7 @@ export default function InvoiceDetailPage() {
                   <div className={styles.timelineDot} style={{ background: 'var(--success)' }} />
                   <div>
                     <div className={styles.timelineTitle}>Pembayaran diterima</div>
-                    <div className={styles.timelineDate}>{invoice.paid_at}</div>
+                    <div className={styles.timelineDate}>{formatDate(invoice.paid_at)}</div>
                   </div>
                 </div>
               )}
