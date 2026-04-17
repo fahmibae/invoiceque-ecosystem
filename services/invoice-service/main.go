@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -22,11 +23,23 @@ func main() {
 	cfg := config.Load()
 
 	// Connect to PostgreSQL
-	db, err := sql.Open("postgres", cfg.DBURL)
+	// Add binary_parameters=yes to avoid PgBouncer prepared statement conflicts with Neon
+	dbURL := cfg.DBURL
+	if !strings.Contains(dbURL, "binary_parameters") {
+		if strings.Contains(dbURL, "?") {
+			dbURL += "&binary_parameters=yes"
+		} else {
+			dbURL += "?binary_parameters=yes"
+		}
+	}
+	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Fatalf("[INVOICE] Failed to connect to database: %v", err)
 	}
 	defer db.Close()
+
+	// Limit to 1 connection to avoid PgBouncer prepared statement conflicts
+	db.SetMaxOpenConns(1)
 
 	if err := db.Ping(); err != nil {
 		log.Fatalf("[INVOICE] Database ping failed: %v", err)
