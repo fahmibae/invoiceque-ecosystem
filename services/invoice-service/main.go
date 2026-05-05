@@ -10,7 +10,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
-	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/invoiceque/invoice-service/config"
 	"github.com/invoiceque/invoice-service/handlers"
@@ -38,8 +37,10 @@ func main() {
 	}
 	defer db.Close()
 
-	// Limit to 1 connection to avoid PgBouncer prepared statement conflicts
-	db.SetMaxOpenConns(1)
+	// Connection pool tuning (binary_parameters=yes handles PgBouncer compatibility)
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
 
 	if err := db.Ping(); err != nil {
 		log.Fatalf("[INVOICE] Database ping failed: %v", err)
@@ -49,45 +50,21 @@ func main() {
 	// Run migrations
 	runMigrations(db)
 
-	// Connect to RabbitMQ with retry
-	var conn *amqp.Connection
-	for i := 0; i < 30; i++ {
-		conn, err = amqp.Dial(cfg.RabbitMQURL)
-		if err == nil {
-			break
-		}
-		log.Printf("[INVOICE] Waiting for RabbitMQ... attempt %d/30", i+1)
-		time.Sleep(2 * time.Second)
-	}
-	if err != nil {
-		log.Fatalf("[INVOICE] Failed to connect to RabbitMQ: %v", err)
-	}
-	defer conn.Close()
-	log.Println("[INVOICE] Connected to RabbitMQ")
-
 	// Initialize components
 	invoiceRepo := repository.NewInvoiceRepository(db)
 	settingsRepo := repository.NewSettingsRepository(db)
 
-	publisher, err := messaging.NewPublisher(conn)
-	if err != nil {
-		log.Fatalf("[INVOICE] Failed to create publisher: %v", err)
-	}
+	publisher := messaging.NewPublisher(cfg.NotificationServiceURL)
 
 	paymentClient := services.NewPaymentServiceClient(cfg.PaymentServiceURL)
 	pdfGenerator := services.NewPdfGeneratorService(settingsRepo)
 	invoiceService := services.NewInvoiceService(invoiceRepo, publisher, pdfGenerator, paymentClient)
 
-	// Start payment event consumer
-	paymentConsumer := messaging.NewPaymentEventConsumer(invoiceService.MarkAsPaid)
-	if err := paymentConsumer.Start(conn); err != nil {
-		log.Fatalf("[INVOICE] Failed to start payment consumer: %v", err)
-	}
-
 	// Initialize handlers
 	invoiceHandler := handlers.NewInvoiceHandler(invoiceService, pdfGenerator, invoiceRepo)
 	dashboardHandler := handlers.NewDashboardHandler(invoiceService)
 	settingsHandler := handlers.NewSettingsHandler(settingsRepo)
+	eventHandler := handlers.NewEventHandler(invoiceService)
 
 	// Setup Gin router
 	r := gin.Default()
@@ -97,12 +74,16 @@ func main() {
 		c.JSON(200, gin.H{"status": "healthy", "service": "invoice-service"})
 	})
 
+	// Event receiving endpoint (from payment-service)
+	r.POST("/events/payment", eventHandler.HandlePaymentEvent)
+
 	// Invoice routes (matching Java InvoiceController)
 	invoices := r.Group("/invoices")
 	{
 		invoices.GET("", invoiceHandler.List)
 		invoices.POST("", invoiceHandler.Create)
 		invoices.POST("/bulk-delete", invoiceHandler.BulkDelete)
+		invoices.GET("/linkable", invoiceHandler.ListLinkable)
 		invoices.GET("/:id", invoiceHandler.Get)
 		invoices.GET("/:id/pdf", invoiceHandler.DownloadPdf)
 		invoices.PUT("/:id", invoiceHandler.Update)

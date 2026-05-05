@@ -2,10 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '@/context/ThemeContext';
-import { subscriptionApi, invoiceSettingsApi, type SubscriptionPlan, type Subscription, type InvoiceSettingsData } from '@/lib/api';
-import { formatCurrency } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
+import { invoiceSettingsApi, authApi } from '@/lib/api';
 import XenditSetupCard from '@/components/XenditSetupCard';
-import styles from './settings.module.css';
+import PaypalSetupCard from '@/components/PaypalSetupCard';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
+import Link from 'next/link';
+import { Payment02Icon, Building02Icon, PaintBoardIcon, Notification01Icon } from 'hugeicons-react';
 
 const featureLabels: Record<string, string> = {
   basic_invoicing: 'Invoicing Dasar',
@@ -32,25 +36,46 @@ export default function SettingsPage() {
   const [bizPhone, setBizPhone] = useState('');
   const [bizWebsite, setBizWebsite] = useState('');
   const [bizAddress, setBizAddress] = useState('');
+  const [logoUrl, setLogoUrl] = useState('');
   const [accentColor, setAccentColor] = useState('#DC2626');
   const [footerText, setFooterText] = useState('Terima kasih atas kepercayaan Anda 🙏');
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState('');
 
-  // Subscription state
-  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
-  const [current, setCurrent] = useState<Subscription | null>(null);
-  const [loadingSub, setLoadingSub] = useState(true);
-  const [subscribing, setSubscribing] = useState<string | null>(null);
+  // Payment settings state
+  const [bankName, setBankName] = useState('');
+  const [bankAccountNumber, setBankAccountNumber] = useState('');
+  const [bankAccountName, setBankAccountName] = useState('');
+  const [savingPayment, setSavingPayment] = useState(false);
+  const [paymentMsg, setPaymentMsg] = useState('');
+
+  // User profile state
+  const { user } = useAuth();
+  const [userName, setUserName] = useState('');
+  const [userCompany, setUserCompany] = useState('');
+  const [userPhone, setUserPhone] = useState('');
+  const [savingUser, setSavingUser] = useState(false);
+  const [userMsg, setUserMsg] = useState('');
+
+  // Change password state
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordMsg, setPasswordMsg] = useState('');
+
+  // Load user profile on mount
+  useEffect(() => {
+    if (user) {
+      setUserName(user.name || '');
+      setUserCompany(user.company || '');
+      setUserPhone(user.phone || '');
+    }
+  }, [user]);
 
   // Load invoice settings on mount
   useEffect(() => {
     loadSettings();
   }, []);
-
-  useEffect(() => {
-    if (activeTab === 'billing') loadSubscription();
-  }, [activeTab]);
 
   const loadSettings = async () => {
     try {
@@ -60,8 +85,12 @@ export default function SettingsPage() {
       setBizPhone(s.business_phone || '');
       setBizWebsite(s.business_website || '');
       setBizAddress(s.business_address || '');
+      setLogoUrl(s.logo_url || '');
       setAccentColor(s.accent_color || '#DC2626');
       setFooterText(s.footer_text || 'Terima kasih atas kepercayaan Anda 🙏');
+      setBankName(s.bank_name || '');
+      setBankAccountNumber(s.bank_account_number || '');
+      setBankAccountName(s.bank_account_name || '');
     } catch {
       // Use defaults if API not available
     }
@@ -77,6 +106,7 @@ export default function SettingsPage() {
         business_phone: bizPhone,
         business_website: bizWebsite,
         business_address: bizAddress,
+        logo_url: logoUrl,
         accent_color: accentColor,
         footer_text: footerText,
       });
@@ -89,325 +119,385 @@ export default function SettingsPage() {
     }
   };
 
-  const loadSubscription = async () => {
-    setLoadingSub(true);
+  const saveUserProfile = async () => {
+    setSavingUser(true);
+    setUserMsg('');
     try {
-      const [plansRes, currentRes] = await Promise.all([
-        subscriptionApi.getPlans(),
-        subscriptionApi.getCurrent().catch(() => null),
-      ]);
-      setPlans(plansRes.data || []);
-      setCurrent(currentRes);
+      await authApi.updateProfile(userName, userCompany, userPhone);
+      setUserMsg('✅ Berhasil disimpan!');
+      setTimeout(() => setUserMsg(''), 3000);
+      if (user) {
+        localStorage.setItem('user', JSON.stringify({ ...user, name: userName, company: userCompany, phone: userPhone }));
+      }
     } catch {
-      setPlans([
-        { id: 'plan_free', name: 'free', display_name: 'Free', price: 0, currency: 'IDR', billing_period: 'monthly', max_invoices: 5, max_clients: 10, max_payment_links: 5, features: '["basic_invoicing","email_notifications"]', is_active: true },
-        { id: 'plan_pro', name: 'pro', display_name: 'Pro', price: 99000, currency: 'IDR', billing_period: 'monthly', max_invoices: 100, max_clients: 500, max_payment_links: 100, features: '["basic_invoicing","email_notifications","custom_branding","priority_support","xendit_integration"]', is_active: true },
-        { id: 'plan_enterprise', name: 'enterprise', display_name: 'Enterprise', price: 299000, currency: 'IDR', billing_period: 'monthly', max_invoices: -1, max_clients: -1, max_payment_links: -1, features: '["basic_invoicing","email_notifications","custom_branding","priority_support","xendit_integration","api_access","dedicated_support","sla"]', is_active: true },
-      ]);
+      setUserMsg('❌ Gagal menyimpan');
     } finally {
-      setLoadingSub(false);
+      setSavingUser(false);
     }
   };
 
-  const handleSubscribe = async (planId: string) => {
-    setSubscribing(planId);
+  const savePassword = async () => {
+    if (!oldPassword || !newPassword) return;
+    setSavingPassword(true);
+    setPasswordMsg('');
     try {
-      await subscriptionApi.subscribe(planId);
-      await loadSubscription();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Gagal subscribe');
+      await authApi.changePassword(oldPassword, newPassword);
+      setPasswordMsg('✅ Password berhasil diubah!');
+      setOldPassword('');
+      setNewPassword('');
+      setTimeout(() => setPasswordMsg(''), 3000);
+    } catch {
+      setPasswordMsg('❌ Gagal mengubah password');
     } finally {
-      setSubscribing(null);
+      setSavingPassword(false);
     }
   };
-
-  const parseFeatures = (features: string): string[] => {
-    try { return JSON.parse(features); } catch { return []; }
-  };
-
-  const formatLimit = (limit: number) => (limit === -1 ? 'Unlimited' : `${limit}`);
 
   return (
     <div className="animate-fade-in">
       <div className="page-header">
         <div className="page-header-left">
-          <h1 className="page-title">⚙️ Pengaturan</h1>
+          <h1 className="page-title">Pengaturan</h1>
           <p className="page-subtitle">Kelola profil bisnis, desain invoice, dan langganan Anda</p>
         </div>
-      </div>
+        <div className="flex">
+          <Link href="/subscription" className="btn btn-secondary flex items-center gap-2">
+            <span>Upgrade</span>
+          </Link>
+        </div>
 
-      {/* Tab Navigation */}
-      <div className={styles.tabNav}>
-        <button
-          className={`${styles.tabBtn} ${activeTab === 'general' ? styles.tabActive : ''}`}
-          onClick={() => setActiveTab('general')}
-        >
-          🏢 Umum
-        </button>
-        <button
-          className={`${styles.tabBtn} ${activeTab === 'billing' ? styles.tabActive : ''}`}
-          onClick={() => setActiveTab('billing')}
-        >
-          💎 Tagihan & Langganan
-        </button>
       </div>
-
-      {/* ── GENERAL TAB ── */}
-      {activeTab === 'general' && (
-        <div className={styles.settingsGrid}>
-          {/* Business Profile */}
-          <div className="card">
-            <h3 className={styles.sectionTitle}>🏢 Profil Bisnis</h3>
-            <p style={{ fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 16 }}>
-              Informasi ini akan tampil di header invoice PDF Anda
-            </p>
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Nama Bisnis</label>
-                <input type="text" className="form-input" placeholder="PT Contoh Sukses" value={bizName} onChange={e => setBizName(e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Email Bisnis</label>
-                <input type="email" className="form-input" placeholder="hello@bisnis.com" value={bizEmail} onChange={e => setBizEmail(e.target.value)} />
-              </div>
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Telepon</label>
-                <input type="tel" className="form-input" placeholder="+62 812 3456 7890" value={bizPhone} onChange={e => setBizPhone(e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Website</label>
-                <input type="url" className="form-input" placeholder="https://bisnis.com" value={bizWebsite} onChange={e => setBizWebsite(e.target.value)} />
-              </div>
+      <div className="flex flex-col gap-5">
+        {/* User Profile */}
+        <div className="card">
+          <h3 className="flex items-center gap-2 text-base font-bold mb-5 pb-3 border-b border-border-light">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            Profil Pengguna
+          </h3>
+          <p className="text-[13px] text-text-tertiary mb-4">
+            Kelola informasi akun Anda
+          </p>
+          <div className="form-group mb-4">
+            <label className="form-label">Email Akun (Tidak dapat diubah)</label>
+            <input type="text" className="form-input bg-bg-main text-text-tertiary" value={user?.email || ''} disabled />
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Nama Lengkap</label>
+              <input type="text" className="form-input" placeholder="Nama Anda" value={userName} onChange={e => setUserName(e.target.value)} />
             </div>
             <div className="form-group">
-              <label className="form-label">Alamat</label>
-              <textarea className="form-input form-textarea" placeholder="Jl. Contoh No. 123, Jakarta" value={bizAddress} onChange={e => setBizAddress(e.target.value)} />
+              <label className="form-label">Perusahaan / Instansi</label>
+              <input type="text" className="form-input" placeholder="Nama Perusahaan" value={userCompany} onChange={e => setUserCompany(e.target.value)} />
             </div>
           </div>
-
-          {/* Invoice Design */}
-          <div className="card">
-            <h3 className={styles.sectionTitle}>🎨 Desain Invoice</h3>
-            <p style={{ fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 16 }}>
-              Kustomisasi tampilan PDF invoice Anda
-            </p>
-
-            {/* Color Picker */}
-            <div className="form-group">
-              <label className="form-label">Warna Aksen</label>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                {colorPresets.map(c => (
-                  <button
-                    key={c}
-                    onClick={() => setAccentColor(c)}
-                    style={{
-                      width: 36, height: 36, borderRadius: 8, background: c, border: accentColor === c ? '3px solid var(--text-primary)' : '2px solid transparent',
-                      cursor: 'pointer', transition: 'all 0.15s',
-                    }}
-                  />
-                ))}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="color" value={accentColor} onChange={e => setAccentColor(e.target.value)} style={{ width: 40, height: 32, border: 'none', cursor: 'pointer' }} />
-                <input type="text" className="form-input" value={accentColor} onChange={e => setAccentColor(e.target.value)} style={{ width: 100, fontFamily: 'monospace' }} />
-              </div>
-            </div>
-
-            {/* Preview */}
-            <div style={{ marginTop: 16, padding: 16, border: `2px solid ${accentColor}`, borderRadius: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 12, borderBottom: `3px solid ${accentColor}`, marginBottom: 12 }}>
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: 20, color: accentColor }}>{bizName || 'Nama Bisnis Anda'}</div>
-                  {bizEmail && <div style={{ fontSize: 10, color: '#888' }}>{bizEmail}</div>}
-                  {bizPhone && <div style={{ fontSize: 10, color: '#888' }}>{bizPhone}</div>}
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontWeight: 800, fontSize: 16 }}>INVOICE</div>
-                  <div style={{ fontSize: 12, color: accentColor, fontWeight: 700 }}>INV-2025-001</div>
-                </div>
-              </div>
-              <div style={{ textAlign: 'center', fontSize: 10, color: '#999', paddingTop: 8, borderTop: '1px solid #eee' }}>
-                {footerText}
-              </div>
-            </div>
-
-            <div className="form-group" style={{ marginTop: 16 }}>
-              <label className="form-label">Teks Footer</label>
-              <input type="text" className="form-input" value={footerText} onChange={e => setFooterText(e.target.value)} placeholder="Terima kasih atas kepercayaan Anda" />
-            </div>
+          <div className="form-group mb-4">
+            <label className="form-label">No. Telepon Akun</label>
+            <PhoneInput
+              international
+              defaultCountry="ID"
+              className="form-input flex items-center"
+              placeholder="+62 812 3456 7890"
+              value={userPhone}
+              onChange={(val) => setUserPhone(val || '')}
+            />
           </div>
-
-          {/* Save Button */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button className="btn btn-primary" onClick={saveProfile} disabled={savingProfile}>
-              {savingProfile ? '⏳ Menyimpan...' : '💾 Simpan Profil & Desain'}
+          <div className="flex items-center gap-3">
+            <button className="btn btn-primary" onClick={saveUserProfile} disabled={savingUser}>
+              {savingUser ? 'Menyimpan...' : 'Simpan Profil Pengguna'}
             </button>
-            {profileMsg && <span style={{ fontSize: 14 }}>{profileMsg}</span>}
+            {userMsg && <span className="text-sm font-medium text-green-600">{userMsg}</span>}
           </div>
 
-          {/* Appearance */}
-          <div className="card">
-            <h3 className={styles.sectionTitle}>🌙 Tampilan App</h3>
-            <div className={styles.optionRow}>
-              <div>
-                <div className={styles.optionTitle}>Mode Gelap</div>
-                <div className={styles.optionDesc}>Aktifkan tampilan gelap untuk kenyamanan mata</div>
-              </div>
-              <label className={styles.toggle}>
-                <input type="checkbox" checked={theme === 'dark'} onChange={toggleTheme} />
-                <span className={styles.toggleSlider}></span>
-              </label>
-            </div>
-            <div className={styles.themePreview}>
-              <div className={`${styles.themeCard} ${theme === 'light' ? styles.themeActive : ''}`} onClick={() => theme === 'dark' && toggleTheme()}>
-                <div className={styles.themeIcon}>☀️</div>
-                <span>Light</span>
-              </div>
-              <div className={`${styles.themeCard} ${theme === 'dark' ? styles.themeActive : ''}`} onClick={() => theme === 'light' && toggleTheme()}>
-                <div className={styles.themeIcon}>🌙</div>
-                <span>Dark</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Payment Settings */}
-          <div className="card">
-            <h3 className={styles.sectionTitle}>💳 Pengaturan Pembayaran</h3>
-            <div className="form-group">
-              <label className="form-label">Nama Bank</label>
-              <input type="text" className="form-input" defaultValue="Bank Central Asia (BCA)" />
-            </div>
+          <div className="mt-8 pt-6 border-t border-border-light">
+            <h4 className="font-bold mb-4 text-sm flex items-center gap-2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              Ubah Password
+            </h4>
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label">No. Rekening</label>
-                <input type="text" className="form-input" defaultValue="123 456 7890" />
+                <label className="form-label">Password Lama</label>
+                <input type="password" className="form-input" placeholder="Masukkan password lama" value={oldPassword} onChange={e => setOldPassword(e.target.value)} />
               </div>
               <div className="form-group">
-                <label className="form-label">Atas Nama</label>
-                <input type="text" className="form-input" defaultValue="PT InvoiceQue Studio" />
+                <label className="form-label">Password Baru</label>
+                <input type="password" className="form-input" placeholder="Minimal 6 karakter" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
               </div>
             </div>
-            <button className="btn btn-primary">💾 Simpan</button>
-            <XenditSetupCard />
-          </div>
-
-          {/* Notifications */}
-          <div className="card">
-            <h3 className={styles.sectionTitle}>🔔 Notifikasi</h3>
-            <div className={styles.optionRow}>
-              <div>
-                <div className={styles.optionTitle}>Email Invoice Terkirim</div>
-                <div className={styles.optionDesc}>Notifikasi saat invoice berhasil dikirim</div>
-              </div>
-              <label className={styles.toggle}>
-                <input type="checkbox" defaultChecked />
-                <span className={styles.toggleSlider}></span>
-              </label>
-            </div>
-            <div className={styles.optionRow}>
-              <div>
-                <div className={styles.optionTitle}>Payment Received</div>
-                <div className={styles.optionDesc}>Notifikasi saat pembayaran diterima</div>
-              </div>
-              <label className={styles.toggle}>
-                <input type="checkbox" defaultChecked />
-                <span className={styles.toggleSlider}></span>
-              </label>
-            </div>
-            <div className={styles.optionRow}>
-              <div>
-                <div className={styles.optionTitle}>Invoice Overdue</div>
-                <div className={styles.optionDesc}>Notifikasi saat invoice melewati jatuh tempo</div>
-              </div>
-              <label className={styles.toggle}>
-                <input type="checkbox" defaultChecked />
-                <span className={styles.toggleSlider}></span>
-              </label>
+            <div className="flex items-center gap-3 mt-4">
+              <button className="btn btn-secondary" onClick={savePassword} disabled={savingPassword || !oldPassword || !newPassword}>
+                {savingPassword ? 'Menyimpan...' : 'Ubah Password'}
+              </button>
+              {passwordMsg && <span className="text-sm font-medium text-green-600">{passwordMsg}</span>}
             </div>
           </div>
         </div>
-      )}
 
-      {/* ── BILLING & SUBSCRIPTION TAB ── */}
-      {activeTab === 'billing' && (
-        <div>
-          {loadingSub ? (
-            <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 60 }}>
-              <div className={styles.spinner} />
+        {/* Business Profile */}
+        <div className="card">
+          <h3 className="flex items-center gap-2 text-base font-bold mb-5 pb-3 border-b border-border-light"><Building02Icon /> Profil Bisnis</h3>
+          <p className="text-[13px] text-text-tertiary mb-4">
+            Informasi ini akan tampil di header invoice PDF Anda
+          </p>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Nama Bisnis</label>
+              <input type="text" className="form-input" placeholder="PT Contoh Sukses" value={bizName} onChange={e => setBizName(e.target.value)} />
             </div>
-          ) : (
-            <>
-              {current && (
-                <div className={styles.currentPlan}>
-                  <div className={styles.currentIcon}>✅</div>
-                  <div>
-                    <div className={styles.currentLabel}>Paket Saat Ini</div>
-                    <div className={styles.currentName}>{current.plan?.display_name || 'Free'}</div>
-                  </div>
-                </div>
+            <div className="form-group">
+              <label className="form-label">Email Bisnis</label>
+              <input type="email" className="form-input" placeholder="hello@bisnis.com" value={bizEmail} onChange={e => setBizEmail(e.target.value)} />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Telepon</label>
+              <PhoneInput
+                international
+                defaultCountry="ID"
+                className="form-input flex items-center"
+                placeholder="+62 812 3456 7890"
+                value={bizPhone}
+                onChange={(val) => setBizPhone(val || '')}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Website</label>
+              <input type="url" className="form-input" placeholder="https://bisnis.com" value={bizWebsite} onChange={e => setBizWebsite(e.target.value)} />
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Alamat</label>
+            <textarea className="form-input form-textarea" placeholder="Jl. Contoh No. 123, Jakarta" value={bizAddress} onChange={e => setBizAddress(e.target.value)} />
+          </div>
+        </div>
+
+        {/* Invoice Design */}
+        <div className="card">
+          <h3 className="flex gap-2 items-center text-base font-bold mb-5 pb-3 border-b border-border-light"><PaintBoardIcon /> Desain Invoice</h3>
+          <p className="text-[13px] text-text-tertiary mb-4">
+            Kustomisasi tampilan PDF invoice Anda
+          </p>
+
+          {/* Color Picker */}
+          <div className="form-group">
+            <label className="form-label">Warna Aksen</label>
+            <div className="flex gap-2 flex-wrap mb-2">
+              {colorPresets.map(c => (
+                <button
+                  key={c}
+                  onClick={() => setAccentColor(c)}
+                  style={{
+                    width: 36, height: 36, borderRadius: 8, background: c, border: accentColor === c ? '3px solid var(--text-primary)' : '2px solid transparent',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                />
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="color" value={accentColor} onChange={e => setAccentColor(e.target.value)} className="w-10 h-8 border-none cursor-pointer" />
+              <input type="text" className="form-input w-[100px] font-mono" value={accentColor} onChange={e => setAccentColor(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="form-group mt-4">
+            <label className="form-label">Logo Perusahaan (Opsional)</label>
+            <div className="flex items-center gap-4 mt-2">
+              <input
+                type="file"
+                accept="image/png, image/jpeg, image/jpg"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+
+                  const reader = new FileReader();
+                  reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                      const canvas = document.createElement('canvas');
+                      const MAX_WIDTH = 300;
+                      const MAX_HEIGHT = 300;
+                      let width = img.width;
+                      let height = img.height;
+
+                      if (width > height) {
+                        if (width > MAX_WIDTH) {
+                          height *= MAX_WIDTH / width;
+                          width = MAX_WIDTH;
+                        }
+                      } else {
+                        if (height > MAX_HEIGHT) {
+                          width *= MAX_HEIGHT / height;
+                          height = MAX_HEIGHT;
+                        }
+                      }
+                      canvas.width = width;
+                      canvas.height = height;
+                      const ctx = canvas.getContext('2d');
+                      ctx?.drawImage(img, 0, 0, width, height);
+
+                      // Compress to base64
+                      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                      setLogoUrl(dataUrl);
+                    };
+                    img.src = event.target?.result as string;
+                  };
+                  reader.readAsDataURL(file);
+                }}
+                className="block w-full text-sm text-text-secondary
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-md file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-red-50 file:text-red-600
+                    hover:file:bg-red-100"
+              />
+              {logoUrl && (
+                <button
+                  type="button"
+                  onClick={() => setLogoUrl('')}
+                  className="text-xs text-red-500 hover:text-red-700 whitespace-nowrap font-semibold"
+                >
+                  Hapus Logo
+                </button>
               )}
+            </div>
 
-              <div className={styles.plansGrid}>
-                {plans.map((plan) => {
-                  const isCurrentPlan = current?.plan_id === plan.id;
-                  const features = parseFeatures(plan.features);
-
-                  return (
-                    <div
-                      key={plan.id}
-                      className={`${styles.planCard} ${plan.name === 'pro' ? styles.popular : ''} ${isCurrentPlan ? styles.activePlan : ''}`}
-                    >
-                      {plan.name === 'pro' && (
-                        <div className={styles.popularBadge}>🔥 Populer</div>
-                      )}
-                      <div className={styles.planHeader}>
-                        <h3 className={styles.planName}>{plan.display_name}</h3>
-                        <div className={styles.planPrice}>
-                          <span className={styles.priceAmount}>
-                            {plan.price === 0 ? 'Gratis' : formatCurrency(plan.price)}
-                          </span>
-                          {plan.price > 0 && <span className={styles.pricePeriod}>/bulan</span>}
-                        </div>
-                      </div>
-
-                      <div className={styles.planLimits}>
-                        <div className={styles.limitItem}><span>📄</span><span>{formatLimit(plan.max_invoices)} Invoice</span></div>
-                        <div className={styles.limitItem}><span>👥</span><span>{formatLimit(plan.max_clients)} Klien</span></div>
-                        <div className={styles.limitItem}><span>🔗</span><span>{formatLimit(plan.max_payment_links)} Payment Link</span></div>
-                      </div>
-
-                      <div className={styles.planFeatures}>
-                        {features.map((f) => (
-                          <div key={f} className={styles.featureItem}>
-                            <span className={styles.featureCheck}>✓</span>
-                            <span>{featureLabels[f] || f}</span>
-                          </div>
-                        ))}
-                      </div>
-
-                      <button
-                        className={`btn ${isCurrentPlan ? 'btn-secondary' : plan.name === 'pro' ? 'btn-primary' : 'btn-secondary'} ${styles.planBtn}`}
-                        disabled={isCurrentPlan || subscribing === plan.id}
-                        onClick={() => handleSubscribe(plan.id)}
-                      >
-                        {subscribing === plan.id
-                          ? 'Memproses...'
-                          : isCurrentPlan
-                          ? '✓ Paket Aktif'
-                          : plan.price === 0
-                          ? 'Mulai Gratis'
-                          : 'Pilih Paket'}
-                      </button>
-                    </div>
-                  );
-                })}
+            {logoUrl && (
+              <div className="mt-3 p-3 bg-transparent border border-border-light rounded-md max-w-xs flex items-center justify-center h-24 relative group">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               </div>
-            </>
-          )}
+            )}
+          </div>
+
+          {/* Preview */}
+          <div className="mt-6 p-4 rounded-[10px]" style={{ border: `2px solid ${accentColor}` }}>
+            <div className="flex justify-between items-center pb-3 mb-3" style={{ borderBottom: `3px solid ${accentColor}` }}>
+              <div className="flex gap-4 items-center">
+                {logoUrl && (
+                  <div className="w-12 h-12 flex items-center justify-center shrink-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  </div>
+                )}
+                <div>
+                  <div className="font-extrabold text-xl" style={{ color: accentColor }}>{bizName || 'Nama Bisnis Anda'}</div>
+                  {bizEmail && <div className="text-[10px] text-[#888]">{bizEmail}</div>}
+                  {bizPhone && <div className="text-[10px] text-[#888]">{bizPhone}</div>}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="font-extrabold text-base">INVOICE</div>
+                <div className="text-xs font-bold" style={{ color: accentColor }}>INV-2025-001</div>
+              </div>
+            </div>
+            <div className="text-center text-[10px] text-[#999] pt-2 border-t border-[#eee]">
+              {footerText}
+            </div>
+          </div>
+
+          <div className="form-group mt-4">
+            <label className="form-label">Teks Footer</label>
+            <input type="text" className="form-input" value={footerText} onChange={e => setFooterText(e.target.value)} placeholder="Terima kasih atas kepercayaan Anda" />
+          </div>
         </div>
-      )}
+
+        {/* Save Button */}
+        <div className="flex items-center gap-3">
+          <button className="btn btn-primary" onClick={saveProfile} disabled={savingProfile}>
+            {savingProfile ? 'Menyimpan...' : 'Simpan Profil & Desain'}
+          </button>
+          {profileMsg && <span className="text-sm">{profileMsg}</span>}
+        </div>
+
+        {/* Payment Settings */}
+        <div className="card">
+          <h3 className="flex gap-2 items-center text-base font-bold mb-5 pb-3 border-b border-border-light"><Payment02Icon /> Pengaturan Pembayaran</h3>
+          <p className="text-[13px] text-text-tertiary mb-4">
+            Informasi rekening bank yang akan ditampilkan di invoice sebagai opsi transfer manual
+          </p>
+          <div className="form-group">
+            <label className="form-label">Nama Bank</label>
+            <input type="text" className="form-input" placeholder="Bank Central Asia (BCA)" value={bankName} onChange={e => setBankName(e.target.value)} />
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">No. Rekening</label>
+              <input type="text" className="form-input" placeholder="123 456 7890" value={bankAccountNumber} onChange={e => setBankAccountNumber(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Atas Nama</label>
+              <input type="text" className="form-input" placeholder="PT Contoh Sukses" value={bankAccountName} onChange={e => setBankAccountName(e.target.value)} />
+            </div>
+          </div>
+          <div className="flex items-center gap-3 mb-5">
+            <button className="btn btn-primary" onClick={async () => {
+              setSavingPayment(true);
+              setPaymentMsg('');
+              try {
+                await invoiceSettingsApi.update({
+                  business_name: bizName,
+                  business_email: bizEmail,
+                  business_phone: bizPhone,
+                  business_website: bizWebsite,
+                  business_address: bizAddress,
+                  accent_color: accentColor,
+                  footer_text: footerText,
+                  bank_name: bankName,
+                  bank_account_number: bankAccountNumber,
+                  bank_account_name: bankAccountName,
+                });
+                setPaymentMsg('✅ Berhasil disimpan!');
+                setTimeout(() => setPaymentMsg(''), 3000);
+              } catch {
+                setPaymentMsg('❌ Gagal menyimpan');
+              } finally {
+                setSavingPayment(false);
+              }
+            }} disabled={savingPayment}>
+              {savingPayment ? 'Menyimpan...' : 'Simpan Pembayaran'}
+            </button>
+            {paymentMsg && <span className="text-sm">{paymentMsg}</span>}
+          </div>
+          <XenditSetupCard />
+          <PaypalSetupCard />
+        </div>
+
+        {/* Notifications */}
+        <div className="card">
+          <h3 className="flex gap-2 items-center text-base font-bold mb-5 pb-3 border-b border-border-light"><Notification01Icon /> Notifikasi</h3>
+          <div className="flex justify-between items-center py-3.5 border-b border-border-light last:border-b-0">
+            <div>
+              <div className="text-sm font-semibold mb-0.5">Email Invoice Terkirim</div>
+              <div className="text-xs text-text-tertiary">Notifikasi saat invoice berhasil dikirim</div>
+            </div>
+            <label className="relative inline-block w-12 h-[26px] shrink-0">
+              <input type="checkbox" defaultChecked className="peer opacity-0 w-0 h-0" />
+              <span className="absolute cursor-pointer inset-0 bg-border-color transition-all duration-150 rounded-full peer-checked:bg-gradient-to-br peer-checked:from-red-600 peer-checked:to-red-500 before:absolute before:content-[''] before:h-5 before:w-5 before:left-[3px] before:bottom-[3px] before:bg-white before:transition-all before:duration-150 before:rounded-full peer-checked:before:translate-x-[22px]"></span>
+            </label>
+          </div>
+          <div className="flex justify-between items-center py-3.5 border-b border-border-light last:border-b-0">
+            <div>
+              <div className="text-sm font-semibold mb-0.5">Payment Received</div>
+              <div className="text-xs text-text-tertiary">Notifikasi saat pembayaran diterima</div>
+            </div>
+            <label className="relative inline-block w-12 h-[26px] shrink-0">
+              <input type="checkbox" defaultChecked className="peer opacity-0 w-0 h-0" />
+              <span className="absolute cursor-pointer inset-0 bg-border-color transition-all duration-150 rounded-full peer-checked:bg-gradient-to-br peer-checked:from-red-600 peer-checked:to-red-500 before:absolute before:content-[''] before:h-5 before:w-5 before:left-[3px] before:bottom-[3px] before:bg-white before:transition-all before:duration-150 before:rounded-full peer-checked:before:translate-x-[22px]"></span>
+            </label>
+          </div>
+          <div className="flex justify-between items-center py-3.5 border-b border-border-light last:border-b-0">
+            <div>
+              <div className="text-sm font-semibold mb-0.5">Invoice Overdue</div>
+              <div className="text-xs text-text-tertiary">Notifikasi saat invoice melewati jatuh tempo</div>
+            </div>
+            <label className="relative inline-block w-12 h-[26px] shrink-0">
+              <input type="checkbox" defaultChecked className="peer opacity-0 w-0 h-0" />
+              <span className="absolute cursor-pointer inset-0 bg-border-color transition-all duration-150 rounded-full peer-checked:bg-gradient-to-br peer-checked:from-red-600 peer-checked:to-red-500 before:absolute before:content-[''] before:h-5 before:w-5 before:left-[3px] before:bottom-[3px] before:bg-white before:transition-all before:duration-150 before:rounded-full peer-checked:before:translate-x-[22px]"></span>
+            </label>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

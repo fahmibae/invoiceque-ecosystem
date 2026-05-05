@@ -27,8 +27,23 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+type GoogleLoginRequest struct {
+	IDToken string `json:"id_token" binding:"required"`
+}
+
 type AuthResponse struct {
 	Token        string `json:"token"`
 	RefreshToken string `json:"refresh_token"`
 	User         User   `json:"user"`
+}
+
+type UpdateProfileRequest struct {
+	Name    string `json:"name" binding:"required"`
+	Company string `json:"company"`
+	Phone   string `json:"phone"`
+}
+
+type ChangePasswordRequest struct {
+	OldPassword string `json:"old_password" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,min=6"`
 }

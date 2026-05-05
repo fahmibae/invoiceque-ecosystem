@@ -1,10 +1,12 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
 	"math"
+	"strings"
 
 	"github.com/invoiceque/invoice-service/models"
 )
@@ -36,7 +38,7 @@ func (r *InvoiceRepository) FindByUserID(userID, status string, page, size int) 
 		SELECT id, invoice_number, user_id, client_id, client_name, client_email,
 		       subtotal, tax, discount, total, status, payment_type, dp_percentage,
 		       dp_amount, amount_paid, amount_remaining, due_date, created_at, paid_at,
-		       notes, payment_link, remaining_payment_link
+		       notes, payment_link, remaining_payment_link, COALESCE(currency,'IDR'), COALESCE(exchange_rate_idr,0)
 		FROM invoices WHERE user_id = $1 AND ($2 = '' OR status = $2)
 		ORDER BY created_at DESC LIMIT $3 OFFSET $4`,
 		userID, status, size, offset)
@@ -54,13 +56,9 @@ func (r *InvoiceRepository) FindByUserID(userID, status string, page, size int) 
 		invoices = append(invoices, *inv)
 	}
 
-	// Load items for each invoice
-	for i := range invoices {
-		items, err := r.FindItemsByInvoiceID(invoices[i].ID)
-		if err != nil {
-			log.Printf("[INVOICE] Warning: failed to load items for invoice %s: %v", invoices[i].ID, err)
-		}
-		invoices[i].Items = items
+	// Batch-load items for ALL invoices in a single query (fixes N+1)
+	if err := r.batchLoadItems(invoices); err != nil {
+		log.Printf("[INVOICE] Warning: failed to batch-load items: %v", err)
 	}
 
 	return invoices, total, nil
@@ -72,7 +70,7 @@ func (r *InvoiceRepository) FindByIDAndUserID(id, userID string) (*models.Invoic
 		SELECT id, invoice_number, user_id, client_id, client_name, client_email,
 		       subtotal, tax, discount, total, status, payment_type, dp_percentage,
 		       dp_amount, amount_paid, amount_remaining, due_date, created_at, paid_at,
-		       notes, payment_link, remaining_payment_link
+		       notes, payment_link, remaining_payment_link, COALESCE(currency,'IDR'), COALESCE(exchange_rate_idr,0)
 		FROM invoices WHERE id = $1 AND user_id = $2`, id, userID)
 
 	inv, err := scanInvoiceRow(row)
@@ -98,7 +96,7 @@ func (r *InvoiceRepository) FindByID(id string) (*models.Invoice, error) {
 		SELECT id, invoice_number, user_id, client_id, client_name, client_email,
 		       subtotal, tax, discount, total, status, payment_type, dp_percentage,
 		       dp_amount, amount_paid, amount_remaining, due_date, created_at, paid_at,
-		       notes, payment_link, remaining_payment_link
+		       notes, payment_link, remaining_payment_link, COALESCE(currency,'IDR'), COALESCE(exchange_rate_idr,0)
 		FROM invoices WHERE id = $1`, id)
 
 	inv, err := scanInvoiceRow(row)
@@ -124,8 +122,8 @@ func (r *InvoiceRepository) Save(inv *models.Invoice) error {
 		INSERT INTO invoices (id, invoice_number, user_id, client_id, client_name, client_email,
 		    subtotal, tax, discount, total, status, payment_type, dp_percentage,
 		    dp_amount, amount_paid, amount_remaining, due_date, created_at, paid_at,
-		    notes, payment_link, remaining_payment_link)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+		    notes, payment_link, remaining_payment_link, currency, exchange_rate_idr)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
 		ON CONFLICT (id) DO UPDATE SET
 		    invoice_number = EXCLUDED.invoice_number,
 		    client_id = EXCLUDED.client_id,
@@ -145,25 +143,34 @@ func (r *InvoiceRepository) Save(inv *models.Invoice) error {
 		    paid_at = EXCLUDED.paid_at,
 		    notes = EXCLUDED.notes,
 		    payment_link = EXCLUDED.payment_link,
-		    remaining_payment_link = EXCLUDED.remaining_payment_link`,
+		    remaining_payment_link = EXCLUDED.remaining_payment_link,
+		    currency = EXCLUDED.currency,
+		    exchange_rate_idr = EXCLUDED.exchange_rate_idr`,
 		inv.ID, inv.Number, inv.UserID, inv.ClientID, inv.ClientName, inv.ClientEmail,
 		inv.Subtotal, inv.Tax, inv.Discount, inv.Total, inv.Status, inv.PaymentType,
 		inv.DpPercentage, inv.DpAmount, inv.AmountPaid, inv.AmountRemaining,
-		inv.DueDate, inv.CreatedAt, inv.PaidAt, inv.Notes, inv.PaymentLink, inv.RemainingPaymentLink)
+		inv.DueDate, inv.CreatedAt, inv.PaidAt, inv.Notes, inv.PaymentLink, inv.RemainingPaymentLink,
+		inv.Currency, inv.ExchangeRateIDR)
 	return err
 }
 
-// SaveItems deletes existing items and inserts new ones (matching JPA orphanRemoval behavior)
+// SaveItems deletes existing items and inserts new ones within a transaction
 func (r *InvoiceRepository) SaveItems(invoiceID string, items []models.InvoiceItem) error {
+	tx, err := r.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
 	// Delete existing items
-	_, err := r.db.Exec("DELETE FROM invoice_items WHERE invoice_id = $1", invoiceID)
+	_, err = tx.Exec("DELETE FROM invoice_items WHERE invoice_id = $1", invoiceID)
 	if err != nil {
 		return err
 	}
 
 	// Insert new items
 	for _, item := range items {
-		_, err := r.db.Exec(`
+		_, err := tx.Exec(`
 			INSERT INTO invoice_items (id, invoice_id, description, quantity, price, total)
 			VALUES ($1, $2, $3, $4, $5, $6)`,
 			item.ID, invoiceID, item.Description, item.Quantity, item.Price, item.Total)
@@ -171,18 +178,26 @@ func (r *InvoiceRepository) SaveItems(invoiceID string, items []models.InvoiceIt
 			return err
 		}
 	}
-	return nil
+	return tx.Commit()
 }
 
-// Delete deletes an invoice and its items (CASCADE)
+// Delete deletes an invoice and its items within a transaction
 func (r *InvoiceRepository) Delete(id string) error {
-	// Delete items first (foreign key constraint)
-	_, err := r.db.Exec("DELETE FROM invoice_items WHERE invoice_id = $1", id)
+	tx, err := r.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec("DELETE FROM invoice_items WHERE invoice_id = $1", id)
 	if err != nil {
 		return err
 	}
-	_, err = r.db.Exec("DELETE FROM invoices WHERE id = $1", id)
-	return err
+	_, err = tx.Exec("DELETE FROM invoices WHERE id = $1", id)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // FindItemsByInvoiceID returns items for an invoice
@@ -223,24 +238,62 @@ func (r *InvoiceRepository) CountByUserIDAndStatus(userID, status string) (int64
 	return count, err
 }
 
-// SumTotalRevenueByUserID returns the sum of totals for paid invoices
+// SumTotalRevenueByUserID returns the sum of amount_paid for invoices that have received any payment.
+// This includes both fully paid and partially paid (DP) invoices, reflecting actual money received.
 func (r *InvoiceRepository) SumTotalRevenueByUserID(userID string) (float64, error) {
 	var total sql.NullFloat64
-	err := r.db.QueryRow("SELECT COALESCE(SUM(total), 0) FROM invoices WHERE user_id = $1 AND status = 'paid'", userID).Scan(&total)
+	err := r.db.QueryRow("SELECT COALESCE(SUM(amount_paid), 0) FROM invoices WHERE user_id = $1 AND status IN ('paid', 'partially_paid')", userID).Scan(&total)
 	if err != nil {
 		return 0, err
 	}
 	return total.Float64, nil
 }
 
-// SumPendingAmountByUserID returns the sum of totals for sent/overdue invoices
+// SumPendingAmountByUserID returns the sum of amount_remaining for sent/overdue/partially_paid invoices.
+// Uses amount_remaining so that DP invoices only count their outstanding balance, not the full total.
 func (r *InvoiceRepository) SumPendingAmountByUserID(userID string) (float64, error) {
 	var total sql.NullFloat64
-	err := r.db.QueryRow("SELECT COALESCE(SUM(total), 0) FROM invoices WHERE user_id = $1 AND status IN ('sent', 'overdue')", userID).Scan(&total)
+	err := r.db.QueryRow("SELECT COALESCE(SUM(amount_remaining), 0) FROM invoices WHERE user_id = $1 AND status IN ('sent', 'overdue', 'partially_paid')", userID).Scan(&total)
 	if err != nil {
 		return 0, err
 	}
 	return total.Float64, nil
+}
+
+// FindLinkableByUserID returns invoices that can still be linked to a payment link.
+// Rules:
+//   - Status is NOT 'paid' (full payment not yet received), OR
+//   - Payment type is 'dp' (down payment) AND amount_remaining > 0 (still has a remaining balance)
+func (r *InvoiceRepository) FindLinkableByUserID(userID string) ([]models.Invoice, error) {
+	rows, err := r.db.Query(`
+		SELECT id, invoice_number, user_id, client_id, client_name, client_email,
+		       subtotal, tax, discount, total, status, payment_type, dp_percentage,
+		       dp_amount, amount_paid, amount_remaining, due_date, created_at, paid_at,
+		       notes, payment_link, remaining_payment_link, COALESCE(currency,'IDR'), COALESCE(exchange_rate_idr,0)
+		FROM invoices
+		WHERE user_id = $1
+		  AND (
+		    status != 'paid'
+		    OR (payment_type = 'dp' AND amount_remaining > 0)
+		  )
+		ORDER BY created_at DESC`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var invoices []models.Invoice
+	for rows.Next() {
+		inv, err := scanInvoice(rows)
+		if err != nil {
+			return nil, err
+		}
+		invoices = append(invoices, *inv)
+	}
+	if invoices == nil {
+		invoices = []models.Invoice{}
+	}
+	return invoices, nil
 }
 
 // FindPaidInvoicesByUserID returns paid invoices ordered by paid_at DESC
@@ -249,7 +302,7 @@ func (r *InvoiceRepository) FindPaidInvoicesByUserID(userID string) ([]models.In
 		SELECT id, invoice_number, user_id, client_id, client_name, client_email,
 		       subtotal, tax, discount, total, status, payment_type, dp_percentage,
 		       dp_amount, amount_paid, amount_remaining, due_date, created_at, paid_at,
-		       notes, payment_link, remaining_payment_link
+		       notes, payment_link, remaining_payment_link, COALESCE(currency,'IDR'), COALESCE(exchange_rate_idr,0)
 		FROM invoices WHERE user_id = $1 AND status = 'paid'
 		ORDER BY paid_at DESC`, userID)
 	if err != nil {
@@ -273,6 +326,160 @@ func TotalPages(total int64, size int) int {
 	return int(math.Ceil(float64(total) / float64(size)))
 }
 
+// batchLoadItems loads items for multiple invoices in a single query (fixes N+1)
+func (r *InvoiceRepository) batchLoadItems(invoices []models.Invoice) error {
+	if len(invoices) == 0 {
+		return nil
+	}
+
+	ids := make([]string, len(invoices))
+	for i, inv := range invoices {
+		ids[i] = inv.ID
+	}
+
+	// Build placeholders
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(`SELECT id, invoice_id, description, quantity, price, total
+		FROM invoice_items WHERE invoice_id IN (%s)`, strings.Join(placeholders, ","))
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	itemMap := make(map[string][]models.InvoiceItem)
+	for rows.Next() {
+		var item models.InvoiceItem
+		if err := rows.Scan(&item.ID, &item.InvoiceID, &item.Description, &item.Quantity, &item.Price, &item.Total); err != nil {
+			return err
+		}
+		itemMap[item.InvoiceID] = append(itemMap[item.InvoiceID], item)
+	}
+
+	for i := range invoices {
+		if items, ok := itemMap[invoices[i].ID]; ok {
+			invoices[i].Items = items
+		} else {
+			invoices[i].Items = []models.InvoiceItem{}
+		}
+	}
+	return nil
+}
+
+// FindByIDForUpdate returns an invoice locked for update (prevents race conditions in webhooks)
+func (r *InvoiceRepository) FindByIDForUpdate(tx *sql.Tx, id string) (*models.Invoice, error) {
+	row := tx.QueryRow(`
+		SELECT id, invoice_number, user_id, client_id, client_name, client_email,
+		       subtotal, tax, discount, total, status, payment_type, dp_percentage,
+		       dp_amount, amount_paid, amount_remaining, due_date, created_at, paid_at,
+		       notes, payment_link, remaining_payment_link, COALESCE(currency,'IDR'), COALESCE(exchange_rate_idr,0)
+		FROM invoices WHERE id = $1 FOR UPDATE`, id)
+
+	inv, err := scanInvoiceRow(row)
+	if err != nil {
+		return nil, err
+	}
+
+	items, err := r.FindItemsByInvoiceID(inv.ID)
+	if err != nil {
+		return nil, err
+	}
+	inv.Items = items
+	return inv, nil
+}
+
+// SaveInTx saves an invoice within an existing transaction
+func (r *InvoiceRepository) SaveInTx(tx *sql.Tx, inv *models.Invoice) error {
+	_, err := tx.Exec(`
+		INSERT INTO invoices (id, invoice_number, user_id, client_id, client_name, client_email,
+		    subtotal, tax, discount, total, status, payment_type, dp_percentage,
+		    dp_amount, amount_paid, amount_remaining, due_date, created_at, paid_at,
+		    notes, payment_link, remaining_payment_link, currency, exchange_rate_idr)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+		ON CONFLICT (id) DO UPDATE SET
+		    invoice_number = EXCLUDED.invoice_number,
+		    client_id = EXCLUDED.client_id,
+		    client_name = EXCLUDED.client_name,
+		    client_email = EXCLUDED.client_email,
+		    subtotal = EXCLUDED.subtotal,
+		    tax = EXCLUDED.tax,
+		    discount = EXCLUDED.discount,
+		    total = EXCLUDED.total,
+		    status = EXCLUDED.status,
+		    payment_type = EXCLUDED.payment_type,
+		    dp_percentage = EXCLUDED.dp_percentage,
+		    dp_amount = EXCLUDED.dp_amount,
+		    amount_paid = EXCLUDED.amount_paid,
+		    amount_remaining = EXCLUDED.amount_remaining,
+		    due_date = EXCLUDED.due_date,
+		    paid_at = EXCLUDED.paid_at,
+		    notes = EXCLUDED.notes,
+		    payment_link = EXCLUDED.payment_link,
+		    remaining_payment_link = EXCLUDED.remaining_payment_link,
+		    currency = EXCLUDED.currency,
+		    exchange_rate_idr = EXCLUDED.exchange_rate_idr`,
+		inv.ID, inv.Number, inv.UserID, inv.ClientID, inv.ClientName, inv.ClientEmail,
+		inv.Subtotal, inv.Tax, inv.Discount, inv.Total, inv.Status, inv.PaymentType,
+		inv.DpPercentage, inv.DpAmount, inv.AmountPaid, inv.AmountRemaining,
+		inv.DueDate, inv.CreatedAt, inv.PaidAt, inv.Notes, inv.PaymentLink, inv.RemainingPaymentLink,
+		inv.Currency, inv.ExchangeRateIDR)
+	return err
+}
+
+// BeginTx starts a database transaction
+func (r *InvoiceRepository) BeginTx() (*sql.Tx, error) {
+	return r.db.BeginTx(context.Background(), nil)
+}
+
+// GetDashboardStatsCombined returns all dashboard stats in a single query
+func (r *InvoiceRepository) GetDashboardStatsCombined(userID string) (totalRevenue float64, totalInvoices, paidInvoices, overdueInvoices int64, pendingAmount float64, err error) {
+	err = r.db.QueryRow(`
+		SELECT
+			COALESCE(SUM(CASE WHEN status IN ('paid','partially_paid') THEN amount_paid ELSE 0 END), 0),
+			COUNT(*),
+			COUNT(CASE WHEN status = 'paid' THEN 1 END),
+			COUNT(CASE WHEN status = 'overdue' THEN 1 END),
+			COALESCE(SUM(CASE WHEN status IN ('sent','overdue','partially_paid') THEN amount_remaining ELSE 0 END), 0)
+		FROM invoices WHERE user_id = $1`, userID,
+	).Scan(&totalRevenue, &totalInvoices, &paidInvoices, &overdueInvoices, &pendingAmount)
+	return
+}
+
+// GetRevenueChartSQL returns monthly revenue aggregated in SQL (replaces in-memory aggregation)
+func (r *InvoiceRepository) GetRevenueChartSQL(userID string, months int) (map[string]float64, error) {
+	rows, err := r.db.Query(`
+		SELECT TO_CHAR(paid_at, 'YYYY-MM') AS month_key,
+		       COALESCE(SUM(total), 0) AS revenue
+		FROM invoices
+		WHERE user_id = $1
+		  AND status = 'paid'
+		  AND paid_at >= NOW() - ($2 || ' months')::INTERVAL
+		GROUP BY month_key
+		ORDER BY month_key`, userID, months)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[string]float64)
+	for rows.Next() {
+		var key string
+		var revenue float64
+		if err := rows.Scan(&key, &revenue); err != nil {
+			return nil, err
+		}
+		result[key] = revenue
+	}
+	return result, nil
+}
+
 // -- Settings Repository --
 
 type SettingsRepository struct {
@@ -286,13 +493,15 @@ func NewSettingsRepository(db *sql.DB) *SettingsRepository {
 func (r *SettingsRepository) FindByUserID(userID string) (*models.InvoiceSettings, error) {
 	row := r.db.QueryRow(`
 		SELECT user_id, business_name, business_email, business_phone, business_website,
-		       business_address, logo_url, accent_color, footer_text
+		       business_address, logo_url, accent_color, footer_text,
+		       COALESCE(bank_name,''), COALESCE(bank_account_number,''), COALESCE(bank_account_name,'')
 		FROM invoice_settings WHERE user_id = $1`, userID)
 
 	var s models.InvoiceSettings
 	var logoURL, accentColor, footerText sql.NullString
 	err := row.Scan(&s.UserID, &s.BusinessName, &s.BusinessEmail, &s.BusinessPhone,
-		&s.BusinessWebsite, &s.BusinessAddress, &logoURL, &accentColor, &footerText)
+		&s.BusinessWebsite, &s.BusinessAddress, &logoURL, &accentColor, &footerText,
+		&s.BankName, &s.BankAccountNumber, &s.BankAccountName)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return &models.InvoiceSettings{
@@ -318,8 +527,9 @@ func (r *SettingsRepository) FindByUserID(userID string) (*models.InvoiceSetting
 func (r *SettingsRepository) Upsert(s *models.InvoiceSettings) error {
 	_, err := r.db.Exec(`
 		INSERT INTO invoice_settings (user_id, business_name, business_email, business_phone,
-		    business_website, business_address, logo_url, accent_color, footer_text)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		    business_website, business_address, logo_url, accent_color, footer_text,
+		    bank_name, bank_account_number, bank_account_name)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 		ON CONFLICT (user_id) DO UPDATE SET
 		    business_name = EXCLUDED.business_name,
 		    business_email = EXCLUDED.business_email,
@@ -328,9 +538,13 @@ func (r *SettingsRepository) Upsert(s *models.InvoiceSettings) error {
 		    business_address = EXCLUDED.business_address,
 		    logo_url = EXCLUDED.logo_url,
 		    accent_color = EXCLUDED.accent_color,
-		    footer_text = EXCLUDED.footer_text`,
+		    footer_text = EXCLUDED.footer_text,
+		    bank_name = EXCLUDED.bank_name,
+		    bank_account_number = EXCLUDED.bank_account_number,
+		    bank_account_name = EXCLUDED.bank_account_name`,
 		s.UserID, s.BusinessName, s.BusinessEmail, s.BusinessPhone,
-		s.BusinessWebsite, s.BusinessAddress, s.LogoURL, s.AccentColor, s.FooterText)
+		s.BusinessWebsite, s.BusinessAddress, s.LogoURL, s.AccentColor, s.FooterText,
+		s.BankName, s.BankAccountNumber, s.BankAccountName)
 	return err
 }
 
@@ -346,7 +560,7 @@ func scanInvoice(rows *sql.Rows) (*models.Invoice, error) {
 		&inv.ID, &inv.Number, &inv.UserID, &inv.ClientID, &inv.ClientName, &inv.ClientEmail,
 		&inv.Subtotal, &inv.Tax, &inv.Discount, &inv.Total, &inv.Status, &inv.PaymentType,
 		&inv.DpPercentage, &inv.DpAmount, &inv.AmountPaid, &inv.AmountRemaining,
-		&dueDate, &createdAt, &paidAt, &notes, &paymentLink, &remainingPaymentLink)
+		&dueDate, &createdAt, &paidAt, &notes, &paymentLink, &remainingPaymentLink, &inv.Currency, &inv.ExchangeRateIDR)
 	if err != nil {
 		return nil, err
 	}
@@ -380,7 +594,7 @@ func scanInvoiceRow(row *sql.Row) (*models.Invoice, error) {
 		&inv.ID, &inv.Number, &inv.UserID, &inv.ClientID, &inv.ClientName, &inv.ClientEmail,
 		&inv.Subtotal, &inv.Tax, &inv.Discount, &inv.Total, &inv.Status, &inv.PaymentType,
 		&inv.DpPercentage, &inv.DpAmount, &inv.AmountPaid, &inv.AmountRemaining,
-		&dueDate, &createdAt, &paidAt, &notes, &paymentLink, &remainingPaymentLink)
+		&dueDate, &createdAt, &paidAt, &notes, &paymentLink, &remainingPaymentLink, &inv.Currency, &inv.ExchangeRateIDR)
 	if err != nil {
 		return nil, err
 	}

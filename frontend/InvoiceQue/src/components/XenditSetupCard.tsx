@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { xenditApi, type XenditAccount } from '@/lib/api';
-import styles from '@/app/(dashboard)/subscription/subscription.module.css';
+import { Payment01Icon, Link04Icon, Alert01Icon } from 'hugeicons-react';
 
 export default function XenditSetupCard() {
   const [account, setAccount] = useState<XenditAccount | null>(null);
@@ -37,30 +37,30 @@ export default function XenditSetupCard() {
 
   if (account) {
     return (
-      <div className={`${styles.xenditCard} ${styles.xenditActive}`}>
-        <div className={styles.xenditHeader}>
-          <div className={styles.xenditIcon}>💳</div>
+      <div className="bg-bg-card border-2 rounded-xl p-5 border-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.15)] bg-emerald-50 dark:bg-emerald-900/10 mt-5">
+        <div className="flex items-center gap-3.5 mb-5 pb-4 border-b border-border-light">
+          <div className="text-[28px]"><Payment01Icon/></div>
           <div>
-            <div className={styles.xenditTitle}>Xendit Payment Gateway</div>
-            <div className={styles.xenditSubtitle}>Terima pembayaran langsung ke rekening Anda</div>
+            <div className="text-base font-bold text-text-primary mb-1">Xendit Payment Gateway</div>
+            <div className="text-[13px] text-text-tertiary">Terima pembayaran langsung ke rekening Anda</div>
           </div>
         </div>
-        <div className={styles.xenditInfo}>
-          <div className={styles.xenditInfoRow}>
-            <span className={styles.xenditInfoLabel}>Status</span>
-            <span className={styles.xenditBadge}>✓ Active</span>
+        <div className="flex flex-col gap-3">
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-text-tertiary">Status</span>
+            <span className="inline-block py-1 px-2.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600">✓ Active</span>
           </div>
-          <div className={styles.xenditInfoRow}>
-            <span className={styles.xenditInfoLabel}>Email</span>
-            <span className={styles.xenditInfoValue}>{account.account_email}</span>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-text-tertiary">Email</span>
+            <span className="font-semibold text-text-primary">{account.account_email}</span>
           </div>
-          <div className={styles.xenditInfoRow}>
-            <span className={styles.xenditInfoLabel}>Bisnis</span>
-            <span className={styles.xenditInfoValue}>{account.business_name}</span>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-text-tertiary">Bisnis</span>
+            <span className="font-semibold text-text-primary">{account.business_name}</span>
           </div>
-          <div className={styles.xenditInfoRow}>
-            <span className={styles.xenditInfoLabel}>Platform Fee</span>
-            <span className={styles.xenditInfoValue}>{account.platform_fee_percent}%</span>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-text-tertiary">Platform Fee</span>
+            <span className="font-semibold text-text-primary">{account.platform_fee_percent}%</span>
           </div>
         </div>
       </div>
@@ -68,12 +68,12 @@ export default function XenditSetupCard() {
   }
 
   return (
-    <div className={styles.xenditCard}>
-      <div className={styles.xenditHeader}>
-        <div className={styles.xenditIcon}>💳</div>
+    <div className="bg-bg-card border-2 rounded-xl p-5 border-border-color mt-5">
+      <div className="flex items-center gap-3.5 mb-5 pb-4 border-b border-border-light">
+        <div className="text-[28px]"><Payment01Icon/></div>
         <div>
-          <div className={styles.xenditTitle}>Setup Xendit Payment</div>
-          <div className={styles.xenditSubtitle}>Hubungkan akun Xendit untuk menerima pembayaran otomatis</div>
+          <div className="text-base font-bold text-text-primary mb-1">Setup Xendit Payment</div>
+          <div className="text-[13px] text-text-tertiary">Hubungkan akun Xendit untuk menerima pembayaran otomatis</div>
         </div>
       </div>
       <form onSubmit={handleSetup}>
@@ -100,10 +100,10 @@ export default function XenditSetupCard() {
           />
         </div>
         {error && (
-          <div style={{ color: '#EF4444', fontSize: 13, marginBottom: 12 }}>⚠️ {error}</div>
+          <div className="flex items-center gap-2 text-red-500 text-[13px] mb-3"><Alert01Icon/> {error}</div>
         )}
-        <button type="submit" className="btn btn-primary" disabled={submitting}>
-          {submitting ? 'Menghubungkan...' : '🔗 Hubungkan Xendit'}
+        <button type="submit" className="flex items-center gap-2 btn btn-primary" disabled={submitting}>
+          {submitting ? 'Menghubungkan...' : <><Link04Icon/> Hubungkan Xendit</>}
         </button>
       </form>
     </div>

@@ -25,6 +25,8 @@ type Invoice struct {
 	Notes                string     `json:"notes" db:"notes"`
 	PaymentLink          string     `json:"payment_link" db:"payment_link"`
 	RemainingPaymentLink string     `json:"remaining_payment_link" db:"remaining_payment_link"`
+	Currency             string     `json:"currency" db:"currency"`
+	ExchangeRateIDR      float64    `json:"exchange_rate_idr" db:"exchange_rate_idr"`
 	Items                []InvoiceItem `json:"items" db:"-"`
 }
 
@@ -38,13 +40,16 @@ type InvoiceItem struct {
 }
 
 type InvoiceSettings struct {
-	UserID          string `json:"user_id" db:"user_id"`
-	BusinessName    string `json:"business_name" db:"business_name"`
-	BusinessEmail   string `json:"business_email" db:"business_email"`
-	BusinessPhone   string `json:"business_phone" db:"business_phone"`
-	BusinessWebsite string `json:"business_website" db:"business_website"`
-	BusinessAddress string `json:"business_address" db:"business_address"`
-	LogoURL         string `json:"logo_url" db:"logo_url"`
-	AccentColor     string `json:"accent_color" db:"accent_color"`
-	FooterText      string `json:"footer_text" db:"footer_text"`
+	UserID            string `json:"user_id" db:"user_id"`
+	BusinessName      string `json:"business_name" db:"business_name"`
+	BusinessEmail     string `json:"business_email" db:"business_email"`
+	BusinessPhone     string `json:"business_phone" db:"business_phone"`
+	BusinessWebsite   string `json:"business_website" db:"business_website"`
+	BusinessAddress   string `json:"business_address" db:"business_address"`
+	LogoURL           string `json:"logo_url" db:"logo_url"`
+	AccentColor       string `json:"accent_color" db:"accent_color"`
+	FooterText        string `json:"footer_text" db:"footer_text"`
+	BankName          string `json:"bank_name" db:"bank_name"`
+	BankAccountNumber string `json:"bank_account_number" db:"bank_account_number"`
+	BankAccountName   string `json:"bank_account_name" db:"bank_account_name"`
 }

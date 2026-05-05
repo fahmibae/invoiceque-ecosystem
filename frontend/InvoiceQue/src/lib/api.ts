@@ -67,6 +67,12 @@ export const authApi = {
       body: JSON.stringify({ name, email, password, company, phone }),
     }),
 
+  googleLogin: (idToken: string) =>
+    request<AuthResponse>('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ id_token: idToken }),
+    }),
+
   refresh: (refreshToken: string) =>
     request<AuthResponse>('/auth/refresh', {
       method: 'POST',
@@ -75,6 +81,18 @@ export const authApi = {
 
   profile: () =>
     request<User>('/auth/profile'),
+
+  updateProfile: (name: string, company: string, phone: string) =>
+    request<User>('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify({ name, company, phone }),
+    }),
+
+  changePassword: (oldPassword: string, newPassword: string) =>
+    request<{ message: string }>('/auth/password', {
+      method: 'PUT',
+      body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+    }),
 };
 
 // ── Client API ────────────────────────────────────────
@@ -140,6 +158,12 @@ export const clientApi = {
     request<{ message: string }>(`/clients/${id}`, {
       method: 'DELETE',
     }),
+
+  bulkDelete: (ids: string[]) =>
+    request<{ message: string; deleted: number }>('/clients/bulk-delete', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }),
 };
 
 // ── Invoice API ───────────────────────────────────────
@@ -175,6 +199,8 @@ export interface Invoice {
   notes?: string;
   payment_link?: string;
   remaining_payment_link?: string;
+  currency: string;
+  exchange_rate_idr: number;
 }
 
 export interface CreateInvoiceRequest {
@@ -189,6 +215,7 @@ export interface CreateInvoiceRequest {
   status?: string;
   payment_type?: string;
   dp_percentage?: number;
+  currency?: string;
 }
 
 export const invoiceApi = {
@@ -247,6 +274,10 @@ export const invoiceApi = {
       method: 'POST',
       body: JSON.stringify({ ids }),
     }),
+
+  /** Returns invoices that can still receive a payment link (not fully paid, or DP with remaining balance) */
+  listLinkable: () =>
+    request<{ data: Invoice[] }>('/invoices/linkable'),
 };
 
 // ── Dashboard API ─────────────────────────────────────
@@ -287,6 +318,8 @@ export interface PaymentLink {
   clicks: number;
   payments: number;
   invoice_id?: string;
+  payment_provider?: string;
+  provider_order_id?: string;
   expires_at?: string;
   created_at: string;
   updated_at: string;
@@ -299,6 +332,9 @@ export interface CreatePaymentLinkRequest {
   currency?: string;
   invoice_id?: string;
   expires_at?: string;
+  payment_provider?: string;
+  client_name?: string;
+  client_email?: string;
 }
 
 export interface UpdatePaymentLinkRequest {
@@ -336,6 +372,25 @@ export const paymentLinkApi = {
     request<{ message: string }>(`/payments/${id}`, {
       method: 'DELETE',
     }),
+
+  bulkDelete: (ids: string[]) =>
+    request<{ message: string; deleted: number }>('/payments/bulk-delete', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }),
+
+  /** Cascade delete payment links associated with a single invoice */
+  deleteByInvoice: (invoiceId: string) =>
+    request<{ message: string; deleted: number }>(`/payments/by-invoice/${invoiceId}`, {
+      method: 'DELETE',
+    }),
+
+  /** Cascade delete payment links associated with multiple invoices */
+  deleteByInvoices: (invoiceIds: string[]) =>
+    request<{ message: string; deleted: number }>('/payments/by-invoices', {
+      method: 'POST',
+      body: JSON.stringify({ invoice_ids: invoiceIds }),
+    }),
 };
 
 // ── Notification API ──────────────────────────────────
@@ -347,12 +402,22 @@ export interface NotificationLog {
   subject: string;
   message: string;
   status: string;
+  is_read: boolean;
   created_at: string;
 }
 
 export const notificationApi = {
-  list: () =>
-    request<{ data: NotificationLog[]; total: number }>('/notifications'),
+  list: (page = 1, perPage = 15) => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('per_page', String(perPage));
+    return request<{ data: NotificationLog[]; total: number; page: number; per_page: number; total_pages: number; unread_count: number }>(`/notifications?${params}`);
+  },
+
+  markAsRead: (id: string) =>
+    request<{ message: string }>(`/notifications/${id}/read`, {
+      method: 'PUT',
+    }),
 };
 
 // ── Subscription API ──────────────────────────────────
@@ -372,6 +437,8 @@ export interface SubscriptionPlan {
 }
 
 export interface Subscription {
+  current_period_end: string;
+  current_period_start: string;
   id: string;
   user_id: string;
   plan_id: string;
@@ -409,6 +476,15 @@ export const subscriptionApi = {
       method: 'POST',
       body: JSON.stringify({ plan_id: planId }),
     }),
+
+  checkout: (planId: string) =>
+    request<{ checkout_url: string; transaction_id: string; external_id: string }>('/subscriptions/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ plan_id: planId }),
+    }),
+
+  checkoutStatus: (externalId: string) =>
+    request<{ status: string; external_id: string; plan_id: string; amount: number }>(`/subscription/checkout/status/${externalId}`),
 };
 
 // ── Xendit Account API ────────────────────────────────
@@ -436,6 +512,36 @@ export const xenditApi = {
     }),
 };
 
+// ── PayPal Account API (Email-only) ───────────────────
+
+export interface PaypalAccount {
+  id: string;
+  paypal_email: string;
+  status: string;
+}
+
+export const paypalApi = {
+  getAccount: () =>
+    request<PaypalAccount>('/payments/paypal/account'),
+
+  /** Connect user's PayPal — just needs their PayPal email */
+  connect: (paypalEmail: string) =>
+    request<PaypalAccount>('/payments/paypal/setup', {
+      method: 'POST',
+      body: JSON.stringify({ paypal_email: paypalEmail }),
+    }),
+
+  disconnect: () =>
+    request<{ message: string }>('/payments/paypal/account', {
+      method: 'DELETE',
+    }),
+
+  captureOrder: (orderId: string) =>
+    request<{ status: string; order_id: string; message: string }>(`/payments/paypal/capture/${orderId}`, {
+      method: 'POST',
+    }),
+};
+
 // ── Invoice Settings API ──────────────────────────────
 
 export interface InvoiceSettingsData {
@@ -448,6 +554,9 @@ export interface InvoiceSettingsData {
   logo_url?: string;
   accent_color: string;
   footer_text: string;
+  bank_name?: string;
+  bank_account_number?: string;
+  bank_account_name?: string;
 }
 
 export const invoiceSettingsApi = {

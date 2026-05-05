@@ -47,3 +47,4 @@ Thumbs.db
 # Data volumes
 postgres_data/
 rabbitmq_data/
+render-monolith/target/

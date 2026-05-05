@@ -6,14 +6,20 @@ primary_region = 'sin'
 
 [env]
   PORT = '8003'
-  PAYMENT_SERVICE_URL = 'http://invoiceque-payment.internal:8004'
+  PAYMENT_SERVICE_URL = 'https://invoiceque-payment.fly.dev'
+  NOTIFICATION_SERVICE_URL = 'https://invoiceque-notification.fly.dev'
 
 [http_service]
   internal_port = 8003
   force_https = true
-  auto_stop_machines = 'off'
+  auto_stop_machines = 'stop'
   auto_start_machines = true
-  min_machines_running = 1
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = 'requests'
+    hard_limit = 20
+    soft_limit = 10
 
 [[vm]]
   memory = '256mb'

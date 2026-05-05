@@ -109,3 +109,28 @@ func (r *ClientRepository) Delete(id, userID string) error {
 	_, err := r.db.Exec(query, id, userID)
 	return err
 }
+
+func (r *ClientRepository) BulkDelete(ids []string, userID string) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+
+	query := `DELETE FROM clients WHERE user_id = $1 AND id = ANY($2)`
+	// Convert []string to PostgreSQL text array syntax
+	var idArray string
+	idArray += "{"
+	for i, id := range ids {
+		if i > 0 {
+			idArray += ","
+		}
+		idArray += `"` + id + `"`
+	}
+	idArray += "}"
+
+	res, err := r.db.Exec(query, userID, idArray)
+	if err != nil {
+		return 0, err
+	}
+
+	return res.RowsAffected()
+}

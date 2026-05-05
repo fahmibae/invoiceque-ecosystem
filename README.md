@@ -9,9 +9,10 @@ Arsitektur microservice untuk InvoiceQue SaaS Platform.
 | API Gateway | Go | Gin | — | 8080 |
 | Auth Service | Go | Gin | PostgreSQL | 8001 |
 | Client Service | Go | Gin | PostgreSQL | 8002 |
-| Invoice Service | Java 21 | Spring Boot 3 | PostgreSQL | 8003 |
+| Invoice Service | Go | Gin | PostgreSQL | 8003 |
 | Payment Service | Rust | Actix-Web | PostgreSQL | 8004 |
-| Notification Service | Go | Gin + RabbitMQ | — | 8005 |
+| Notification Service | Go | Gin | MongoDB | 8005 |
+| Subscription Service | Go | Gin | PostgreSQL | 8006 |
 
 ## Quick Start
 
@@ -68,8 +69,10 @@ All requests go through the API Gateway at `http://localhost:8080`:
 - `GET  /api/v1/pay/:id` — Payment page
 - `POST /api/v1/payments/webhook` — Payment webhook
 
-## RabbitMQ Management
+## Inter-Service Communication
 
-- URL: `http://localhost:15672`
-- Username: `invoiceque`
-- Password: `invoiceque123`
+Services communicate via direct REST API calls:
+- **Payment → Notification**: `POST /events/payment`
+- **Payment → Invoice**: `POST /events/payment`
+- **Invoice → Notification**: `POST /events/invoice`
+- **Subscription → Notification**: `POST /events/subscription`

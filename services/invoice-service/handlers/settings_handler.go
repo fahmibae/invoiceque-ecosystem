@@ -63,15 +63,20 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 	if req.BusinessAddress != "" {
 		existing.BusinessAddress = req.BusinessAddress
 	}
-	if req.LogoURL != "" {
-		existing.LogoURL = req.LogoURL
-	}
+	
+	// Allow clearing the logo URL
+	existing.LogoURL = req.LogoURL
+
 	if req.AccentColor != "" {
 		existing.AccentColor = req.AccentColor
 	}
 	if req.FooterText != "" {
 		existing.FooterText = req.FooterText
 	}
+	// Always update bank fields (allow clearing them to empty)
+	existing.BankName = req.BankName
+	existing.BankAccountNumber = req.BankAccountNumber
+	existing.BankAccountName = req.BankAccountName
 
 	if err := h.repo.Upsert(existing); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

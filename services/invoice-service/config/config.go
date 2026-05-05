@@ -3,23 +3,13 @@ package config
 import "os"
 
 type Config struct {
-	DBURL             string
-	Port              string
-	RabbitMQURL       string
-	PaymentServiceURL string
+	DBURL                  string
+	Port                   string
+	NotificationServiceURL string
+	PaymentServiceURL      string
 }
 
 func Load() *Config {
-	// Build RabbitMQ URL from individual env vars or use a combined one
-	rabbitURL := getEnv("RABBITMQ_URL", "")
-	if rabbitURL == "" {
-		host := getEnv("SPRING_RABBITMQ_HOST", "localhost")
-		port := getEnv("SPRING_RABBITMQ_PORT", "5672")
-		user := getEnv("SPRING_RABBITMQ_USERNAME", "invoiceque")
-		pass := getEnv("SPRING_RABBITMQ_PASSWORD", "invoiceque123")
-		rabbitURL = "amqp://" + user + ":" + pass + "@" + host + ":" + port
-	}
-
 	// Build DB URL from individual env vars or use a combined one
 	dbURL := getEnv("DB_URL", "")
 	if dbURL == "" {
@@ -32,10 +22,10 @@ func Load() *Config {
 	}
 
 	return &Config{
-		DBURL:             dbURL,
-		Port:              getEnv("PORT", getEnv("SERVER_PORT", "8003")),
-		RabbitMQURL:       rabbitURL,
-		PaymentServiceURL: getEnv("PAYMENT_SERVICE_URL", "http://localhost:8004"),
+		DBURL:                  dbURL,
+		Port:                   getEnv("PORT", getEnv("SERVER_PORT", "8003")),
+		NotificationServiceURL: getEnv("NOTIFICATION_SERVICE_URL", "http://localhost:8005"),
+		PaymentServiceURL:      getEnv("PAYMENT_SERVICE_URL", "http://localhost:8004"),
 	}
 }
 

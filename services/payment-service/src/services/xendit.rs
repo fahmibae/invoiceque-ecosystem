@@ -79,4 +79,33 @@ impl XenditClient {
     pub fn verify_callback_token(incoming_token: &str, expected_token: &str) -> bool {
         incoming_token == expected_token
     }
+
+    /// Fetch invoice status from Xendit by invoice ID
+    /// Returns the status string e.g. "PAID", "SETTLED", "PENDING", "EXPIRED"
+    pub async fn get_invoice_status(
+        &self,
+        xendit_user_id: &str,
+        invoice_id: &str,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        let resp = self.client
+            .get(format!("{}/v2/invoices/{}", self.base_url, invoice_id))
+            .basic_auth(&self.api_key, Some(""))
+            .header("for-user-id", xendit_user_id)
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(format!("Xendit get invoice failed ({}): {}", status, body).into());
+        }
+
+        let json: serde_json::Value = resp.json().await?;
+        let status = json["status"]
+            .as_str()
+            .unwrap_or("UNKNOWN")
+            .to_uppercase();
+
+        Ok(status)
+    }
 }

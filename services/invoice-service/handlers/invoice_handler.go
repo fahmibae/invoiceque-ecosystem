@@ -29,6 +29,23 @@ func NewInvoiceHandler(
 	}
 }
 
+// ListLinkable handles GET /invoices/linkable
+// Returns invoices that can be associated with a new payment link:
+//   - status != 'paid', OR
+//   - payment_type = 'dp' AND amount_remaining > 0
+func (h *InvoiceHandler) ListLinkable(c *gin.Context) {
+	userID := c.GetHeader("X-User-ID")
+
+	invoices, err := h.repo.FindLinkableByUserID(userID)
+	if err != nil {
+		log.Printf("[INVOICE] Error listing linkable invoices: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": invoices})
+}
+
 // List handles GET /invoices
 func (h *InvoiceHandler) List(c *gin.Context) {
 	userID := c.GetHeader("X-User-ID")

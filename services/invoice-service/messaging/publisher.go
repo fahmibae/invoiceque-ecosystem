@@ -1,77 +1,66 @@
 package messaging
 
 import (
+	"bytes"
 	"encoding/json"
 	"log"
-
-	amqp "github.com/rabbitmq/amqp091-go"
+	"net/http"
+	"time"
 )
 
-const ExchangeName = "invoiceque.events"
-
 type Publisher struct {
-	channel *amqp.Channel
+	notificationServiceURL string
+	client                 *http.Client
 }
 
-func NewPublisher(conn *amqp.Connection) (*Publisher, error) {
-	ch, err := conn.Channel()
-	if err != nil {
-		return nil, err
+func NewPublisher(notificationServiceURL string) *Publisher {
+	return &Publisher{
+		notificationServiceURL: notificationServiceURL,
+		client:                 &http.Client{Timeout: 10 * time.Second},
 	}
-
-	// Declare exchange (matches Java TopicExchange)
-	err = ch.ExchangeDeclare(
-		ExchangeName,
-		"topic",
-		true,  // durable
-		false, // auto-deleted
-		false, // internal
-		false, // no-wait
-		nil,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Publisher{channel: ch}, nil
 }
 
 func (p *Publisher) PublishInvoiceCreated(event map[string]interface{}) {
-	p.publish("invoice.created", event)
+	p.publish("/events/invoice", event)
 }
 
 func (p *Publisher) PublishInvoiceSent(event map[string]interface{}) {
-	p.publish("invoice.sent", event)
+	p.publish("/events/invoice", event)
 }
 
 func (p *Publisher) PublishInvoicePaid(event map[string]interface{}) {
-	p.publish("invoice.paid", event)
+	p.publish("/events/invoice", event)
 }
 
 func (p *Publisher) PublishInvoiceOverdue(event map[string]interface{}) {
-	p.publish("invoice.overdue", event)
+	p.publish("/events/invoice", event)
 }
 
-func (p *Publisher) publish(routingKey string, event map[string]interface{}) {
+func (p *Publisher) publish(endpoint string, event map[string]interface{}) {
 	body, err := json.Marshal(event)
 	if err != nil {
 		log.Printf("[INVOICE] Failed to marshal event: %v", err)
 		return
 	}
 
-	err = p.channel.Publish(
-		ExchangeName,
-		routingKey,
-		false, // mandatory
-		false, // immediate
-		amqp.Publishing{
-			ContentType: "application/json",
-			Body:        body,
-		},
-	)
+	url := p.notificationServiceURL + endpoint
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
-		log.Printf("[INVOICE] Failed to publish event %s: %v", routingKey, err)
+		log.Printf("[INVOICE] Failed to create request for event: %v", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		log.Printf("[INVOICE] Failed to publish event %s via REST: %v", event["event_type"], err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		log.Printf("[INVOICE] Notification service returned error %d for event %s", resp.StatusCode, event["event_type"])
 	} else {
-		log.Printf("[INVOICE] Published event: %s", routingKey)
+		log.Printf("[INVOICE] Published event: %s", event["event_type"])
 	}
 }

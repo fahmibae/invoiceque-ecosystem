@@ -32,8 +32,18 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config) {
 	// ── Public routes (no auth required) ──────────────────────
 	// Must be registered BEFORE wildcard protected routes to avoid conflict
 	v1.GET("/pay/:id", proxyHandler(cfg.PaymentServiceURL, "/api/v1"))
+	v1.POST("/pay-checkout/:id", proxyHandler(cfg.PaymentServiceURL, "/api/v1"))
+	v1.POST("/pay-capture/:id", proxyHandler(cfg.PaymentServiceURL, "/api/v1"))
+	v1.GET("/pay-status/:id", proxyHandler(cfg.PaymentServiceURL, "/api/v1"))
 	v1.POST("/webhooks/payments", fixedPathProxy(cfg.PaymentServiceURL, "/payments/webhook"))
+	v1.POST("/webhooks/paypal", fixedPathProxy(cfg.PaymentServiceURL, "/payments/webhook/paypal"))
+	v1.POST("/webhooks/subscription", fixedPathProxy(cfg.SubscriptionServiceURL, "/subscriptions/webhook"))
 	v1.GET("/plans", fixedPathProxy(cfg.SubscriptionServiceURL, "/subscriptions/plans"))
+	v1.GET("/subscription/checkout/status/:external_id", func(c *gin.Context) {
+		extID := c.Param("external_id")
+		targetURL := cfg.SubscriptionServiceURL + "/subscriptions/checkout/status/" + extID
+		doProxy(c, targetURL)
+	})
 
 	// ── Protected routes ──────────────────────────────────────
 	protected := v1.Group("")

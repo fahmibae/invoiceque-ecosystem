@@ -55,3 +55,26 @@ type SubscribeRequest struct {
 type IncrementUsageRequest struct {
 	Type string `json:"type" binding:"required"` // "invoice", "client", "payment_link"
 }
+
+type CheckoutRequest struct {
+	PlanID string `json:"plan_id" binding:"required"`
+}
+
+type CheckoutResponse struct {
+	CheckoutURL   string `json:"checkout_url"`
+	TransactionID string `json:"transaction_id"`
+	ExternalID    string `json:"external_id"`
+}
+
+type SubscriptionTransaction struct {
+	ID          string    `json:"id"`
+	UserID      string    `json:"user_id"`
+	PlanID      string    `json:"plan_id"`
+	Amount      float64   `json:"amount"`
+	Status      string    `json:"status"` // pending, paid, expired, failed
+	CheckoutURL string    `json:"checkout_url"`
+	ExternalID  string    `json:"external_id"`
+	XenditID    string    `json:"xendit_id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}

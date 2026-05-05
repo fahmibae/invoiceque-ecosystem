@@ -3,8 +3,8 @@ use crate::models::payment_link::PaymentLink;
 
 pub async fn create(pool: &PgPool, link: &PaymentLink) -> Result<PaymentLink, sqlx::Error> {
     let result = sqlx::query_as::<_, PaymentLink>(
-        r#"INSERT INTO payment_links (id, user_id, title, description, amount, currency, status, url, clicks, payments, invoice_id, expires_at, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        r#"INSERT INTO payment_links (id, user_id, title, description, amount, currency, status, url, clicks, payments, invoice_id, payment_provider, provider_order_id, expires_at, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
         RETURNING *"#
     )
     .bind(&link.id)
@@ -18,6 +18,8 @@ pub async fn create(pool: &PgPool, link: &PaymentLink) -> Result<PaymentLink, sq
     .bind(link.clicks)
     .bind(link.payments)
     .bind(&link.invoice_id)
+    .bind(&link.payment_provider)
+    .bind(&link.provider_order_id)
     .bind(link.expires_at)
     .bind(link.created_at)
     .bind(link.updated_at)
@@ -108,4 +110,66 @@ pub async fn mark_payment_completed(pool: &PgPool, id: &str) -> Result<PaymentLi
     .bind(id)
     .fetch_one(pool)
     .await
+}
+
+pub async fn bulk_delete(pool: &PgPool, ids: &[String], user_id: &str) -> Result<u64, sqlx::Error> {
+    if ids.is_empty() {
+        return Ok(0);
+    }
+    let res = sqlx::query("DELETE FROM payment_links WHERE user_id = $1 AND id = ANY($2)")
+        .bind(user_id)
+        .bind(ids)
+        .execute(pool)
+        .await?;
+    Ok(res.rows_affected())
+}
+
+/// Delete active payment links by invoice_id. Completed links are cancelled instead.
+pub async fn delete_by_invoice_id(pool: &PgPool, invoice_id: &str, user_id: &str) -> Result<u64, sqlx::Error> {
+    // Cancel completed payment links (preserve audit trail)
+    sqlx::query(
+        "UPDATE payment_links SET status = 'cancelled', updated_at = NOW() WHERE invoice_id = $1 AND user_id = $2 AND status = 'completed'"
+    )
+    .bind(invoice_id)
+    .bind(user_id)
+    .execute(pool)
+    .await?;
+
+    // Delete active/pending payment links
+    let res = sqlx::query(
+        "DELETE FROM payment_links WHERE invoice_id = $1 AND user_id = $2 AND status != 'completed'"
+    )
+    .bind(invoice_id)
+    .bind(user_id)
+    .execute(pool)
+    .await?;
+
+    Ok(res.rows_affected())
+}
+
+/// Delete active payment links by multiple invoice_ids (for bulk invoice delete)
+pub async fn delete_by_invoice_ids(pool: &PgPool, invoice_ids: &[String], user_id: &str) -> Result<u64, sqlx::Error> {
+    if invoice_ids.is_empty() {
+        return Ok(0);
+    }
+
+    // Cancel completed payment links
+    sqlx::query(
+        "UPDATE payment_links SET status = 'cancelled', updated_at = NOW() WHERE invoice_id = ANY($1) AND user_id = $2 AND status = 'completed'"
+    )
+    .bind(invoice_ids)
+    .bind(user_id)
+    .execute(pool)
+    .await?;
+
+    // Delete active/pending payment links
+    let res = sqlx::query(
+        "DELETE FROM payment_links WHERE invoice_id = ANY($1) AND user_id = $2 AND status != 'completed'"
+    )
+    .bind(invoice_ids)
+    .bind(user_id)
+    .execute(pool)
+    .await?;
+
+    Ok(res.rows_affected())
 }

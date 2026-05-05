@@ -15,6 +15,8 @@ pub struct PaymentLink {
     pub clicks: i32,
     pub payments: i32,
     pub invoice_id: Option<String>,
+    pub payment_provider: Option<String>,
+    pub provider_order_id: Option<String>,
     pub expires_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -28,6 +30,9 @@ pub struct CreatePaymentLinkRequest {
     pub currency: Option<String>,
     pub invoice_id: Option<String>,
     pub expires_at: Option<String>,
+    pub payment_provider: Option<String>,
+    pub client_name: Option<String>,
+    pub client_email: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -54,3 +59,4 @@ pub struct WebhookPayload {
     pub status: String,
     pub amount: f64,
 }
+

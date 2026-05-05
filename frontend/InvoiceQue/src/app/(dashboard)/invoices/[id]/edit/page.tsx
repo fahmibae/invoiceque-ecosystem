@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { clientApi, invoiceApi, type Client, type Invoice } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
-import styles from '../../create/create.module.css';
+import { User02Icon, PackageIcon, GoogleDocIcon, Payment02Icon, MoneyBag01Icon, ArrowLeft02Icon } from 'hugeicons-react';
 
 interface LineItem {
   id: number;
@@ -145,7 +145,7 @@ export default function EditInvoicePage() {
 
   if (loading) {
     return (
-      <div className="animate-fade-in" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+      <div className="animate-fade-in p-10 text-center text-text-secondary">
         Memuat data invoice...
       </div>
     );
@@ -155,29 +155,25 @@ export default function EditInvoicePage() {
     <div className="animate-fade-in">
       <div className="page-header">
         <div className="page-header-left">
-          <h1 className="page-title">✏️ Edit Invoice</h1>
+          <div className="flex items-center gap-2">
+            <Link href="/invoices" className="btn btn-icon btn-transparent border-none hover:bg-transparent hover:-translate-x-1 transition"><ArrowLeft02Icon/></Link>
+            <h1 className="page-title">Edit Invoice</h1>
+          </div>
           <p className="page-subtitle">Ubah detail invoice sebelum dikirim</p>
         </div>
-        <Link href={`/invoices/${params.id}`} className="btn btn-secondary">
-          ← Kembali
-        </Link>
       </div>
 
       {error && (
-        <div style={{
-          padding: '12px 16px', background: 'rgba(239,68,68,0.1)',
-          border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px',
-          color: '#EF4444', fontSize: '14px', marginBottom: '16px',
-        }}>
+        <div className="px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-500 text-sm mb-4">
           {error}
         </div>
       )}
 
-      <div className={styles.createGrid}>
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-6 items-start">
         {/* Form */}
-        <div className={styles.formSection}>
+        <div className="flex flex-col gap-5">
           <div className="card">
-            <h3 className={styles.sectionTitle}>👤 Informasi Klien</h3>
+            <h3 className="flex items-center gap-2 text-base font-bold mb-4 pb-3 border-b border-border-light"><User02Icon /> Informasi Klien</h3>
             <div className="form-group">
               <label className="form-label">Pilih Klien</label>
               <select className="form-input form-select" value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)}>
@@ -188,27 +184,27 @@ export default function EditInvoicePage() {
               </select>
             </div>
             {client && (
-              <div className={styles.clientPreview}>
-                <div className={styles.clientPreviewAvatar}>
+              <div className="flex items-center gap-3.5 p-3.5 bg-bg-secondary rounded-md mt-2">
+                <div className="w-[42px] h-[42px] bg-gradient-to-br from-red-600 to-red-500 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0">
                   {client.name.split(' ').map((n) => n[0]).join('').substring(0,2)}
                 </div>
                 <div>
-                  <div style={{ fontWeight: 600 }}>{client.name}</div>
-                  <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{client.company}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{client.email}</div>
+                  <div className="font-semibold">{client.name}</div>
+                  <div className="text-[13px] text-text-secondary">{client.company}</div>
+                  <div className="text-xs text-text-tertiary">{client.email}</div>
                 </div>
               </div>
             )}
           </div>
 
           <div className="card">
-            <h3 className={styles.sectionTitle}>📦 Item & Layanan</h3>
+            <h3 className="flex items-center gap-2 text-base font-bold mb-4 pb-3 border-b border-border-light"><PackageIcon /> Item & Layanan</h3>
             {items.map((item, index) => (
-              <div key={item.id} className={styles.lineItem}>
-                <div className={styles.lineItemHeader}>
-                  <span className={styles.lineItemNum}>#{index + 1}</span>
+              <div key={item.id} className="border border-border-light rounded-md p-4 mb-3 bg-bg-secondary transition-all duration-150 hover:border-red-200">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-bold text-red-600 bg-red-50 dark:bg-red-900/10 px-2.5 py-0.5 rounded-full">#{index + 1}</span>
                   {items.length > 1 && (
-                    <button className={styles.removeBtn} onClick={() => removeItem(item.id)}>✕</button>
+                    <button className="w-7 h-7 flex items-center justify-center rounded-full bg-danger-bg text-danger text-xs cursor-pointer transition-all duration-150 border-none hover:bg-danger hover:text-white" onClick={() => removeItem(item.id)}>✕</button>
                   )}
                 </div>
                 <div className="form-group">
@@ -225,18 +221,18 @@ export default function EditInvoicePage() {
                     <input type="number" className="form-input" min="0" value={item.price} onChange={(e) => updateItem(item.id, 'price', parseInt(e.target.value) || 0)} />
                   </div>
                 </div>
-                <div className={styles.lineItemTotal}>
-                  Subtotal: <strong>{formatCurrency(item.quantity * item.price)}</strong>
+                <div className="text-right text-sm text-text-secondary pt-2 border-t border-dashed border-border-color mt-2">
+                  Subtotal: <strong className="text-text-primary">{formatCurrency(item.quantity * item.price)}</strong>
                 </div>
               </div>
             ))}
-            <button className={`btn btn-secondary ${styles.addItemBtn}`} onClick={addItem}>
+            <button className="btn btn-secondary w-full mt-1" onClick={addItem}>
               ＋ Tambah Item
             </button>
           </div>
 
           <div className="card">
-            <h3 className={styles.sectionTitle}>📋 Detail Tambahan</h3>
+            <h3 className="flex items-center gap-2 text-base font-bold mb-4 pb-3 border-b border-border-light"><GoogleDocIcon/> Detail Tambahan</h3>
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Pajak (%)</label>
@@ -256,28 +252,28 @@ export default function EditInvoicePage() {
               <textarea className="form-input form-textarea" placeholder="Catatan tambahan..." value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
 
-            <div className="form-group" style={{ marginTop: 16 }}>
-              <label className="form-label">💳 Tipe Pembayaran</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button type="button" className={`btn ${paymentType === 'full' ? 'btn-primary' : 'btn-secondary'}`} style={{ flex: 1 }} onClick={() => setPaymentType('full')}>
-                  💰 Full Payment
+            <div className="form-group mt-4">
+              <label className="flex items-center gap-2 form-label"><Payment02Icon/> Tipe Pembayaran</label>
+              <div className="flex gap-2">
+                <button type="button" className={`btn flex-1 ${paymentType === 'full' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setPaymentType('full')}>
+                  <MoneyBag01Icon/> Full Payment
                 </button>
-                <button type="button" className={`btn ${paymentType === 'dp' ? 'btn-primary' : 'btn-secondary'}`} style={{ flex: 1 }} onClick={() => setPaymentType('dp')}>
-                  📋 Down Payment
+                <button type="button" className={`btn flex-1 ${paymentType === 'dp' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setPaymentType('dp')}>
+                  <GoogleDocIcon/> Down Payment
                 </button>
               </div>
             </div>
 
             {paymentType === 'dp' && (
-              <div style={{ marginTop: 12, padding: 16, background: 'rgba(217,119,6,0.08)', borderRadius: 10, border: '1px solid rgba(217,119,6,0.2)' }}>
-                <label className="form-label" style={{ color: '#d97706' }}>Persentase DP</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <input type="range" min="10" max="90" step="5" value={dpPercentage} onChange={(e) => setDpPercentage(parseInt(e.target.value))} style={{ flex: 1 }} />
-                  <span style={{ fontWeight: 700, fontSize: 18, color: '#d97706', minWidth: 50, textAlign: 'right' }}>{dpPercentage}%</span>
+              <div className="mt-3 p-4 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                <label className="form-label text-amber-600">Persentase DP</label>
+                <div className="flex items-center gap-3">
+                  <input type="range" min="10" max="90" step="5" value={dpPercentage} onChange={(e) => setDpPercentage(parseInt(e.target.value))} className="flex-1" />
+                  <span className="font-bold text-lg text-amber-600 min-w-[50px] text-right">{dpPercentage}%</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 13 }}>
-                  <div><span style={{ color: 'var(--text-tertiary)' }}>DP: </span><strong style={{ color: '#d97706' }}>{formatCurrency(dpAmount)}</strong></div>
-                  <div><span style={{ color: 'var(--text-tertiary)' }}>Sisa: </span><strong>{formatCurrency(remainingAmount)}</strong></div>
+                <div className="flex justify-between mt-2.5 text-[13px]">
+                  <div><span className="text-text-tertiary">DP: </span><strong className="text-amber-600">{formatCurrency(dpAmount)}</strong></div>
+                  <div><span className="text-text-tertiary">Sisa: </span><strong className="text-text-primary">{formatCurrency(remainingAmount)}</strong></div>
                 </div>
               </div>
             )}
@@ -285,23 +281,23 @@ export default function EditInvoicePage() {
         </div>
 
         {/* Preview */}
-        <div className={styles.previewSection}>
-          <div className={`card ${styles.previewCard}`}>
-            <div className={styles.previewTotals}>
-              <div className={styles.totalRow}><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
-              <div className={styles.totalRow}><span>Pajak ({tax}%)</span><span>{formatCurrency(taxAmount)}</span></div>
+        <div className="sticky top-[calc(var(--header-height)+24px)] max-lg:relative max-lg:top-0">
+          <div className="card p-7">
+            <div className="py-4 border-t border-border-color">
+              <div className="flex justify-between py-1.5 text-[13px] text-text-secondary"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
+              <div className="flex justify-between py-1.5 text-[13px] text-text-secondary"><span>Pajak ({tax}%)</span><span>{formatCurrency(taxAmount)}</span></div>
               {discount > 0 && (
-                <div className={styles.totalRow}><span>Diskon</span><span style={{ color: 'var(--success)' }}>-{formatCurrency(discount)}</span></div>
+                <div className="flex justify-between py-1.5 text-[13px] text-text-secondary"><span>Diskon</span><span className="text-success">-{formatCurrency(discount)}</span></div>
               )}
-              <div className={`${styles.totalRow} ${styles.grandTotal}`}><span>Total</span><span>{formatCurrency(total)}</span></div>
+              <div className="flex justify-between py-1.5 text-[13px] text-text-secondary text-lg font-extrabold text-text-primary pt-3 mt-2 border-t-2 border-red-500"><span>Total</span><span>{formatCurrency(total)}</span></div>
             </div>
 
-            <div className={styles.previewActions}>
-              <button className="btn btn-primary btn-lg" style={{ width: '100%' }} onClick={() => handleSubmit('draft')} disabled={saving}>
-                {saving ? '⏳ Menyimpan...' : '💾 Simpan Perubahan'}
+            <div className="flex flex-col gap-2 mt-4">
+              <button className="btn btn-primary btn-lg w-full" onClick={() => handleSubmit('draft')} disabled={saving}>
+                {saving ? '⏳ Menyimpan...' : 'Simpan Perubahan'}
               </button>
-              <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => handleSubmit('sent')} disabled={saving}>
-                📤 Simpan & Kirim
+              <button className="btn btn-secondary w-full" onClick={() => handleSubmit('sent')} disabled={saving}>
+                Simpan & Kirim
               </button>
             </div>
           </div>

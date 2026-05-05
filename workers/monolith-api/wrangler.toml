@@ -1,0 +1,32 @@
+name = "iq-api"
+main = "build/worker/shim.mjs"
+compatibility_date = "2024-12-01"
+
+[build]
+command = "cargo install -q worker-build && worker-build --release"
+
+# ── Environment Variables (non-secret, overridable) ──
+[vars]
+ALLOWED_ORIGINS = "https://app.invoicequ.my.id,https://invoicequ.my.id,https://invoiceque-ecosystem.vercel.app"
+BASE_PAYMENT_URL = "https://app.invoicequ.my.id/pay"
+XENDIT_BASE_URL = "https://api.xendit.co"
+PAYPAL_BASE_URL = "https://api-m.paypal.com"
+SMTP_HOST = "smtp.gmail.com"
+SMTP_PORT = "587"
+FROM_EMAIL = "noreply@invoicequ.my.id"
+
+# ── Secrets (set via `wrangler secret put <NAME>`) ──
+# JWT_SECRET
+# AUTH_DB_URL
+# CLIENT_DB_URL
+# INVOICE_DB_URL
+# PAYMENT_DB_URL
+# SUBSCRIPTION_DB_URL
+# XENDIT_API_KEY
+# XENDIT_CALLBACK_TOKEN
+# PAYPAL_CLIENT_ID
+# PAYPAL_SECRET
+# PAYPAL_WEBHOOK_ID
+# SMTP_USER
+# SMTP_PASS
+# RESEND_API_KEY

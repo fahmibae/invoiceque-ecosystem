@@ -40,6 +40,20 @@ func NewPdfGeneratorService(settingsRepo *repository.SettingsRepository) *PdfGen
 		"orBool": func(a, b bool) bool {
 			return a || b
 		},
+		"initials": func(name string) string {
+			parts := strings.Fields(name)
+			if len(parts) == 0 {
+				return "IN"
+			}
+			if len(parts) == 1 {
+				r := []rune(parts[0])
+				if len(r) >= 2 {
+					return strings.ToUpper(string(r[:2]))
+				}
+				return strings.ToUpper(parts[0])
+			}
+			return strings.ToUpper(string(parts[0][0]) + string(parts[1][0]))
+		},
 	}
 
 	tmpl := template.Must(template.New("invoice_template.html").Funcs(funcMap).ParseFiles("templates/invoice_template.html"))
@@ -64,7 +78,7 @@ type pdfTemplateData struct {
 	BusinessPhone   string
 	BusinessAddress string
 	BusinessWebsite string
-	LogoURL         string
+	LogoURL         template.URL
 	AccentColor     string
 	FooterText      string
 	Items           []pdfItemData
@@ -160,7 +174,7 @@ func (s *PdfGeneratorService) GenerateInvoicePdf(invoice *models.Invoice) ([]byt
 		BusinessPhone:   settings.BusinessPhone,
 		BusinessAddress: settings.BusinessAddress,
 		BusinessWebsite: settings.BusinessWebsite,
-		LogoURL:         settings.LogoURL,
+		LogoURL:         template.URL(settings.LogoURL),
 		AccentColor:     accent,
 		FooterText:      footerText,
 		Items:           items,

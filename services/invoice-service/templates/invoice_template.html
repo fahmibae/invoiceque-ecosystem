@@ -2,16 +2,28 @@
 <html>
 <head>
     <meta charset="UTF-8"/>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@100..800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 12px; color: #333; background: white; }
+        body { font-family: 'Sora', sans-serif; font-size: 12px; color: #333; background: white; }
         .container { max-width: 680px; margin: 0 auto; padding: 30px; }
 
         /* Header */
         .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; padding-bottom: 20px; }
-        .logo { font-weight: 800; font-size: 28px; }
+        .logo { font-weight: 800; font-size: 40px; }
+        .logo-box {
+            width: 100px;
+            height: auto;
+            border-radius: 10px;
+            color: white;
+            font-weight: 800;
+            font-size: 60px;
+            letter-spacing: 1px;
+        }
         .logo-sub { font-size: 10px; color: #888; margin-top: 2px; }
-        .biz-info { font-size: 10px; color: #888; margin-top: 6px; line-height: 1.5; }
+        .biz-info { font-size: 10px; color: #888; margin-top: 2px; line-height: 1.2; }
         .invoice-title { text-align: right; }
         .invoice-title h1 { font-size: 24px; color: #333; margin-bottom: 4px; }
         .invoice-number { font-weight: 700; font-size: 14px; }
@@ -26,7 +38,18 @@
         .status-overdue { background: #fee2e2; color: #dc2626; }
 
         /* Client info */
-        .client-section { margin-bottom: 24px; }
+        .client-section {  
+            display: flex;
+            justify-content: space-between;
+            gap: 40px;
+            margin: 30px 0; 
+        }
+        .left-section {
+            text-align: left;
+        }
+        .right-section {
+            text-align: right;
+        }
         .client-label { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
         .client-name { font-size: 16px; font-weight: 700; color: #333; }
         .client-email { font-size: 12px; color: #666; }
@@ -39,7 +62,13 @@
         .items-table .qty-cell { text-align: center; }
 
         /* Totals */
-        .totals-section { display: flex; justify-content: flex-end; margin-bottom: 24px; }
+        .totals-section { text-align: right; }
+        .left-section {
+            text-align: left;
+        }
+        .right-section {
+            text-align: right;
+        }
         .totals-table { width: 280px; }
         .totals-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 12px; }
         .totals-row.grand-total { border-top: 2px solid #333; padding-top: 10px; margin-top: 4px; font-size: 16px; font-weight: 800; }
@@ -68,44 +97,70 @@
 <body>
     <div class="container">
         <!-- Header -->
-        <div class="header" style="border-bottom: 3px solid {{.AccentColor}}">
-            <div>
-                {{if .LogoURL}}
-                <div>
-                    <img src="{{.LogoURL}}" style="max-height: 48px; max-width: 160px;" alt="Logo"/>
-                </div>
-                {{else}}
-                <div class="logo" style="color: {{.AccentColor}}">{{.BusinessName}}</div>
+        <table style="width: 100%; border-bottom: 3px solid {{ .AccentColor }}; padding-bottom: 20px; margin-bottom: 30px;">
+            <tr>
+                <!-- LEFT: LOGO / BUSINESS -->
+                <td style="width: 10%; vertical-align: top;">
+                    {{if .LogoURL}}
+                    <div>
+                        <img src="{{.LogoURL}}" style="height: 100px; width: auto; object-fit: cover;" alt="Logo"/>
+                    </div>
+                    {{else}}
+                    <div class="logo-box" style="background: {{.AccentColor}}">
+                        {{initials .BusinessName}}
+                    </div>
+                    {{end}}
+                </td>
+
+                <!-- RIGHT (optional kalau mau nanti isi sesuatu) -->
+                <td style="width: 90%; vertical-align: top; text-align: right;">
+                    <div style="color: {{.AccentColor}}; font-weight: 800; font-size: 32px;">
+                        {{.BusinessName}}
+                    </div>
+                
+                    {{if or (ne .BusinessEmail "") (ne .BusinessPhone "")}}
+                    <div class="biz-info" style="font-size: 13px; color: #888; margin-top: 6px;  line-height: 1.2;">
+                        {{if ne .BusinessEmail ""}}<span>{{.BusinessEmail}}</span>{{end}}
+                        {{if and (ne .BusinessEmail "") (ne .BusinessPhone "")}} · {{end}}
+                        {{if ne .BusinessPhone ""}}<span>{{.BusinessPhone}}</span>{{end}}
+                    </div>
                 {{end}}
 
-                {{if or (ne .BusinessEmail "") (ne .BusinessPhone "")}}
-                <div class="biz-info">
-                    {{if ne .BusinessEmail ""}}<span>{{.BusinessEmail}}</span>{{end}}
-                    {{if and (ne .BusinessEmail "") (ne .BusinessPhone "")}} · {{end}}
-                    {{if ne .BusinessPhone ""}}<span>{{.BusinessPhone}}</span>{{end}}
-                </div>
+                {{if ne .BusinessAddress ""}}
+                <div class="biz-info" style="font-size: 13px; color: #888;">{{.BusinessAddress}}</div>
                 {{end}}
-                {{if ne .BusinessAddress ""}}<div class="biz-info">{{.BusinessAddress}}</div>{{end}}
-                {{if ne .BusinessWebsite ""}}<div class="biz-info">{{.BusinessWebsite}}</div>{{end}}
-            </div>
-            <div class="invoice-title">
-                <h1>INVOICE</h1>
-                <div class="invoice-number" style="color: {{.AccentColor}}">{{.InvoiceNumber}}</div>
-                <div class="invoice-date">Tanggal: {{.CreatedAt}}</div>
-                <div style="margin-top: 6px;">
-                    <span class="status-badge status-{{.Status}}">{{.Status}}</span>
-                </div>
-            </div>
-        </div>
+
+                {{if ne .BusinessWebsite ""}}
+                <div class="biz-info" style="font-size: 13px; color: #888;">{{.BusinessWebsite}}</div>
+                {{end}}
+                </td>
+            </tr>
+        </table>
 
         <!-- Client Info -->
-        <div class="client-section">
-            <div class="client-label">Ditagihkan kepada</div>
-            <div class="client-name">{{.ClientName}}</div>
-            <div class="client-email">{{.ClientEmail}}</div>
-            <div style="font-size: 11px; color: #888; margin-top: 2px;">Jatuh tempo: {{.DueDate}}</div>
-        </div>
+        <table style="width: 100%; margin: 30px 0; border-collapse: collapse;">
+            <tr>
+                <!-- LEFT -->
+                <td style="width: 50%; vertical-align: top;">
+                    <h1 style="margin-bottom: 6px;">INVOICE</h1>
+                    <div class="invoice-number" style="color: {{.AccentColor}}">{{.InvoiceNumber}}</div>
+                    <div class="invoice-date">Tanggal: {{.CreatedAt}}</div>
+                    <div style="margin-top: 6px;">
+                        <span class="status-badge status-{{.Status}}">{{.Status}}</span>
+                    </div>
+                </td>
 
+                <!-- RIGHT -->
+                <td style="width: 50%; vertical-align: top; text-align: right;">
+                    <div class="client-label">Ditagihkan kepada</div>
+                    <div class="client-name">{{.ClientName}}</div>
+                    <div class="client-email">{{.ClientEmail}}</div>
+                    <div style="font-size: 11px; color: #888; margin-top: 2px;">
+                        Jatuh tempo: {{.DueDate}}
+                    </div>
+                </td>
+            </tr>
+        </table>
         <!-- Items Table -->
         <table class="items-table">
             <thead>
@@ -129,29 +184,40 @@
         </table>
 
         <!-- Totals -->
-        <div class="totals-section">
-            <div class="totals-table">
-                <div class="totals-row">
-                    <span>Subtotal</span>
-                    <span>{{.SubtotalFormatted}}</span>
-                </div>
-                <div class="totals-row">
-                    <span>Pajak</span>
-                    <span>{{.TaxFormatted}}</span>
-                </div>
-                {{if gt .DiscountValue 0.0}}
-                <div class="totals-row">
-                    <span>Diskon</span>
-                    <span>-{{.DiscountFormatted}}</span>
-                </div>
-                {{end}}
-                <div class="totals-row grand-total" style="color: {{.AccentColor}}">
-                    <span>Grand Total</span>
-                    <span>{{.TotalFormatted}}</span>
-                </div>
-            </div>
-        </div>
+        <table style="width: 100%; margin-bottom: 24px;">
+            <tr>
+                <td style="width: 100%; text-align: right;">
+                    <table style="width: 280px; display: inline-table; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #f3f4f6;">Subtotal</td>
+                            <td style="text-align: right; border-bottom: 1px solid #f3f4f6; padding: 10px 12px;">{{.SubtotalFormatted}}</td>
+                        </tr>
 
+                        <tr>
+                            <td style="border-bottom: 1px solid #f3f4f6; padding: 10px 12px; text-align: right;">Pajak</td>
+                            <td style="text-align: right;border-bottom: 1px solid #f3f4f6; padding: 10px 12px;">{{.TaxFormatted}}</td>
+                        </tr>
+
+                        {{if gt .DiscountValue 0.0}}
+                        <tr>
+                            <td style="border-bottom: 1px solid #f3f4f6; padding: 10px 12px; text-align: right;">Diskon</td>
+                            <td style="text-align: right;border-bottom: 1px solid #f3f4f6; padding: 10px 12px;">-{{.DiscountFormatted}}</td>
+                        </tr>
+                        {{end}}
+
+                        <tr>
+                            <td colspan="2" style="border-top: 2px solid #333; padding-top: 12px;"></td>
+                        </tr>
+
+                        <tr style="font-weight: 800; font-size: 16px; color: {{.AccentColor}};">
+                            <td style="padding: 10px 12px; text-align: right;">Grand Total</td>
+                            <td style="text-align: right; padding: 10px 12px;">{{.TotalFormatted}}</td>
+                        </tr>
+
+                    </table>
+                </td>
+            </tr>
+        </table>
         <!-- DP Info Box -->
         {{if .IsDp}}
         <div class="dp-info-box">
@@ -178,9 +244,9 @@
         <!-- Payment Link -->
         {{if ne .PaymentLink ""}}
         <div class="payment-section">
-            <div class="payment-title" style="color: {{.AccentColor}}">{{if .IsDp}}💳 Bayar DP Sekarang{{else}}💳 Bayar Invoice Ini{{end}}</div>
+            <div class="payment-title" style="color: {{.AccentColor}};">{{if .IsDp}}💳 Bayar DP Sekarang{{else}}💳 Bayar Invoice Ini{{end}}</div>
             <div class="payment-desc">{{if .IsDp}}Klik tombol di bawah untuk membayar Down Payment{{else}}Klik tombol di bawah untuk melakukan pembayaran secara online{{end}}</div>
-            <a class="payment-btn" href="{{.PaymentLink}}" style="background: {{.AccentColor}}">Bayar Sekarang</a>
+            <a class="payment-btn" href="{{.PaymentLink}}" style="background: {{.AccentColor}};">Bayar Sekarang</a>
             <div class="payment-url">{{.PaymentLink}}</div>
         </div>
         {{end}}

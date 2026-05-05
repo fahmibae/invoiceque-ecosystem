@@ -4,6 +4,9 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { clientApi } from '@/lib/api';
+import { GoogleDocIcon, Alert01Icon, ArrowLeft02Icon } from 'hugeicons-react';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 
 export default function CreateClientPage() {
   const router = useRouter();
@@ -41,21 +44,23 @@ export default function CreateClientPage() {
     <div className="animate-fade-in">
       <div className="page-header">
         <div className="page-header-left">
-          <h1 className="page-title">👤 Tambah Klien Baru</h1>
+          <div className="flex items-center gap-2">
+            <Link href="/clients" className="btn btn-icon btn-transparent border-none hover:bg-transparent hover:-translate-x-1 transition"><ArrowLeft02Icon/></Link>
+            <h1 className="page-title">Tambah Klien Baru</h1>
+          </div>
           <p className="page-subtitle">Isi data klien untuk mempermudah pembuatan invoice</p>
         </div>
-        <Link href="/clients" className="btn btn-secondary">← Kembali</Link>
       </div>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="w-full">
         <div className="card">
-          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20, paddingBottom: 12, borderBottom: '1px solid var(--border-light)' }}>
-            📋 Informasi Klien
+          <h3 className="text-base flex items-center gap-2 font-bold mb-5 pb-3 border-b border-border-light">
+            <GoogleDocIcon/> Informasi Klien
           </h3>
 
           {error && (
-            <div style={{ padding: '12px 16px', marginBottom: 16, borderRadius: 8, background: 'rgba(239,68,68,0.1)', color: '#ef4444', fontSize: 14 }}>
-              ⚠️ {error}
+            <div className="flex items-center gap-2 py-3 px-4 mb-4 rounded-lg bg-red-500/10 text-red-500 text-sm">
+               <Alert01Icon/> {error}
             </div>
           )}
 
@@ -76,7 +81,14 @@ export default function CreateClientPage() {
             </div>
             <div className="form-group">
               <label className="form-label">Telepon</label>
-              <input type="tel" className="form-input" placeholder="+62 xxx xxxx xxxx" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <PhoneInput
+                international
+                defaultCountry="ID"
+                className="form-input flex items-center"
+                placeholder="+62 xxx xxxx xxxx"
+                value={phone}
+                onChange={(val) => setPhone(val || '')}
+              />
             </div>
           </div>
           <div className="form-group">
@@ -87,8 +99,8 @@ export default function CreateClientPage() {
             <label className="form-label">Kota</label>
             <input type="text" className="form-input" placeholder="Kota" value={city} onChange={(e) => setCity(e.target.value)} />
           </div>
-          <button type="submit" className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: 8 }} disabled={loading}>
-            {loading ? '⏳ Menyimpan...' : '💾 Simpan Klien'}
+          <button type="submit" className="btn btn-primary btn-lg w-full mt-2" disabled={loading}>
+            {loading ? 'Menyimpan...' : 'Simpan Klien'}
           </button>
         </div>
       </form>

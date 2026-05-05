@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/invoiceque/client-service/config"
@@ -21,6 +22,11 @@ func main() {
 		log.Fatalf("[CLIENT] Failed to connect to database: %v", err)
 	}
 	defer db.Close()
+
+	// Connection pool tuning
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
 
 	if err := db.Ping(); err != nil {
 		log.Fatalf("[CLIENT] Database ping failed: %v", err)
@@ -44,6 +50,7 @@ func main() {
 		clients.POST("", clientHandler.Create)
 		clients.PUT("/:id", clientHandler.Update)
 		clients.DELETE("/:id", clientHandler.Delete)
+		clients.POST("/bulk-delete", clientHandler.BulkDelete)
 	}
 
 	addr := fmt.Sprintf(":%s", cfg.Port)

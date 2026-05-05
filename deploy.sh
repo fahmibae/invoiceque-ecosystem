@@ -34,7 +34,6 @@ create_apps() {
   log "Creating Fly.io apps..."
 
   local apps=(
-    "invoiceque-rabbitmq"
     "invoiceque-gateway"
     "invoiceque-auth"
     "invoiceque-client"
@@ -53,10 +52,6 @@ create_apps() {
       success "Created $app"
     fi
   done
-
-  # Create volume for RabbitMQ
-  log "Creating RabbitMQ volume..."
-  fly volumes create rabbitmq_data --app invoiceque-rabbitmq --region sin --size 1 --yes 2>/dev/null || warn "Volume may already exist"
 }
 
 # ── Set Secrets ──────────────────────────────────────────────
@@ -69,9 +64,6 @@ set_secrets() {
 
   source "$ROOT_DIR/.env.production"
 
-  # RabbitMQ
-  fly secrets set RABBITMQ_DEFAULT_PASS="$RABBITMQ_PASSWORD" --app invoiceque-rabbitmq
-
   # Auth
   fly secrets set DB_URL="$AUTH_DB_URL" JWT_SECRET="$JWT_SECRET" --app invoiceque-auth
 
@@ -81,21 +73,22 @@ set_secrets() {
   # Invoice
   fly secrets set \
     DB_URL="$INVOICE_DB_URL" \
-    RABBITMQ_URL="amqp://invoiceque:${RABBITMQ_PASSWORD}@invoiceque-rabbitmq.internal:5672" \
+    NOTIFICATION_SERVICE_URL="http://invoiceque-notification.internal:8005" \
     PAYMENT_SERVICE_URL="http://invoiceque-payment.internal:8004" \
     --app invoiceque-invoice
 
   # Payment
   fly secrets set \
     DATABASE_URL="$PAYMENT_DB_URL" \
-    RABBITMQ_URL="amqp://invoiceque:${RABBITMQ_PASSWORD}@invoiceque-rabbitmq.internal:5672" \
+    NOTIFICATION_SERVICE_URL="http://invoiceque-notification.internal:8005" \
+    INVOICE_SERVICE_URL="http://invoiceque-invoice.internal:8003" \
     XENDIT_API_KEY="$XENDIT_API_KEY" \
     XENDIT_CALLBACK_TOKEN="$XENDIT_CALLBACK_TOKEN" \
     --app invoiceque-payment
 
   # Notification
   fly secrets set \
-    RABBITMQ_URL="amqp://invoiceque:${RABBITMQ_PASSWORD}@invoiceque-rabbitmq.internal:5672" \
+    AUTH_SERVICE_URL="http://invoiceque-auth.internal:8001" \
     SMTP_HOST="${SMTP_HOST:-smtp.gmail.com}" \
     SMTP_PORT="${SMTP_PORT:-587}" \
     SMTP_USER="$SMTP_USER" \
@@ -104,7 +97,13 @@ set_secrets() {
     --app invoiceque-notification
 
   # Subscription
-  fly secrets set DB_URL="$SUBSCRIPTION_DB_URL" --app invoiceque-subscription
+  fly secrets set \
+    DB_URL="$SUBSCRIPTION_DB_URL" \
+    NOTIFICATION_SERVICE_URL="http://invoiceque-notification.internal:8005" \
+    XENDIT_API_KEY="$XENDIT_API_KEY" \
+    XENDIT_CALLBACK_TOKEN="$XENDIT_CALLBACK_TOKEN" \
+    FRONTEND_URL="https://invoiceque.my.id" \
+    --app invoiceque-subscription
 
   # Gateway
   fly secrets set JWT_SECRET="$JWT_SECRET" --app invoiceque-gateway
@@ -113,12 +112,6 @@ set_secrets() {
 }
 
 # ── Deploy Functions ─────────────────────────────────────────
-deploy_rabbitmq() {
-  log "Deploying RabbitMQ..."
-  cd "$ROOT_DIR/infrastructure/rabbitmq"
-  fly deploy --app invoiceque-rabbitmq
-  success "RabbitMQ deployed!"
-}
 
 deploy_auth() {
   log "Deploying Auth Service..."
@@ -180,9 +173,6 @@ deploy_all() {
   log "🚀 Deploying ALL InvoiceQue services to Fly.io..."
   echo ""
 
-  deploy_rabbitmq
-  sleep 10  # Wait for RabbitMQ to be healthy
-
   deploy_auth
   deploy_client
   deploy_invoice
@@ -205,7 +195,6 @@ deploy_all() {
 case "${1:-help}" in
   create)     create_apps ;;
   secrets)    set_secrets ;;
-  rabbitmq)   deploy_rabbitmq ;;
   auth)       deploy_auth ;;
   client)     deploy_client ;;
   invoice)    deploy_invoice ;;
@@ -222,7 +211,6 @@ case "${1:-help}" in
     echo "  create        Create all Fly.io apps"
     echo "  secrets       Set all secrets from .env.production"
     echo "  all           Deploy all services"
-    echo "  rabbitmq      Deploy RabbitMQ only"
     echo "  auth          Deploy Auth Service only"
     echo "  client        Deploy Client Service only"
     echo "  invoice       Deploy Invoice Service only"

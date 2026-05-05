@@ -1,11 +1,17 @@
 package services
 
 import (
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math"
+	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/invoiceque/invoice-service/messaging"
@@ -87,6 +93,11 @@ func (s *InvoiceService) Create(req models.InvoiceRequest, userID string) (*mode
 		status = req.Status
 	}
 
+	currency := "IDR"
+	if req.Currency != "" {
+		currency = req.Currency
+	}
+
 	inv := &models.Invoice{
 		ID:           invoiceID,
 		Number:       invoiceNumber,
@@ -101,6 +112,7 @@ func (s *InvoiceService) Create(req models.InvoiceRequest, userID string) (*mode
 		Status:       status,
 		PaymentType:  paymentType,
 		DpPercentage: dpPercentage,
+		Currency:     currency,
 		CreatedAt:    &now,
 	}
 
@@ -156,10 +168,16 @@ func (s *InvoiceService) Create(req models.InvoiceRequest, userID string) (*mode
 		"event_type":     "invoice.created",
 		"invoice_id":     inv.ID,
 		"invoice_number": inv.Number,
+		"user_id":        inv.UserID,
 		"client_name":    inv.ClientName,
 		"client_email":   clientEmail,
+		"subtotal":       inv.Subtotal,
+		"tax":            inv.Tax,
+		"discount":       inv.Discount,
 		"total":          inv.Total,
 		"due_date":       dueDate,
+		"items":          inv.Items,
+		"payment_link":   inv.PaymentLink,
 	})
 
 	resp := models.ToResponse(inv)
@@ -177,6 +195,9 @@ func (s *InvoiceService) Update(id string, req models.InvoiceRequest, userID str
 	inv.ClientEmail = req.ClientEmail
 	inv.DueDate = req.DueDate
 	inv.Notes = req.Notes
+	if req.Currency != "" {
+		inv.Currency = req.Currency
+	}
 	if req.Tax != nil {
 		inv.Tax = *req.Tax
 	}
@@ -301,10 +322,15 @@ func (s *InvoiceService) SendInvoice(id, userID string) (*models.InvoiceResponse
 			"event_type":     "invoice.sent",
 			"invoice_id":     inv.ID,
 			"invoice_number": inv.Number,
+			"user_id":        inv.UserID,
 			"client_name":    inv.ClientName,
 			"client_email":   inv.ClientEmail,
+			"subtotal":       inv.Subtotal,
+			"tax":            inv.Tax,
+			"discount":       inv.Discount,
 			"total":          inv.Total,
 			"due_date":       inv.DueDate,
+			"items":          inv.Items,
 			"payment_link":   inv.PaymentLink,
 			"pdf_base64":     pdfBase64,
 		})
@@ -315,11 +341,25 @@ func (s *InvoiceService) SendInvoice(id, userID string) (*models.InvoiceResponse
 }
 
 // MarkAsPaid is called when a payment is completed (via payment webhook).
-// Handles both full payment and DP two-phase payment.
+// Uses SELECT FOR UPDATE to prevent race conditions from concurrent webhook retries.
 func (s *InvoiceService) MarkAsPaid(invoiceID string) {
-	inv, err := s.repo.FindByID(invoiceID)
+	tx, err := s.repo.BeginTx()
+	if err != nil {
+		log.Printf("[INVOICE] Failed to begin transaction for invoice %s: %v", invoiceID, err)
+		return
+	}
+	defer tx.Rollback()
+
+	// Lock the row to prevent concurrent webhook retries from corrupting state
+	inv, err := s.repo.FindByIDForUpdate(tx, invoiceID)
 	if err != nil {
 		log.Printf("[INVOICE] Failed to find invoice %s: %v", invoiceID, err)
+		return
+	}
+
+	// Idempotency: skip if already fully paid
+	if inv.Status == "paid" {
+		log.Printf("[INVOICE] Invoice %s already paid, skipping", inv.Number)
 		return
 	}
 
@@ -330,17 +370,20 @@ func (s *InvoiceService) MarkAsPaid(invoiceID string) {
 		inv.AmountPaid = inv.DpAmount
 		inv.AmountRemaining = inv.Total - inv.DpAmount
 		inv.Status = "partially_paid"
-		if err := s.repo.Save(inv); err != nil {
+		if err := s.repo.SaveInTx(tx, inv); err != nil {
 			log.Printf("[INVOICE] Failed to save invoice %s: %v", inv.Number, err)
+			return
+		}
+		if err := tx.Commit(); err != nil {
+			log.Printf("[INVOICE] Failed to commit DP phase 1 for %s: %v", inv.Number, err)
 			return
 		}
 		log.Printf("[INVOICE] Invoice %s DP received. Paid: %f, Remaining: %f",
 			inv.Number, inv.AmountPaid, inv.AmountRemaining)
 
-		// Auto-create payment link for remaining balance
+		// Auto-create payment link for remaining balance (outside transaction)
 		remainingURL := s.paymentClient.CreatePaymentLink(
-			inv.UserID,
-			inv.ID,
+			inv.UserID, inv.ID,
 			"Pelunasan Invoice "+inv.Number,
 			"Sisa pembayaran untuk "+inv.ClientName,
 			inv.AmountRemaining,
@@ -358,6 +401,7 @@ func (s *InvoiceService) MarkAsPaid(invoiceID string) {
 			"event_type":       "invoice.dp_paid",
 			"invoice_id":       inv.ID,
 			"invoice_number":   inv.Number,
+			"user_id":          inv.UserID,
 			"client_name":      inv.ClientName,
 			"client_email":     inv.ClientEmail,
 			"total":            inv.Total,
@@ -373,8 +417,13 @@ func (s *InvoiceService) MarkAsPaid(invoiceID string) {
 		inv.Status = "paid"
 		now := time.Now()
 		inv.PaidAt = &now
-		if err := s.repo.Save(inv); err != nil {
+		inv.ExchangeRateIDR = fetchExchangeRateToIDR(inv.Currency)
+		if err := s.repo.SaveInTx(tx, inv); err != nil {
 			log.Printf("[INVOICE] Failed to save invoice %s: %v", inv.Number, err)
+			return
+		}
+		if err := tx.Commit(); err != nil {
+			log.Printf("[INVOICE] Failed to commit payment for %s: %v", inv.Number, err)
 			return
 		}
 		log.Printf("[INVOICE] Invoice %s fully paid", inv.Number)
@@ -384,6 +433,7 @@ func (s *InvoiceService) MarkAsPaid(invoiceID string) {
 			"event_type":     "invoice.paid",
 			"invoice_id":     inv.ID,
 			"invoice_number": inv.Number,
+			"user_id":        inv.UserID,
 			"client_name":    inv.ClientName,
 			"client_email":   inv.ClientEmail,
 			"total":          inv.Total,
@@ -392,25 +442,10 @@ func (s *InvoiceService) MarkAsPaid(invoiceID string) {
 	}
 }
 
-// GetDashboardStats returns dashboard statistics
+// GetDashboardStats returns dashboard statistics using a single combined SQL query
 func (s *InvoiceService) GetDashboardStats(userID string) (*models.DashboardStatsResponse, error) {
-	totalRevenue, err := s.repo.SumTotalRevenueByUserID(userID)
-	if err != nil {
-		return nil, err
-	}
-	totalInvoices, err := s.repo.CountByUserID(userID)
-	if err != nil {
-		return nil, err
-	}
-	paidInvoices, err := s.repo.CountByUserIDAndStatus(userID, "paid")
-	if err != nil {
-		return nil, err
-	}
-	pendingAmount, err := s.repo.SumPendingAmountByUserID(userID)
-	if err != nil {
-		return nil, err
-	}
-	overdueInvoices, err := s.repo.CountByUserIDAndStatus(userID, "overdue")
+	totalRevenue, totalInvoices, paidInvoices, overdueInvoices, pendingAmount, err :=
+		s.repo.GetDashboardStatsCombined(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -425,21 +460,11 @@ func (s *InvoiceService) GetDashboardStats(userID string) (*models.DashboardStat
 	}, nil
 }
 
-// GetRevenueChart returns revenue chart data for the last N months
+// GetRevenueChart returns revenue chart data for the last N months using SQL aggregation
 func (s *InvoiceService) GetRevenueChart(userID string, months int) ([]models.RevenueChartItem, error) {
-	paidInvoices, err := s.repo.FindPaidInvoicesByUserID(userID)
+	revenueByMonth, err := s.repo.GetRevenueChartSQL(userID, months)
 	if err != nil {
 		return nil, err
-	}
-
-	// Group paid invoices by year-month
-	revenueByMonth := make(map[string]float64)
-	for _, inv := range paidInvoices {
-		if inv.PaidAt == nil {
-			continue
-		}
-		key := fmt.Sprintf("%d-%02d", inv.PaidAt.Year(), inv.PaidAt.Month())
-		revenueByMonth[key] += inv.Total
 	}
 
 	// Indonesian month names
@@ -466,12 +491,80 @@ func (s *InvoiceService) GetRevenueChart(userID string, months int) ([]models.Re
 }
 
 func generateShortID() string {
-	// Generate UUID-like short ID (matching Java UUID.randomUUID().toString().substring(0, 8).toUpperCase())
-	t := time.Now().UnixNano()
-	return strings.ToUpper(fmt.Sprintf("%08x", t%0xFFFFFFFF))
+	// Use crypto/rand for collision-resistant IDs
+	b := make([]byte, 4)
+	rand.Read(b)
+	return strings.ToUpper(hex.EncodeToString(b))
 }
 
 // Ensure roundTo2 is available (defined in pdf_generator.go but redeclaring for safety)
 func init() {
 	_ = math.Round // ensure math is used
+}
+
+// Exchange rate cache (1 hour TTL)
+var (
+	exchangeRateCache     = make(map[string]float64)
+	exchangeRateCacheTime time.Time
+	exchangeRateMu        sync.RWMutex
+)
+
+// fetchExchangeRateToIDR fetches the exchange rate with 1-hour caching.
+// Returns 1.0 for IDR. Falls back to 0 if API fails.
+func fetchExchangeRateToIDR(currency string) float64 {
+	if currency == "" || strings.ToUpper(currency) == "IDR" {
+		return 1.0
+	}
+	cur := strings.ToUpper(currency)
+
+	// Check cache (read lock)
+	exchangeRateMu.RLock()
+	if time.Since(exchangeRateCacheTime) < time.Hour {
+		if rate, ok := exchangeRateCache[cur]; ok {
+			exchangeRateMu.RUnlock()
+			return rate
+		}
+	}
+	exchangeRateMu.RUnlock()
+
+	// Cache miss — fetch from API
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get("https://open.er-api.com/v6/latest/IDR")
+	if err != nil {
+		log.Printf("[EXCHANGE] Failed to fetch rates: %v", err)
+		return 0
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("[EXCHANGE] Failed to read response: %v", err)
+		return 0
+	}
+	var data struct {
+		Result string             `json:"result"`
+		Rates  map[string]float64 `json:"rates"`
+	}
+	if err := json.Unmarshal(body, &data); err != nil || data.Result != "success" {
+		log.Printf("[EXCHANGE] Failed to parse rates: %v", err)
+		return 0
+	}
+
+	// Update cache (write lock)
+	exchangeRateMu.Lock()
+	exchangeRateCacheTime = time.Now()
+	for k, v := range data.Rates {
+		if v > 0 {
+			exchangeRateCache[k] = 1.0 / v
+		}
+	}
+	exchangeRateMu.Unlock()
+
+	rate, ok := data.Rates[cur]
+	if !ok || rate <= 0 {
+		log.Printf("[EXCHANGE] Rate not found for %s", currency)
+		return 0
+	}
+	result := 1.0 / rate
+	log.Printf("[EXCHANGE] Locked rate: 1 %s = %.2f IDR", currency, result)
+	return result
 }

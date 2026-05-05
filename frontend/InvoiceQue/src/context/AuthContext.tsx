@@ -9,6 +9,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  googleLogin: (idToken: string) => Promise<void>;
   register: (name: string, email: string, password: string, company?: string, phone?: string) => Promise<void>;
   logout: () => void;
 }
@@ -51,6 +52,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     handleAuthResponse(res);
   }, [handleAuthResponse]);
 
+  const googleLogin = useCallback(async (idToken: string) => {
+    const res = await authApi.googleLogin(idToken);
+    handleAuthResponse(res);
+  }, [handleAuthResponse]);
+
   const register = useCallback(async (
     name: string, email: string, password: string, company?: string, phone?: string
   ) => {
@@ -73,6 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated: !!token,
       isLoading,
       login,
+      googleLogin,
       register,
       logout,
     }}>

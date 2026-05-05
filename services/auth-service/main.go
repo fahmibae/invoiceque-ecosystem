@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/invoiceque/auth-service/config"
@@ -23,6 +24,11 @@ func main() {
 		log.Fatalf("[AUTH] Failed to connect to database: %v", err)
 	}
 	defer db.Close()
+
+	// Connection pool tuning
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
 
 	if err := db.Ping(); err != nil {
 		log.Fatalf("[AUTH] Database ping failed: %v", err)
@@ -47,6 +53,7 @@ func main() {
 	{
 		auth.POST("/register", authHandler.Register)
 		auth.POST("/login", authHandler.Login)
+		auth.POST("/google", authHandler.GoogleLogin)
 		auth.POST("/refresh", authHandler.RefreshToken)
 	}
 
@@ -55,6 +62,19 @@ func main() {
 	protected.Use(middleware.JWTAuth(cfg.JWTSecret))
 	{
 		protected.GET("/profile", authHandler.Profile)
+		protected.PUT("/profile", authHandler.UpdateProfile)
+		protected.PUT("/password", authHandler.ChangePassword)
+
+		// Admin routes
+		protected.GET("/users", authHandler.ListUsers)
+		protected.PUT("/users/:id/role", authHandler.UpdateRole)
+		protected.DELETE("/users/:id", authHandler.DeleteUser)
+	}
+
+	// Internal routes (service-to-service, no JWT required)
+	internal := r.Group("/internal")
+	{
+		internal.GET("/users/:id", authHandler.GetUserByID)
 	}
 
 	addr := fmt.Sprintf(":%s", cfg.Port)

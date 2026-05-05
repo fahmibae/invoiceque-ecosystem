@@ -157,3 +157,23 @@ func generateID() string {
 	rand.Read(b)
 	return hex.EncodeToString(b)
 }
+
+func (h *ClientHandler) BulkDelete(c *gin.Context) {
+	userID := c.GetHeader("X-User-ID")
+
+	var req struct {
+		IDs []string `json:"ids"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ids is required"})
+		return
+	}
+
+	deleted, err := h.clientRepo.BulkDelete(req.IDs, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Clients deleted", "deleted": deleted})
+}

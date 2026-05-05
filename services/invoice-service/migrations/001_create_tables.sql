@@ -21,8 +21,15 @@ CREATE TABLE IF NOT EXISTS invoices (
     paid_at TIMESTAMP,
     notes TEXT,
     payment_link TEXT,
-    remaining_payment_link TEXT
+    remaining_payment_link TEXT,
+    currency VARCHAR(10) DEFAULT 'IDR'
 );
+
+-- Add currency to existing tables if upgrading
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'IDR';
+
+-- Add exchange_rate_idr to lock rate at payment time
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS exchange_rate_idr DECIMAL(15,4) DEFAULT 0;
 
 -- Create invoice_items table
 CREATE TABLE IF NOT EXISTS invoice_items (
@@ -52,3 +59,12 @@ CREATE INDEX IF NOT EXISTS idx_invoices_user_id ON invoices(user_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_user_status ON invoices(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_invoices_created_at ON invoices(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice_id ON invoice_items(invoice_id);
+
+-- Add payment settings columns
+ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS bank_name VARCHAR(255) DEFAULT '';
+ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS bank_account_number VARCHAR(255) DEFAULT '';
+ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS bank_account_name VARCHAR(255) DEFAULT '';
+
+-- Change logo_url to TEXT to allow base64 images
+ALTER TABLE invoice_settings ALTER COLUMN logo_url TYPE TEXT;
+

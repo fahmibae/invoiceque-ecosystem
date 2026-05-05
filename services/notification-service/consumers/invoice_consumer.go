@@ -2,200 +2,116 @@ package consumers
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"log"
 
-	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/invoiceque/notification-service/repository"
 	"github.com/invoiceque/notification-service/services"
 )
 
-type InvoiceEvent struct {
-	EventType   string  `json:"event_type"`
-	InvoiceID   string  `json:"invoice_id"`
-	InvoiceNum  string  `json:"invoice_number"`
-	ClientName  string  `json:"client_name"`
-	ClientEmail string  `json:"client_email"`
+type InvoiceItem struct {
+	Description string  `json:"description"`
+	Quantity    int     `json:"quantity"`
+	Price       float64 `json:"price"`
 	Total       float64 `json:"total"`
-	DueDate     string  `json:"due_date"`
-	PaymentLink string  `json:"payment_link"`
-	PdfBase64   string  `json:"pdf_base64"`
+}
+
+type InvoiceEvent struct {
+	EventType   string        `json:"event_type"`
+	UserID      string        `json:"user_id"`
+	InvoiceID   string        `json:"invoice_id"`
+	InvoiceNum  string        `json:"invoice_number"`
+	ClientName  string        `json:"client_name"`
+	ClientEmail string        `json:"client_email"`
+	Subtotal    float64       `json:"subtotal"`
+	Tax         float64       `json:"tax"`
+	Discount    float64       `json:"discount"`
+	Total       float64       `json:"total"`
+	DueDate     string        `json:"due_date"`
+	PaymentLink string        `json:"payment_link"`
+	PdfBase64   string        `json:"pdf_base64"`
+	Items       []InvoiceItem `json:"items"`
 }
 
 type InvoiceConsumer struct {
 	emailService *services.EmailService
+	repo         *repository.NotificationRepo
 }
 
-func NewInvoiceConsumer(emailSvc *services.EmailService) *InvoiceConsumer {
-	return &InvoiceConsumer{emailService: emailSvc}
+func NewInvoiceConsumer(emailSvc *services.EmailService, repo *repository.NotificationRepo) *InvoiceConsumer {
+	return &InvoiceConsumer{emailService: emailSvc, repo: repo}
 }
 
-func (c *InvoiceConsumer) Start(conn *amqp.Connection) error {
-	ch, err := conn.Channel()
-	if err != nil {
-		return err
-	}
-
-	msgs, err := ch.Consume(
-		"notification.invoice", // queue
-		"notif-invoice",        // consumer tag
-		false,                  // auto-ack
-		false,                  // exclusive
-		false,                  // no-local
-		false,                  // no-wait
-		nil,                    // args
-	)
-	if err != nil {
-		return err
-	}
-
-	go func() {
-		for msg := range msgs {
-			c.handleMessage(msg)
-		}
-	}()
-
-	log.Println("[NOTIFICATION] Invoice consumer started, listening on queue: notification.invoice")
-	return nil
-}
-
-func (c *InvoiceConsumer) handleMessage(msg amqp.Delivery) {
-	var event InvoiceEvent
-	if err := json.Unmarshal(msg.Body, &event); err != nil {
-		log.Printf("[NOTIFICATION] Failed to parse invoice event: %v", err)
-		msg.Nack(false, false)
-		return
-	}
-
-	log.Printf("[NOTIFICATION] Received invoice event: %s for invoice %s", event.EventType, event.InvoiceNum)
+// ProcessEvent handles an invoice event received via REST API
+func (c *InvoiceConsumer) ProcessEvent(event InvoiceEvent) {
+	log.Printf("[NOTIFICATION] Processing invoice event: %s for invoice %s", event.EventType, event.InvoiceNum)
 
 	switch event.EventType {
 	case "invoice.sent":
-		c.handleInvoiceSent(event, msg)
+		c.handleInvoiceSent(event)
 		return
 
 	case "invoice.created":
 		subject := "Invoice Baru: " + event.InvoiceNum
-		body := "Halo " + event.ClientName + ",\n\n" +
-			"Invoice baru telah dibuat dengan nomor " + event.InvoiceNum + ".\n" +
-			"Total: Rp " + formatCurrency(event.Total) + "\n" +
-			"Jatuh tempo: " + event.DueDate + "\n\n" +
-			"Terima kasih,\nInvoiceQue"
+		amountStr := formatCurrency(event.Total)
 
-		err := c.emailService.Send(services.EmailPayload{
-			To:      event.ClientEmail,
-			Subject: subject,
-			Body:    body,
-		})
-		if err != nil {
-			log.Printf("[NOTIFICATION] Failed to send email: %v", err)
-			msg.Nack(false, true)
-			return
-		}
+		emailStatus := "not_sent"
+		c.saveNotification(event.UserID, "invoice_created", event.ClientEmail, subject,
+			fmt.Sprintf("Invoice %s untuk %s sebesar Rp %s telah dibuat", event.InvoiceNum, event.ClientName, amountStr),
+			emailStatus)
 
 	case "invoice.paid":
 		subject := "Pembayaran Diterima: " + event.InvoiceNum
-		body := "Halo " + event.ClientName + ",\n\n" +
-			"Pembayaran untuk invoice " + event.InvoiceNum + " telah diterima.\n" +
-			"Total: Rp " + formatCurrency(event.Total) + "\n\n" +
-			"Terima kasih,\nInvoiceQue"
+		amountStr := formatCurrency(event.Total)
+		htmlBody := services.TemplateInvoicePaid(event.ClientName, event.InvoiceNum, amountStr)
 
+		emailStatus := "sent"
 		err := c.emailService.Send(services.EmailPayload{
-			To:      event.ClientEmail,
-			Subject: subject,
-			Body:    body,
+			To:       event.ClientEmail,
+			Subject:  subject,
+			Body:     fmt.Sprintf("Pembayaran invoice %s sebesar Rp %s diterima.", event.InvoiceNum, amountStr),
+			HTMLBody: htmlBody,
 		})
 		if err != nil {
 			log.Printf("[NOTIFICATION] Failed to send email: %v", err)
-			msg.Nack(false, true)
-			return
+			emailStatus = "failed"
 		}
+
+		c.saveNotification(event.UserID, "payment_received", event.ClientEmail, subject,
+			fmt.Sprintf("Pembayaran invoice %s dari %s sebesar Rp %s telah diterima", event.InvoiceNum, event.ClientName, amountStr),
+			emailStatus)
 
 	case "invoice.overdue":
 		subject := "Reminder: Invoice " + event.InvoiceNum + " Jatuh Tempo"
-		body := "Halo " + event.ClientName + ",\n\n" +
-			"Invoice " + event.InvoiceNum + " telah melewati jatuh tempo.\n" +
-			"Total: Rp " + formatCurrency(event.Total) + "\n" +
-			"Jatuh tempo: " + event.DueDate + "\n\n" +
-			"Mohon segera lakukan pembayaran.\n\n" +
-			"Terima kasih,\nInvoiceQue"
+		amountStr := formatCurrency(event.Total)
+		htmlBody := services.TemplateInvoiceOverdue(event.ClientName, event.InvoiceNum, amountStr, event.DueDate)
 
+		emailStatus := "sent"
 		err := c.emailService.Send(services.EmailPayload{
-			To:      event.ClientEmail,
-			Subject: subject,
-			Body:    body,
+			To:       event.ClientEmail,
+			Subject:  subject,
+			Body:     fmt.Sprintf("Invoice %s sebesar Rp %s telah jatuh tempo (%s).", event.InvoiceNum, amountStr, event.DueDate),
+			HTMLBody: htmlBody,
 		})
 		if err != nil {
 			log.Printf("[NOTIFICATION] Failed to send email: %v", err)
-			msg.Nack(false, true)
-			return
+			emailStatus = "failed"
 		}
+
+		c.saveNotification(event.UserID, "invoice_overdue", event.ClientEmail, subject,
+			fmt.Sprintf("Invoice %s untuk %s sebesar Rp %s telah jatuh tempo", event.InvoiceNum, event.ClientName, amountStr),
+			emailStatus)
 
 	default:
 		log.Printf("[NOTIFICATION] Unknown invoice event type: %s", event.EventType)
-		msg.Ack(false)
 		return
 	}
-
-	msg.Ack(false)
 }
 
-func (c *InvoiceConsumer) handleInvoiceSent(event InvoiceEvent, msg amqp.Delivery) {
-	// Build professional HTML email
-	paymentBtn := ""
-	if event.PaymentLink != "" {
-		paymentBtn = fmt.Sprintf(`
-			<div style="text-align:center;margin:24px 0;">
-				<a href="%s" style="display:inline-block;background:linear-gradient(135deg,#DC2626,#EF4444);color:white;padding:14px 40px;border-radius:8px;font-weight:700;font-size:16px;text-decoration:none;">
-					💳 Bayar Sekarang
-				</a>
-				<p style="margin-top:8px;font-size:12px;color:#888;">
-					Atau klik link: <a href="%s" style="color:#DC2626;">%s</a>
-				</p>
-			</div>`, event.PaymentLink, event.PaymentLink, event.PaymentLink)
-	}
+func (c *InvoiceConsumer) handleInvoiceSent(event InvoiceEvent) {
+	itemsHTML := formatItemsHTML(event)
+	htmlBody := services.TemplateInvoiceSent(event.ClientName, event.InvoiceNum, formatCurrency(event.Total), event.DueDate, event.PaymentLink, itemsHTML)
 
-	htmlBody := fmt.Sprintf(`
-<!DOCTYPE html>
-<html>
-<body style="font-family:'Helvetica Neue',Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px;">
-<div style="max-width:600px;margin:0 auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-	<div style="background:linear-gradient(135deg,#DC2626,#EF4444);padding:30px;text-align:center;">
-		<div style="display:inline-block;background:white;border-radius:12px;padding:8px 16px;">
-			<span style="font-weight:800;font-size:20px;color:#DC2626;">IQ</span>
-		</div>
-		<h1 style="color:white;margin:16px 0 4px;font-size:24px;">Invoice %s</h1>
-		<p style="color:rgba(255,255,255,0.9);margin:0;font-size:14px;">Tagihan dari InvoiceQue</p>
-	</div>
-	<div style="padding:30px;">
-		<p style="font-size:16px;color:#333;">Halo <strong>%s</strong>,</p>
-		<p style="color:#555;line-height:1.6;">
-			Anda menerima invoice baru. Berikut ringkasan tagihannya:
-		</p>
-		<div style="background:#f8f9fa;border-radius:8px;padding:20px;margin:20px 0;">
-			<table style="width:100%%;font-size:14px;">
-				<tr><td style="color:#888;padding:4px 0;">No. Invoice</td><td style="text-align:right;font-weight:600;">%s</td></tr>
-				<tr><td style="color:#888;padding:4px 0;">Total</td><td style="text-align:right;font-weight:700;color:#DC2626;font-size:18px;">Rp %s</td></tr>
-				<tr><td style="color:#888;padding:4px 0;">Jatuh Tempo</td><td style="text-align:right;font-weight:600;">%s</td></tr>
-			</table>
-		</div>
-		%s
-		<p style="color:#888;font-size:13px;margin-top:20px;">
-			📎 Invoice lengkap terlampir dalam format PDF.
-		</p>
-	</div>
-	<div style="background:#f8f9fa;padding:20px;text-align:center;font-size:12px;color:#888;">
-		<p>Terima kasih atas kepercayaan Anda 🙏</p>
-		<p style="margin-top:4px;">Powered by <strong style="color:#DC2626;">InvoiceQue</strong></p>
-	</div>
-</div>
-</body>
-</html>`,
-		event.InvoiceNum, event.ClientName,
-		event.InvoiceNum, formatCurrency(event.Total), event.DueDate,
-		paymentBtn)
-
-	// Decode PDF attachment
 	var attachments []services.EmailAttachment
 	if event.PdfBase64 != "" {
 		pdfBytes, err := base64.StdEncoding.DecodeString(event.PdfBase64)
@@ -217,14 +133,89 @@ func (c *InvoiceConsumer) handleInvoiceSent(event InvoiceEvent, msg amqp.Deliver
 		Attachments: attachments,
 	})
 
+	emailStatus := "sent"
 	if err != nil {
 		log.Printf("[NOTIFICATION] Failed to send invoice email: %v", err)
-		msg.Nack(false, true)
+		emailStatus = "failed"
+	} else {
+		log.Printf("[NOTIFICATION] ✅ Invoice email sent to %s with PDF attachment", event.ClientEmail)
+	}
+
+	c.saveNotification(event.UserID, "invoice_sent", event.ClientEmail,
+		"Invoice "+event.InvoiceNum+" - Tagihan Anda",
+		fmt.Sprintf("Invoice %s untuk %s sebesar Rp %s telah dikirim via email", event.InvoiceNum, event.ClientName, formatCurrency(event.Total)),
+		emailStatus)
+}
+
+func (c *InvoiceConsumer) saveNotification(userID, notifType, recipient, subject, message, status string) {
+	if c.repo == nil {
+		log.Println("[NOTIFICATION] Warning: repo is nil, skipping database save")
 		return
 	}
 
-	log.Printf("[NOTIFICATION] ✅ Invoice email sent to %s with PDF attachment", event.ClientEmail)
-	msg.Ack(false)
+	err := c.repo.Insert(repository.Notification{
+		UserID:    userID,
+		Type:      notifType,
+		Recipient: recipient,
+		Subject:   subject,
+		Message:   message,
+		Status:    status,
+	})
+	if err != nil {
+		log.Printf("[NOTIFICATION] Failed to save notification to DB: %v", err)
+	} else {
+		log.Printf("[NOTIFICATION] ✅ Notification saved to DB: %s -> %s", notifType, recipient)
+	}
+}
+
+func formatItemsHTML(event InvoiceEvent) string {
+	if len(event.Items) == 0 {
+		return ""
+	}
+	rows := ""
+	for _, item := range event.Items {
+		rows += fmt.Sprintf(`
+		<tr>
+			<td style="padding:10px 16px;border-bottom:1px solid #e5e7eb;">%s</td>
+			<td style="padding:10px 16px;border-bottom:1px solid #e5e7eb;text-align:center;">%d</td>
+			<td style="padding:10px 16px;border-bottom:1px solid #e5e7eb;text-align:right;">%s</td>
+			<td style="padding:10px 16px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">%s</td>
+		</tr>`, item.Description, item.Quantity, formatCurrency(item.Price), formatCurrency(item.Total))
+	}
+
+	return fmt.Sprintf(`
+	<table width="100%%" cellspacing="0" cellpadding="0" style="margin:20px 0;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;font-size:14px;">
+		<thead>
+			<tr style="background:#f9fafb;color:#374151;text-align:left;">
+				<th style="padding:12px 16px;border-bottom:1px solid #e5e7eb;">Deskripsi</th>
+				<th style="padding:12px 16px;border-bottom:1px solid #e5e7eb;text-align:center;">Qty</th>
+				<th style="padding:12px 16px;border-bottom:1px solid #e5e7eb;text-align:right;">Harga</th>
+				<th style="padding:12px 16px;border-bottom:1px solid #e5e7eb;text-align:right;">Total</th>
+			</tr>
+		</thead>
+		<tbody>
+			%s
+		</tbody>
+		<tfoot>
+			<tr>
+				<td colspan="3" style="padding:10px 16px;text-align:right;color:#6b7280;border-top:1px solid #e5e7eb;">Subtotal</td>
+				<td style="padding:10px 16px;text-align:right;font-weight:600;border-top:1px solid #e5e7eb;">Rp %s</td>
+			</tr>
+			<tr>
+				<td colspan="3" style="padding:10px 16px;text-align:right;color:#6b7280;">Pajak</td>
+				<td style="padding:10px 16px;text-align:right;font-weight:600;">Rp %s</td>
+			</tr>
+			<tr>
+				<td colspan="3" style="padding:10px 16px;text-align:right;color:#6b7280;">Diskon</td>
+				<td style="padding:10px 16px;text-align:right;font-weight:600;color:#DC2626;">-Rp %s</td>
+			</tr>
+			<tr style="background:#f9fafb;">
+				<td colspan="3" style="padding:12px 16px;text-align:right;font-weight:700;color:#111827;">Total Tagihan</td>
+				<td style="padding:12px 16px;text-align:right;font-weight:800;color:#2563EB;">Rp %s</td>
+			</tr>
+		</tfoot>
+	</table>
+	`, rows, formatCurrency(event.Subtotal), formatCurrency(event.Tax), formatCurrency(event.Discount), formatCurrency(event.Total))
 }
 
 func formatCurrency(amount float64) string {

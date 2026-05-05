@@ -11,19 +11,19 @@ primary_region = 'sin'
   PAYMENT_SERVICE_URL = 'https://invoiceque-payment.fly.dev'
   NOTIFICATION_SERVICE_URL = 'https://invoiceque-notification.fly.dev'
   SUBSCRIPTION_SERVICE_URL = 'https://invoiceque-subscription.fly.dev'
-  ALLOWED_ORIGINS = 'https://invoiceque-web.fly.dev,http://localhost:3000'
+  ALLOWED_ORIGINS = 'https://app.invoicequ.my.id,https://invoicequ.my.id,https://invoiceque-web.fly.dev,http://localhost:3000'
 
 [http_service]
   internal_port = 8080
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true
-  min_machines_running = 1
+  min_machines_running = 0
 
   [http_service.concurrency]
     type = 'requests'
-    hard_limit = 250
-    soft_limit = 200
+    hard_limit = 20
+    soft_limit = 10
 
 [[vm]]
   memory = '256mb'

@@ -3,10 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { invoiceApi, type Invoice } from '@/lib/api';
+import { invoiceApi, paymentLinkApi, type Invoice, invoiceSettingsApi, type InvoiceSettingsData } from '@/lib/api';
 import { formatCurrency, formatDate, getStatusColor } from '@/lib/utils';
-import styles from './detail.module.css';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import { Download02Icon, ArrowLeft02Icon, Delete02Icon, FlashIcon, ChartIcon, SentIcon, Clock01Icon, Edit02Icon } from 'hugeicons-react';
 
 export default function InvoiceDetailPage() {
   const params = useParams();
@@ -16,6 +16,24 @@ export default function InvoiceDetailPage() {
   const [error, setError] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [bizName, setBizName] = useState('');
+  const [bizEmail, setBizEmail] = useState('');
+  const [companyInitial, setCompanyInitial] = useState('');
+
+  const loadSettings = async () => {
+    try {
+      const s = await invoiceSettingsApi.get();
+      setBizName(s.business_name || '');
+      setBizEmail(s.business_email || '');
+      setCompanyInitial(s.business_name.substring(0, 2).toUpperCase() || '');
+    } catch {
+      // Use defaults if API not available
+    }
+  };
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
 
   useEffect(() => {
     async function fetchInvoice() {
@@ -49,6 +67,12 @@ export default function InvoiceDetailPage() {
     if (!invoice) return;
     setIsDeleting(true);
     try {
+      // Cascade delete: clean up associated payment links first
+      try {
+        await paymentLinkApi.deleteByInvoice(invoice.id);
+      } catch {
+        // Non-blocking — payment links cleanup is best-effort
+      }
       await invoiceApi.delete(invoice.id);
       router.push('/invoices');
     } catch (err) {
@@ -60,7 +84,7 @@ export default function InvoiceDetailPage() {
 
   if (loading) {
     return (
-      <div className="animate-fade-in" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+      <div className="animate-fade-in p-10 text-center text-text-secondary">
         Memuat invoice...
       </div>
     );
@@ -69,11 +93,11 @@ export default function InvoiceDetailPage() {
   if (error || !invoice) {
     return (
       <div className="animate-fade-in">
-        <div className="card empty-state">
-          <div className="empty-state-icon">🔍</div>
-          <h3 className="empty-state-title">Invoice tidak ditemukan</h3>
-          <p className="empty-state-text">{error || 'Invoice yang Anda cari tidak ada.'}</p>
-          <Link href="/invoices" className="btn btn-primary">← Kembali ke Daftar</Link>
+        <div className="card text-center py-16 px-5">
+          <div className="text-5xl mb-4 opacity-50 flex justify-center"><Download02Icon width={48} height={48} /></div>
+          <h3 className="text-lg font-semibold mb-2">Invoice tidak ditemukan</h3>
+          <p className="text-sm text-text-secondary mb-6">{error || 'Invoice yang Anda cari tidak ada.'}</p>
+          <Link href="/invoices" className="btn btn-primary flex items-center gap-2"><ArrowLeft02Icon /> Kembali ke Daftar</Link>
         </div>
       </div>
     );
@@ -93,198 +117,196 @@ export default function InvoiceDetailPage() {
       />
       <div className="page-header">
         <div className="page-header-left">
-          <h1 className="page-title">📄 {invoice.number}</h1>
+          <div className="flex items-center gap-2">
+            <Link href="/invoices" className="btn btn-icon btn-transparent border-none hover:bg-transparent hover:-translate-x-1 transition"><ArrowLeft02Icon /></Link>
+            <h1 className="page-title">{invoice.number}</h1>
+          </div>
           <p className="page-subtitle">Detail invoice untuk {invoice.client_name}</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Link href="/invoices" className="btn btn-secondary">← Kembali</Link>
+        <div className="flex gap-2">
           {invoice.status === 'draft' && (
-            <button className="btn btn-primary" onClick={handleSend}>📤 Kirim Invoice</button>
+            <button className="btn btn-primary flex items-center gap-2" onClick={handleSend}><SentIcon /> Kirim Invoice</button>
           )}
         </div>
       </div>
 
-      <div className={styles.detailGrid}>
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
         {/* Invoice Document */}
-        <div className={`card ${styles.invoiceDoc}`}>
-          <div className={styles.docHeader}>
+        <div className="card p-8 max-sm:p-5">
+          <div className="flex justify-between items-start mb-7 pb-5 border-b-[3px] border-red-500 max-sm:flex-col max-sm:gap-4">
             <div>
-              <div className={styles.docLogo}>IQ</div>
-              <h2 className={styles.docTitle}>INVOICE</h2>
-              <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>InvoiceQue Platform</p>
+              <div className="w-[44px] h-[44px] bg-gradient-to-br from-red-600 to-red-500 rounded-sm flex items-center justify-center font-extrabold text-base text-white mb-2">{companyInitial || 'IQ'}</div>
+              <h2 className="text-[28px] font-black tracking-[3px] bg-gradient-to-br from-red-600 to-red-500 bg-clip-text text-transparent">INVOICE</h2>
+              <p className="text-xs text-text-tertiary">{bizName || 'InvoiceQu Platform'}</p>
             </div>
-            <div className={styles.docMeta}>
-              <div className={styles.docNumber}>{invoice.number}</div>
-              <div className={styles.docDate}>Tanggal: {formatDate(invoice.created_at)}</div>
-              <div className={styles.docDate}>Jatuh Tempo: {invoice.due_date ? formatDate(invoice.due_date) : '-'}</div>
-              <span className={`badge ${getStatusColor(invoice.status)}`} style={{ marginTop: 8 }}>
+            <div className="text-right max-sm:text-left flex flex-col max-sm:items-start items-end">
+              <div className="text-base font-bold mb-1">{invoice.number}</div>
+              <div className="text-[13px] text-text-secondary">Tanggal: {formatDate(invoice.created_at)}</div>
+              <div className="text-[13px] text-text-secondary">Jatuh Tempo: {invoice.due_date ? formatDate(invoice.due_date) : '-'}</div>
+              <span className={`badge ${getStatusColor(invoice.status)} mt-2`}>
                 {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
               </span>
             </div>
           </div>
 
-          <div className={styles.docClientSection}>
-            <div className={styles.docClientCard}>
-              <span className={styles.docLabel}>Tagihan untuk:</span>
-              <div style={{ fontWeight: 700, fontSize: 16 }}>{invoice.client_name}</div>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{invoice.client_email}</div>
+          <div className="mb-6">
+            <div className="p-4 bg-bg-secondary rounded-md border-l-[3px] border-red-500">
+              <span className="block text-[11px] font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-1">Tagihan untuk:</span>
+              <div className="font-bold text-base">{invoice.client_name}</div>
+              <div className="text-[13px] text-text-secondary">{invoice.client_email}</div>
             </div>
           </div>
 
-          <div className={styles.docTable}>
-            <table className={styles.itemTable}>
+          <div className="mb-5 overflow-x-auto">
+            <table className="w-full border-collapse min-w-[500px]">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Deskripsi</th>
-                  <th>Qty</th>
-                  <th>Harga</th>
-                  <th>Total</th>
+                  <th className="py-3 px-3.5 text-left text-xs font-bold uppercase text-white bg-gradient-to-br from-red-600 to-red-500 tracking-[0.5px] first:rounded-tl-md">#</th>
+                  <th className="py-3 px-3.5 text-left text-xs font-bold uppercase text-white bg-gradient-to-br from-red-600 to-red-500 tracking-[0.5px]">Deskripsi</th>
+                  <th className="py-3 px-3.5 text-left text-xs font-bold uppercase text-white bg-gradient-to-br from-red-600 to-red-500 tracking-[0.5px]">Qty</th>
+                  <th className="py-3 px-3.5 text-left text-xs font-bold uppercase text-white bg-gradient-to-br from-red-600 to-red-500 tracking-[0.5px]">Harga</th>
+                  <th className="py-3 px-3.5 text-right text-xs font-bold uppercase text-white bg-gradient-to-br from-red-600 to-red-500 tracking-[0.5px] last:rounded-tr-md">Total</th>
                 </tr>
               </thead>
               <tbody>
                 {invoice.items.map((item, idx) => (
                   <tr key={item.id}>
-                    <td>{idx + 1}</td>
-                    <td>{item.description}</td>
-                    <td>{item.quantity}</td>
-                    <td>{formatCurrency(item.price)}</td>
-                    <td style={{ fontWeight: 600 }}>{formatCurrency(item.total)}</td>
+                    <td className="p-3.5 text-sm border-b border-border-light">{idx + 1}</td>
+                    <td className="p-3.5 text-sm border-b border-border-light">{item.description}</td>
+                    <td className="p-3.5 text-sm border-b border-border-light">{item.quantity}</td>
+                    <td className="p-3.5 text-sm border-b border-border-light">{formatCurrency(item.price, invoice.currency)}</td>
+                    <td className="p-3.5 text-sm border-b border-border-light text-right font-semibold">{formatCurrency(item.total, invoice.currency)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          <div className={styles.docTotals}>
-            <div className={styles.totalLine}>
+          <div className="ml-auto max-w-[300px] py-4 max-sm:max-w-full">
+            <div className="flex justify-between py-2 text-sm text-text-secondary">
               <span>Subtotal</span>
-              <span>{formatCurrency(invoice.subtotal)}</span>
+              <span>{formatCurrency(invoice.subtotal, invoice.currency)}</span>
             </div>
-            <div className={styles.totalLine}>
+            <div className="flex justify-between py-2 text-sm text-text-secondary">
               <span>Pajak</span>
-              <span>{formatCurrency(invoice.tax)}</span>
+              <span>{formatCurrency(invoice.tax, invoice.currency)}</span>
             </div>
             {invoice.discount > 0 && (
-              <div className={styles.totalLine}>
+              <div className="flex justify-between py-2 text-sm text-text-secondary">
                 <span>Diskon</span>
-                <span style={{ color: 'var(--success)' }}>-{formatCurrency(invoice.discount)}</span>
+                <span className="text-success">-{formatCurrency(invoice.discount, invoice.currency)}</span>
               </div>
             )}
-            <div className={`${styles.totalLine} ${styles.grandTotal}`}>
+            <div className="flex justify-between py-2 text-sm text-text-secondary text-xl font-extrabold text-text-primary pt-3 mt-2 border-t-[2px] border-red-500">
               <span>Grand Total</span>
-              <span>{formatCurrency(invoice.total)}</span>
+              <span>{formatCurrency(invoice.total, invoice.currency)}</span>
             </div>
           </div>
 
           {invoice.notes && (
-            <div className={styles.docNotes}>
-              <span className={styles.docLabel}>Catatan:</span>
+            <div className="p-4 bg-bg-secondary rounded-md mt-5 text-[13px] text-text-secondary">
+              <span className="block text-[11px] font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-1">Catatan:</span>
               <p>{invoice.notes}</p>
             </div>
           )}
 
-          <div className={styles.docFooter}>
+          <div className="text-center pt-6 mt-6 border-t border-border-light text-[13px] text-text-secondary">
             <p>Terima kasih atas kepercayaan Anda 🙏</p>
-            <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Powered by InvoiceQue</p>
+            <p className="text-[11px] text-text-tertiary mt-1">Powered by InvoiceQu</p>
           </div>
         </div>
 
         {/* Sidebar Info */}
-        <div className={styles.sideInfo}>
+        <div className="flex flex-col gap-4 sticky top-[calc(var(--header-height)+24px)] max-lg:relative max-lg:top-0">
           <div className="card">
-            <h3 className={styles.sideTitle}>⚡ Aksi</h3>
-            <div className={styles.actionsList}>
+            <h3 className="text-[15px] font-bold mb-3.5 flex items-center gap-2"><FlashIcon /> Aksi</h3>
+            <div className="flex flex-col gap-2">
               {invoice.status === 'draft' && (
                 <>
-                  <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleSend}>📤 Kirim ke Klien</button>
-                  <Link href={`/invoices/${invoice.id}/edit`} className="btn btn-secondary" style={{ width: '100%', textAlign: 'center' }}>✏️ Edit Invoice</Link>
+                  <button className="btn btn-primary w-full" onClick={handleSend}><Download02Icon /> Kirim ke Klien</button>
+                  <Link href={`/invoices/${invoice.id}/edit`} className="btn btn-secondary w-full text-center"><Edit02Icon /> Edit Invoice</Link>
                 </>
               )}
-              <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => invoiceApi.downloadPdf(invoice.id, invoice.number + '.pdf')}>📥 Download PDF</button>
-              <button className="btn btn-ghost" style={{ width: '100%', color: 'var(--danger)' }} onClick={confirmDelete}>
-                🗑️ Hapus Invoice
+              <button className="btn btn-secondary w-full" onClick={() => invoiceApi.downloadPdf(invoice.id, invoice.number + '.pdf')}><Download02Icon /> Download PDF</button>
+              <button className="btn btn-ghost w-full text-danger hover:text-red-600" onClick={confirmDelete}>
+                <Delete02Icon /> Hapus Invoice
               </button>
             </div>
           </div>
 
           <div className="card">
-            <h3 className={styles.sideTitle}>📊 Info Pembayaran</h3>
-            <div className={styles.infoList}>
-              <div className={styles.infoRow}>
-                <span className={styles.infoLabel}>Status</span>
+            <h3 className="text-[15px] font-bold mb-3.5 flex items-center gap-2"><ChartIcon /> Info Pembayaran</h3>
+            <div className="flex flex-col gap-3">
+              <div className="flex justify-between items-center text-[13px]">
+                <span className="text-text-tertiary font-medium">Status</span>
                 <span className={`badge ${getStatusColor(invoice.status)}`}>
                   {invoice.status === 'partially_paid' ? 'DP Dibayar' : invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
                 </span>
               </div>
-              <div className={styles.infoRow}>
-                <span className={styles.infoLabel}>Tipe</span>
-                <span style={{ fontWeight: 600 }}>
+              <div className="flex justify-between items-center text-[13px]">
+                <span className="text-text-tertiary font-medium">Tipe</span>
+                <span className="font-semibold">
                   {invoice.payment_type === 'dp' ? `Down Payment (${invoice.dp_percentage}%)` : 'Full Payment'}
                 </span>
               </div>
-              <div className={styles.infoRow}>
-                <span className={styles.infoLabel}>Total</span>
-                <span style={{ fontWeight: 700 }}>{formatCurrency(invoice.total)}</span>
+              <div className="flex justify-between items-center text-[13px]">
+                <span className="text-text-tertiary font-medium">Total</span>
+                <span className="font-bold">{formatCurrency(invoice.total, invoice.currency)}</span>
               </div>
 
               {invoice.payment_type === 'dp' && (
                 <>
-                  <div style={{ margin: '10px 0 6px', padding: '10px', background: 'rgba(217,119,6,0.08)', borderRadius: 8, border: '1px solid rgba(217,119,6,0.15)' }}>
-                    <div className={styles.infoRow} style={{ marginBottom: 4 }}>
-                      <span style={{ fontSize: 12, color: '#d97706' }}>Nominal DP</span>
-                      <span style={{ fontWeight: 700, color: '#d97706' }}>{formatCurrency(invoice.dp_amount)}</span>
+                  <div className="my-2.5 p-2.5 bg-amber-500/10 rounded-lg border border-amber-500/15">
+                    <div className="flex justify-between items-center text-[13px] mb-1">
+                      <span className="text-xs text-amber-600">Nominal DP</span>
+                      <span className="font-bold text-amber-600">{formatCurrency(invoice.dp_amount, invoice.currency)}</span>
                     </div>
-                    <div className={styles.infoRow} style={{ marginBottom: 4 }}>
-                      <span style={{ fontSize: 12, color: 'var(--success)' }}>Sudah Dibayar</span>
-                      <span style={{ fontWeight: 700, color: 'var(--success)' }}>{formatCurrency(invoice.amount_paid)}</span>
+                    <div className="flex justify-between items-center text-[13px] mb-1">
+                      <span className="text-xs text-success">Sudah Dibayar</span>
+                      <span className="font-bold text-success">{formatCurrency(invoice.amount_paid, invoice.currency)}</span>
                     </div>
-                    <div className={styles.infoRow}>
-                      <span style={{ fontSize: 12 }}>Sisa Bayar</span>
-                      <span style={{ fontWeight: 700, color: invoice.amount_remaining > 0 ? 'var(--danger)' : 'var(--success)' }}>
-                        {formatCurrency(invoice.amount_remaining)}
+                    <div className="flex justify-between items-center text-[13px]">
+                      <span className="text-xs">Sisa Bayar</span>
+                      <span className={`font-bold ${invoice.amount_remaining > 0 ? 'text-danger' : 'text-success'}`}>
+                        {formatCurrency(invoice.amount_remaining, invoice.currency)}
                       </span>
                     </div>
                     {/* Progress bar */}
-                    <div style={{ marginTop: 8, height: 6, background: 'rgba(0,0,0,0.08)', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{
-                        height: '100%',
+                    <div className="mt-2 h-1.5 bg-black/10 rounded-[3px] overflow-hidden">
+                      <div className="h-full rounded-[3px] transition-[width] duration-300 bg-gradient-to-r from-amber-600 to-amber-500" style={{
                         width: `${invoice.total > 0 ? Math.round((invoice.amount_paid / invoice.total) * 100) : 0}%`,
-                        background: 'linear-gradient(90deg, #d97706, #f59e0b)',
-                        borderRadius: 3,
-                        transition: 'width 0.3s',
                       }} />
                     </div>
                   </div>
                 </>
               )}
 
-              <div className={styles.infoRow}>
-                <span className={styles.infoLabel}>Dibuat</span>
+              <div className="flex justify-between items-center text-[13px]">
+                <span className="text-text-tertiary font-medium">Dibuat</span>
                 <span>{formatDate(invoice.created_at)}</span>
               </div>
-              <div className={styles.infoRow}>
-                <span className={styles.infoLabel}>Jatuh Tempo</span>
+              <div className="flex justify-between items-center text-[13px]">
+                <span className="text-text-tertiary font-medium">Jatuh Tempo</span>
                 <span>{invoice.due_date ? formatDate(invoice.due_date) : '-'}</span>
               </div>
               {invoice.paid_at && (
-                <div className={styles.infoRow}>
-                  <span className={styles.infoLabel}>Lunas</span>
-                  <span style={{ color: 'var(--success)' }}>{formatDate(invoice.paid_at)}</span>
+                <div className="flex justify-between items-center text-[13px]">
+                  <span className="text-text-tertiary font-medium">Lunas</span>
+                  <span className="text-success">{formatDate(invoice.paid_at)}</span>
                 </div>
               )}
               {invoice.payment_link && (
-                <div style={{ marginTop: 8 }}>
+                <div className="mt-2">
                   <a href={invoice.payment_link} target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'block', textAlign: 'center', padding: '8px', background: 'rgba(220,38,38,0.1)', borderRadius: 6, color: '#DC2626', fontWeight: 600, fontSize: 12, textDecoration: 'none' }}>
+                    className="block text-center p-2 bg-red-600/10 rounded-md text-red-600 font-semibold text-xs no-underline hover:bg-red-600/20 transition-colors">
                     🔗 {invoice.payment_type === 'dp' && invoice.status !== 'partially_paid' ? 'Link Pembayaran DP' : 'Link Pembayaran'}
                   </a>
                 </div>
               )}
               {invoice.remaining_payment_link && (
-                <div style={{ marginTop: 4 }}>
+                <div className="mt-1">
                   <a href={invoice.remaining_payment_link} target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'block', textAlign: 'center', padding: '8px', background: 'rgba(21,128,61,0.1)', borderRadius: 6, color: '#15803d', fontWeight: 600, fontSize: 12, textDecoration: 'none' }}>
+                    className="block text-center p-2 bg-green-600/10 rounded-md text-green-700 font-semibold text-xs no-underline hover:bg-green-600/20 transition-colors">
                     🔗 Link Pelunasan
                   </a>
                 </div>
@@ -293,30 +315,30 @@ export default function InvoiceDetailPage() {
           </div>
 
           <div className="card">
-            <h3 className={styles.sideTitle}>🕐 Riwayat</h3>
-            <div className={styles.timeline}>
-              <div className={styles.timelineItem}>
-                <div className={styles.timelineDot} style={{ background: 'var(--info)' }} />
+            <h3 className="text-[15px] font-bold mb-3.5 flex items-center gap-2"><Clock01Icon /> Riwayat</h3>
+            <div className="flex flex-col gap-4 pl-4 border-l-[2px] border-border-color">
+              <div className="flex gap-3 items-start relative">
+                <div className="w-2.5 h-2.5 rounded-full shrink-0 mt-1 absolute -left-[21px] bg-info" />
                 <div>
-                  <div className={styles.timelineTitle}>Invoice dibuat</div>
-                  <div className={styles.timelineDate}>{formatDate(invoice.created_at)}</div>
+                  <div className="text-[13px] font-semibold ml-0.5">Invoice dibuat</div>
+                  <div className="text-[11px] text-text-tertiary ml-0.5">{formatDate(invoice.created_at)}</div>
                 </div>
               </div>
               {invoice.status !== 'draft' && (
-                <div className={styles.timelineItem}>
-                  <div className={styles.timelineDot} style={{ background: 'var(--warning)' }} />
+                <div className="flex gap-3 items-start relative">
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0 mt-1 absolute -left-[21px] bg-warning" />
                   <div>
-                    <div className={styles.timelineTitle}>Invoice dikirim</div>
-                    <div className={styles.timelineDate}>{formatDate(invoice.created_at)}</div>
+                    <div className="text-[13px] font-semibold ml-0.5">Invoice dikirim</div>
+                    <div className="text-[11px] text-text-tertiary ml-0.5">{formatDate(invoice.created_at)}</div>
                   </div>
                 </div>
               )}
               {invoice.paid_at && (
-                <div className={styles.timelineItem}>
-                  <div className={styles.timelineDot} style={{ background: 'var(--success)' }} />
+                <div className="flex gap-3 items-start relative">
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0 mt-1 absolute -left-[21px] bg-success" />
                   <div>
-                    <div className={styles.timelineTitle}>Pembayaran diterima</div>
-                    <div className={styles.timelineDate}>{formatDate(invoice.paid_at)}</div>
+                    <div className="text-[13px] font-semibold ml-0.5">Pembayaran diterima</div>
+                    <div className="text-[11px] text-text-tertiary ml-0.5">{formatDate(invoice.paid_at)}</div>
                   </div>
                 </div>
               )}

@@ -5,10 +5,9 @@
 #
 # LANGKAH DEPLOY:
 #   1. Push repo ini ke GitHub
-#   2. Daftar gratis di cloudamqp.com → buat instance → copy AMQP URL
-#   3. Buka render.com → New Blueprint → connect GitHub repo
-#   4. Render akan membaca file ini dan membuat semua services
-#   5. Set env vars bertanda "sync: false" di Render Dashboard
+#   2. Buka render.com → New Blueprint → connect GitHub repo
+#   3. Render akan membaca file ini dan membuat semua services
+#   4. Set env vars bertanda "sync: false" di Render Dashboard
 #
 # ============================================================
 
@@ -58,8 +57,6 @@ services:
         sync: false  # Neon Cloud: AUTH_DB_URL
       - key: JWT_SECRET
         sync: false
-      - key: RABBITMQ_URL
-        sync: false  # CloudAMQP URL
 
   # ── Client Service ───────────────────────────────────────
   - type: web
@@ -74,8 +71,6 @@ services:
         value: "8002"
       - key: DB_URL
         sync: false  # Neon Cloud: CLIENT_DB_URL
-      - key: RABBITMQ_URL
-        sync: false
 
   # ── Invoice Service ──────────────────────────────────────
   - type: web
@@ -90,10 +85,10 @@ services:
         value: "8003"
       - key: DB_URL
         sync: false  # Neon Cloud: INVOICE_DB_URL
-      - key: RABBITMQ_URL
-        sync: false
       - key: PAYMENT_SERVICE_URL
         sync: false  # https://invoiceque-payment.onrender.com
+      - key: NOTIFICATION_SERVICE_URL
+        sync: false  # https://invoiceque-notification.onrender.com
 
   # ── Payment Service (Rust) ───────────────────────────────
   - type: web
@@ -108,8 +103,10 @@ services:
         value: "8004"
       - key: DATABASE_URL
         sync: false  # Neon Cloud: PAYMENT_DB_URL
-      - key: RABBITMQ_URL
-        sync: false
+      - key: NOTIFICATION_SERVICE_URL
+        sync: false  # https://invoiceque-notification.onrender.com
+      - key: INVOICE_SERVICE_URL
+        sync: false  # https://invoiceque-invoice.onrender.com
       - key: XENDIT_API_KEY
         sync: false
       - key: XENDIT_CALLBACK_TOKEN
@@ -130,8 +127,8 @@ services:
     envVars:
       - key: PORT
         value: "8005"
-      - key: RABBITMQ_URL
-        sync: false
+      - key: AUTH_SERVICE_URL
+        sync: false  # https://invoiceque-auth.onrender.com
       - key: SMTP_HOST
         value: "smtp.gmail.com"
       - key: SMTP_PORT
@@ -156,8 +153,8 @@ services:
         value: "8006"
       - key: DB_URL
         sync: false  # Neon Cloud: SUBSCRIPTION_DB_URL
-      - key: RABBITMQ_URL
-        sync: false
+      - key: NOTIFICATION_SERVICE_URL
+        sync: false  # https://invoiceque-notification.onrender.com
 
   # ── Frontend (Next.js) ──────────────────────────────────
   - type: web
@@ -165,6 +162,20 @@ services:
     runtime: docker
     dockerfilePath: ./frontend/InvoiceQue/Dockerfile
     dockerContext: ./frontend/InvoiceQue
+    region: singapore
+    plan: free
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: NEXT_PUBLIC_API_URL
+        value: "https://invoiceque-gateway.onrender.com/api/v1"
+
+  # ── Admin Panel (Next.js) ────────────────────────────────
+  - type: web
+    name: invoiceque-admin
+    runtime: docker
+    dockerfilePath: ./frontend/AdminPanel-InvoiceQue/Dockerfile
+    dockerContext: ./frontend/AdminPanel-InvoiceQue
     region: singapore
     plan: free
     envVars:

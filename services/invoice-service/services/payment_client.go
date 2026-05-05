@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"time"
 )
 
 // PaymentServiceClient is an HTTP client for inter-service communication with the Payment Service.
@@ -18,7 +19,7 @@ type PaymentServiceClient struct {
 func NewPaymentServiceClient(baseURL string) *PaymentServiceClient {
 	return &PaymentServiceClient{
 		baseURL:    baseURL,
-		httpClient: &http.Client{},
+		httpClient: &http.Client{Timeout: 15 * time.Second},
 	}
 }
 

@@ -111,6 +111,15 @@ func (h *SubscriptionHandler) Subscribe(c *gin.Context) {
 		return
 	}
 
+	// Enterprise plan cannot be subscribed directly — must go through admin/sales
+	if plan.Name == "enterprise" {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":   "Paket Enterprise tidak bisa diaktifkan secara langsung. Silakan hubungi tim Sales kami.",
+			"contact": "Hubungi admin SaaS untuk mendapatkan link checkout Enterprise.",
+		})
+		return
+	}
+
 	// Check if user already has a subscription
 	existing, _ := h.repo.GetByUserID(userID)
 	if existing != nil {
@@ -166,49 +175,45 @@ func (h *SubscriptionHandler) IncrementUsage(c *gin.Context) {
 		return
 	}
 
-	// Check limits first
-	subWithPlan, err := h.repo.GetUsage(userID)
+	// Atomic check-and-increment (prevents race condition)
+	incremented, err := h.repo.IncrementUsage(userID, req.Type)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "No subscription found"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to increment usage"})
 		return
 	}
 
-	// Check if limit reached
-	switch req.Type {
-	case "invoice":
-		if subWithPlan.Plan.MaxInvoices != -1 && subWithPlan.InvoicesUsed >= subWithPlan.Plan.MaxInvoices {
-			c.JSON(http.StatusForbidden, gin.H{
-				"error":   "Invoice limit reached",
-				"limit":   subWithPlan.Plan.MaxInvoices,
-				"used":    subWithPlan.InvoicesUsed,
-				"upgrade": "Upgrade to Pro or Enterprise for more invoices",
-			})
-			return
+	if !incremented {
+		// Limit reached — fetch details for error message
+		subWithPlan, _ := h.repo.GetUsage(userID)
+		if subWithPlan != nil {
+			switch req.Type {
+			case "invoice":
+				c.JSON(http.StatusForbidden, gin.H{
+					"error":   "Invoice limit reached",
+					"limit":   subWithPlan.Plan.MaxInvoices,
+					"used":    subWithPlan.InvoicesUsed,
+					"upgrade": "Upgrade to Pro or Enterprise for more invoices",
+				})
+			case "client":
+				c.JSON(http.StatusForbidden, gin.H{
+					"error":   "Client limit reached",
+					"limit":   subWithPlan.Plan.MaxClients,
+					"used":    subWithPlan.ClientsUsed,
+					"upgrade": "Upgrade to Pro or Enterprise for more clients",
+				})
+			case "payment_link":
+				c.JSON(http.StatusForbidden, gin.H{
+					"error":   "Payment link limit reached",
+					"limit":   subWithPlan.Plan.MaxPaymentLinks,
+					"used":    subWithPlan.PaymentLinksUsed,
+					"upgrade": "Upgrade to Pro or Enterprise for more payment links",
+				})
+			default:
+				c.JSON(http.StatusForbidden, gin.H{"error": "Limit reached"})
+			}
+		} else {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Limit reached"})
 		}
-	case "client":
-		if subWithPlan.Plan.MaxClients != -1 && subWithPlan.ClientsUsed >= subWithPlan.Plan.MaxClients {
-			c.JSON(http.StatusForbidden, gin.H{
-				"error":   "Client limit reached",
-				"limit":   subWithPlan.Plan.MaxClients,
-				"used":    subWithPlan.ClientsUsed,
-				"upgrade": "Upgrade to Pro or Enterprise for more clients",
-			})
-			return
-		}
-	case "payment_link":
-		if subWithPlan.Plan.MaxPaymentLinks != -1 && subWithPlan.PaymentLinksUsed >= subWithPlan.Plan.MaxPaymentLinks {
-			c.JSON(http.StatusForbidden, gin.H{
-				"error":   "Payment link limit reached",
-				"limit":   subWithPlan.Plan.MaxPaymentLinks,
-				"used":    subWithPlan.PaymentLinksUsed,
-				"upgrade": "Upgrade to Pro or Enterprise for more payment links",
-			})
-			return
-		}
-	}
-
-	if err := h.repo.IncrementUsage(userID, req.Type); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to increment usage"})
 		return
 	}
 
@@ -251,6 +256,74 @@ func (h *SubscriptionHandler) CheckLimit(c *gin.Context) {
 		"plan":    subWithPlan.Plan.Name,
 		"tier":    subWithPlan.Plan.DisplayName,
 	})
+}
+
+// PUT /subscriptions/plans/:id — Admin: Update plan settings
+func (h *SubscriptionHandler) UpdatePlan(c *gin.Context) {
+	planID := c.Param("id")
+	if planID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Plan ID required"})
+		return
+	}
+
+	// Verify plan exists
+	existing, err := h.repo.GetPlanByID(planID)
+	if err != nil || existing == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Plan not found"})
+		return
+	}
+
+	var req models.SubscriptionPlan
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Use existing values as fallback
+	if req.DisplayName == "" {
+		req.DisplayName = existing.DisplayName
+	}
+	if req.BillingPeriod == "" {
+		req.BillingPeriod = existing.BillingPeriod
+	}
+	if req.Features == "" {
+		req.Features = existing.Features
+	}
+
+	if err := h.repo.UpdatePlanSettings(planID, &req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update plan"})
+		return
+	}
+
+	// Fetch updated plan
+	updated, _ := h.repo.GetPlanByID(planID)
+	c.JSON(http.StatusOK, gin.H{"message": "Plan updated", "data": updated})
+}
+
+// GET /subscriptions/all — Admin: List all user subscriptions
+func (h *SubscriptionHandler) ListAll(c *gin.Context) {
+	subs, err := h.repo.ListAllSubscriptions()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subscriptions"})
+		return
+	}
+	if subs == nil {
+		subs = []models.SubscriptionWithPlan{}
+	}
+	c.JSON(http.StatusOK, gin.H{"data": subs})
+}
+
+// GET /subscriptions/transactions — Admin: List all transactions
+func (h *SubscriptionHandler) ListTransactions(c *gin.Context) {
+	txs, err := h.repo.ListAllTransactions()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch transactions"})
+		return
+	}
+	if txs == nil {
+		txs = []models.SubscriptionTransaction{}
+	}
+	c.JSON(http.StatusOK, gin.H{"data": txs})
 }
 
 func (h *SubscriptionHandler) autoAssignFreePlan(userID string) *models.Subscription {

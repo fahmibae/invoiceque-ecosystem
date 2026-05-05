@@ -1,29 +1,5 @@
 services:
   # ============================================================
-  # INFRASTRUCTURE (only RabbitMQ, databases are on Neon Cloud)
-  # ============================================================
-  rabbitmq:
-    image: rabbitmq:3.13-management-alpine
-    container_name: invoiceque-rabbitmq
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-invoiceque}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-invoiceque123}
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-      - ./infrastructure/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
-      - ./infrastructure/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    networks:
-      - invoiceque-net
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      timeout: 10s
-      retries: 5
-
-  # ============================================================
   # API GATEWAY
   # ============================================================
   api-gateway:
@@ -94,12 +70,9 @@ services:
       - "8003:8003"
     environment:
       DB_URL: ${INVOICE_DB_URL}
-      RABBITMQ_URL: amqp://${RABBITMQ_USERNAME:-invoiceque}:${RABBITMQ_PASSWORD:-invoiceque123}@rabbitmq:5672
       PAYMENT_SERVICE_URL: http://payment-service:8004
+      NOTIFICATION_SERVICE_URL: http://notification-service:8005
       PORT: 8003
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
     networks:
       - invoiceque-net
 
@@ -112,14 +85,12 @@ services:
       - "8004:8004"
     environment:
       DATABASE_URL: ${PAYMENT_DB_URL}
-      RABBITMQ_URL: amqp://${RABBITMQ_USERNAME:-invoiceque}:${RABBITMQ_PASSWORD:-invoiceque123}@rabbitmq:5672
+      NOTIFICATION_SERVICE_URL: http://notification-service:8005
+      INVOICE_SERVICE_URL: http://invoice-service:8003
       XENDIT_API_KEY: ${XENDIT_API_KEY:-xnd_development_placeholder}
       XENDIT_CALLBACK_TOKEN: ${XENDIT_CALLBACK_TOKEN:-xendit-callback-token-placeholder}
       XENDIT_BASE_URL: ${XENDIT_BASE_URL:-https://api.xendit.co}
       PORT: 8004
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
     networks:
       - invoiceque-net
 
@@ -131,16 +102,13 @@ services:
     ports:
       - "8005:8005"
     environment:
-      RABBITMQ_URL: amqp://${RABBITMQ_USERNAME:-invoiceque}:${RABBITMQ_PASSWORD:-invoiceque123}@rabbitmq:5672
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       FROM_EMAIL: ${FROM_EMAIL:-noreply@invoiceque.id}
+      AUTH_SERVICE_URL: http://auth-service:8001
       PORT: 8005
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
     networks:
       - invoiceque-net
 
@@ -153,16 +121,14 @@ services:
       - "8006:8006"
     environment:
       DB_URL: ${SUBSCRIPTION_DB_URL}
+      NOTIFICATION_SERVICE_URL: http://notification-service:8005
       PORT: 8006
     networks:
       - invoiceque-net
 
 # ============================================================
-# VOLUMES & NETWORKS
+# NETWORKS
 # ============================================================
-volumes:
-  rabbitmq_data:
-
 networks:
   invoiceque-net:
     driver: bridge

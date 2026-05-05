@@ -48,6 +48,7 @@ func JWTAuth(jwtSecret string) gin.HandlerFunc {
 		if claims, ok := token.Claims.(jwt.MapClaims); ok {
 			c.Set("user_id", claims["user_id"])
 			c.Set("email", claims["email"])
+			c.Set("role", claims["role"])
 		}
 
 		c.Next()

@@ -13,6 +13,7 @@ type InvoiceRequest struct {
 	Status       string        `json:"status"`
 	PaymentType  string        `json:"payment_type"`
 	DpPercentage *int          `json:"dp_percentage"`
+	Currency     string        `json:"currency"`
 }
 
 type ItemRequest struct {
@@ -45,6 +46,8 @@ type InvoiceResponse struct {
 	Notes                string         `json:"notes"`
 	PaymentLink          string         `json:"payment_link"`
 	RemainingPaymentLink string         `json:"remaining_payment_link"`
+	Currency             string         `json:"currency"`
+	ExchangeRateIDR      float64        `json:"exchange_rate_idr"`
 }
 
 type ItemResponse struct {
@@ -107,5 +110,7 @@ func ToResponse(inv *Invoice) InvoiceResponse {
 		Notes:                inv.Notes,
 		PaymentLink:          inv.PaymentLink,
 		RemainingPaymentLink: inv.RemainingPaymentLink,
+		Currency:             inv.Currency,
+		ExchangeRateIDR:      inv.ExchangeRateIDR,
 	}
 }
