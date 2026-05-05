@@ -23,9 +23,12 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         .map(|v| v.to_string())
         .unwrap_or_else(|_| "*".into());
 
+    // Extract Origin header BEFORE request is consumed
+    let origin = req.headers().get("Origin").ok().flatten().unwrap_or_default();
+
     // Handle CORS preflight for all routes
     if req.method() == Method::Options {
-        return middleware::cors_preflight(&req, &allowed_origins);
+        return middleware::cors_preflight_with_origin(&origin, &allowed_origins);
     }
 
     let url = req.url()?;
@@ -37,14 +40,11 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
 
     match result {
         Ok(resp) => {
-            // Re-parse URL for CORS (req consumed by route)
-            let dummy_req = Request::new(&url.to_string(), Method::Get)?;
-            middleware::with_cors(resp, &dummy_req, &allowed_origins)
+            middleware::with_cors_origin(resp, &origin, &allowed_origins)
         }
         Err(e) => {
             let error_resp = utils::json_error(&format!("Internal error: {}", e), 500)?;
-            let dummy_req = Request::new(&url.to_string(), Method::Get)?;
-            middleware::with_cors(error_resp, &dummy_req, &allowed_origins)
+            middleware::with_cors_origin(error_resp, &origin, &allowed_origins)
         }
     }
 }

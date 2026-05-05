@@ -139,12 +139,17 @@ pub fn extract_auth(req: &Request, jwt_secret: &str) -> std::result::Result<JwtC
 
 /// Build CORS headers for a response.
 pub fn cors_headers(req: &Request, allowed_origins: &str) -> Headers {
-    let mut headers = Headers::new();
     let origin = req.headers().get("Origin").ok().flatten().unwrap_or_default();
+    cors_headers_from_origin(&origin, allowed_origins)
+}
+
+/// Build CORS headers from a pre-extracted origin string.
+pub fn cors_headers_from_origin(origin: &str, allowed_origins: &str) -> Headers {
+    let mut headers = Headers::new();
 
     let origins: Vec<&str> = allowed_origins.split(',').map(|s| s.trim()).collect();
-    if origins.contains(&"*") || origins.iter().any(|o| *o == origin) {
-        let _ = headers.set("Access-Control-Allow-Origin", &origin);
+    if !origin.is_empty() && (origins.contains(&"*") || origins.iter().any(|o| *o == origin)) {
+        let _ = headers.set("Access-Control-Allow-Origin", origin);
     }
 
     let _ = headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
@@ -156,8 +161,14 @@ pub fn cors_headers(req: &Request, allowed_origins: &str) -> Headers {
 
 /// Build a CORS preflight response.
 pub fn cors_preflight(req: &Request, allowed_origins: &str) -> Result<Response> {
+    let origin = req.headers().get("Origin").ok().flatten().unwrap_or_default();
+    cors_preflight_with_origin(&origin, allowed_origins)
+}
+
+/// Build a CORS preflight response from a pre-extracted origin.
+pub fn cors_preflight_with_origin(origin: &str, allowed_origins: &str) -> Result<Response> {
     let mut resp = Response::empty()?.with_status(204);
-    let cors = cors_headers(req, allowed_origins);
+    let cors = cors_headers_from_origin(origin, allowed_origins);
     for (k, v) in cors.entries() {
         resp.headers_mut().set(&k, &v)?;
     }
@@ -166,7 +177,13 @@ pub fn cors_preflight(req: &Request, allowed_origins: &str) -> Result<Response> 
 
 /// Apply CORS headers to an existing response.
 pub fn with_cors(mut resp: Response, req: &Request, allowed_origins: &str) -> Result<Response> {
-    let cors = cors_headers(req, allowed_origins);
+    let origin = req.headers().get("Origin").ok().flatten().unwrap_or_default();
+    with_cors_origin(resp, &origin, allowed_origins)
+}
+
+/// Apply CORS headers using a pre-extracted origin string.
+pub fn with_cors_origin(mut resp: Response, origin: &str, allowed_origins: &str) -> Result<Response> {
+    let cors = cors_headers_from_origin(origin, allowed_origins);
     for (k, v) in cors.entries() {
         resp.headers_mut().set(&k, &v)?;
     }
