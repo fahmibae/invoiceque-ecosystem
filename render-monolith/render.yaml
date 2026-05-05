@@ -1,0 +1,38 @@
+# Render Blueprint — InvoiceQu Monolith (Single Service)
+services:
+  - type: web
+    name: invoicequ-monolith
+    runtime: docker
+    dockerfilePath: ./render-monolith/Dockerfile
+    dockerContext: ./render-monolith
+    plan: free
+    region: singapore
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: RUST_LOG
+        value: info
+      - key: ALLOWED_ORIGINS
+        value: "https://app.invoicequ.my.id,https://invoicequ.my.id,http://localhost:3000"
+      # ── Secrets (set in Render dashboard) ──
+      - key: JWT_SECRET
+        sync: false
+      - key: AUTH_DB_URL
+        sync: false
+      - key: CLIENT_DB_URL
+        sync: false
+      - key: INVOICE_DB_URL
+        sync: false
+      - key: PAYMENT_DB_URL
+        sync: false
+      - key: SUBSCRIPTION_DB_URL
+        sync: false
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_SECRET
+        sync: false
+      - key: PAYPAL_BASE_URL
+        value: "https://api-m.paypal.com"
+      - key: RESEND_API_KEY
+        sync: false
