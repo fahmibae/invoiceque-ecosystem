@@ -16,8 +16,6 @@ pub struct NeonClient {
 struct NeonQuery {
     query: String,
     params: Vec<serde_json::Value>,
-    #[serde(rename = "arrayMode")]
-    array_mode: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -27,18 +25,14 @@ pub struct NeonField {
     pub data_type_id: Option<i32>,
 }
 
+/// Neon HTTP API returns rows as objects (maps) by default.
 #[derive(Debug, Deserialize)]
 pub struct NeonResult {
     pub fields: Vec<NeonField>,
-    pub rows: Vec<Vec<serde_json::Value>>,
+    pub rows: Vec<serde_json::Map<String, serde_json::Value>>,
     #[serde(rename = "rowCount")]
     pub row_count: Option<i64>,
     pub command: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct NeonResponse {
-    results: Vec<NeonResult>,
 }
 
 impl NeonClient {
@@ -74,7 +68,6 @@ impl NeonClient {
         let payload = NeonQuery {
             query: sql.to_string(),
             params: params.to_vec(),
-            array_mode: true,
         };
 
         let body = serde_json::to_string(&payload)
@@ -115,23 +108,7 @@ impl NeonClient {
         params: &[serde_json::Value],
     ) -> Result<Vec<serde_json::Map<String, serde_json::Value>>> {
         let result = self.query(sql, params).await?;
-        let field_names: Vec<String> = result.fields.iter().map(|f| f.name.clone()).collect();
-
-        let maps = result
-            .rows
-            .into_iter()
-            .map(|row| {
-                let mut map = serde_json::Map::new();
-                for (i, val) in row.into_iter().enumerate() {
-                    if let Some(name) = field_names.get(i) {
-                        map.insert(name.clone(), val);
-                    }
-                }
-                map
-            })
-            .collect();
-
-        Ok(maps)
+        Ok(result.rows)
     }
 
     /// Execute a query and deserialize rows into a typed Vec<T>.
@@ -176,7 +153,7 @@ impl NeonClient {
             .ok_or_else(|| Error::RustError("No rows returned".into()))?;
         let val = row.into_iter().next()
             .ok_or_else(|| Error::RustError("No columns returned".into()))?;
-        serde_json::from_value(val)
+        serde_json::from_value(val.1)
             .map_err(|e| Error::RustError(format!("Scalar deserialize error: {}", e)))
     }
 }

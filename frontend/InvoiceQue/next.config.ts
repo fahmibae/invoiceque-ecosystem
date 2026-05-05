@@ -19,7 +19,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: https:",
-      "connect-src 'self' https://api.invoicequ.my.id https://iq-api.invoicequ.workers.dev https://invoicequ-api.invoicequ.workers.dev https://invoiceque-gateway.fly.dev https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com",
+      "connect-src 'self' https://api.invoicequ.my.id https://iq-api.invoicequ.workers.dev https://invoicequ-api.invoicequ.workers.dev https://invoiceque-gateway.fly.dev https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com https://open.er-api.com",
       "frame-src https://accounts.google.com",
       "object-src 'none'",
       "base-uri 'self'",
