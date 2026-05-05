@@ -10,7 +10,7 @@ use crate::utils;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Invoice {
     pub id: String,
-    #[serde(default)] pub invoice_number: String,
+    #[serde(default, rename = "number", alias = "invoice_number")] pub invoice_number: String,
     #[serde(default)] pub user_id: String,
     #[serde(default)] pub client_id: String,
     #[serde(default)] pub client_name: String,

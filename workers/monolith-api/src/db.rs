@@ -44,7 +44,9 @@ impl NeonClient {
             .trim_start_matches("postgres://");
 
         // Extract host part: user:pass@host/db
-        let at_pos = clean.find('@').ok_or_else(|| Error::RustError("Invalid connection string: no @".into()))?;
+        let at_pos = clean
+            .find('@')
+            .ok_or_else(|| Error::RustError("Invalid connection string: no @".into()))?;
         let host_and_db = &clean[at_pos + 1..];
         let slash_pos = host_and_db.find('/').unwrap_or(host_and_db.len());
         let host = &host_and_db[..slash_pos];
@@ -95,7 +97,9 @@ impl NeonClient {
         }
 
         // Neon returns the result directly (not wrapped in "results" array)
-        let neon_resp: NeonResult = response.json().await
+        let neon_resp: NeonResult = response
+            .json()
+            .await
             .map_err(|e| Error::RustError(format!("Neon response parse error: {}", e)))?;
 
         Ok(neon_resp)
@@ -108,7 +112,11 @@ impl NeonClient {
         params: &[serde_json::Value],
     ) -> Result<Vec<serde_json::Map<String, serde_json::Value>>> {
         let result = self.query(sql, params).await?;
-        Ok(result.rows.into_iter().map(coerce_map_values).collect())
+        Ok(result
+            .rows
+            .into_iter()
+            .map(|row| coerce_map_values(row, &result.fields))
+            .collect())
     }
 
     /// Execute a query and deserialize rows into a typed Vec<T>.
@@ -150,9 +158,14 @@ impl NeonClient {
         params: &[serde_json::Value],
     ) -> Result<T> {
         let result = self.query(sql, params).await?;
-        let row = result.rows.into_iter().next()
+        let row = result
+            .rows
+            .into_iter()
+            .next()
             .ok_or_else(|| Error::RustError("No rows returned".into()))?;
-        let (_key, val) = row.into_iter().next()
+        let (_key, val) = row
+            .into_iter()
+            .next()
             .ok_or_else(|| Error::RustError("No columns returned".into()))?;
 
         // Neon HTTP API may return numbers as strings, try parsing
@@ -175,36 +188,148 @@ impl NeonClient {
     }
 }
 
-/// Coerce string values in a map to proper JSON types.
-/// Neon HTTP API returns all values as strings - this converts them back
-/// to numbers/booleans/null for proper serde deserialization.
-fn coerce_map_values(map: serde_json::Map<String, serde_json::Value>) -> serde_json::Map<String, serde_json::Value> {
+/// Coerce Neon HTTP API values using PostgreSQL field metadata.
+/// Neon often returns values as strings, but text columns may also contain
+/// digit-only values such as phone or bank account numbers. Only parse strings
+/// as numbers/booleans when PostgreSQL says the column type is numeric/bool.
+fn coerce_map_values(
+    map: serde_json::Map<String, serde_json::Value>,
+    fields: &[NeonField],
+) -> serde_json::Map<String, serde_json::Value> {
+    let field_types: std::collections::HashMap<String, Option<i32>> = fields
+        .iter()
+        .map(|field| (field.name.clone(), field.data_type_id))
+        .collect();
+
     map.into_iter()
-        .map(|(k, v)| (k, coerce_value(v)))
+        .map(|(k, v)| {
+            let data_type_id = field_types.get(&k).and_then(|id| *id);
+            let coerced = coerce_value(&k, v, data_type_id);
+            (k, coerced)
+        })
         .collect()
 }
 
-fn coerce_value(val: serde_json::Value) -> serde_json::Value {
+fn coerce_value(
+    field_name: &str,
+    val: serde_json::Value,
+    data_type_id: Option<i32>,
+) -> serde_json::Value {
     match val {
-        // Convert null to empty string so String fields work with serde(default)
-        serde_json::Value::Null => serde_json::Value::String(String::new()),
-        serde_json::Value::String(ref s) => {
-            // boolean
-            if s == "true" { return serde_json::Value::Bool(true); }
-            if s == "false" { return serde_json::Value::Bool(false); }
-            // integer
-            if let Ok(n) = s.parse::<i64>() {
-                return serde_json::Value::Number(n.into());
-            }
-            // float
-            if let Ok(n) = s.parse::<f64>() {
-                if let Some(num) = serde_json::Number::from_f64(n) {
-                    return serde_json::Value::Number(num);
-                }
-            }
-            // keep as string
-            val
-        }
+        serde_json::Value::Null => default_value_for_type(data_type_id),
+        serde_json::Value::String(s) => coerce_string_value(field_name, s, data_type_id),
         _ => val,
     }
+}
+
+fn coerce_string_value(
+    field_name: &str,
+    value: String,
+    data_type_id: Option<i32>,
+) -> serde_json::Value {
+    match data_type_id {
+        Some(16) => {
+            parse_bool(&value).map_or(serde_json::Value::String(value), serde_json::Value::Bool)
+        }
+        Some(20 | 21 | 23 | 26) => parse_i64(&value),
+        Some(700 | 701 | 1700) => parse_f64(&value),
+        Some(_) => serde_json::Value::String(value),
+        None => coerce_string_without_type(field_name, value),
+    }
+}
+
+fn default_value_for_type(data_type_id: Option<i32>) -> serde_json::Value {
+    match data_type_id {
+        Some(16) => serde_json::Value::Bool(false),
+        Some(20 | 21 | 23 | 26) => serde_json::Value::Number(0.into()),
+        Some(700 | 701 | 1700) => serde_json::json!(0.0),
+        // Preserve the previous behavior for text/date fields that are modeled
+        // as non-optional Strings with #[serde(default)].
+        Some(25 | 1042 | 1043 | 1082 | 1083 | 1114 | 1184 | 2950) | None => {
+            serde_json::Value::String(String::new())
+        }
+        _ => serde_json::Value::Null,
+    }
+}
+
+fn coerce_string_without_type(field_name: &str, value: String) -> serde_json::Value {
+    if is_known_bool_field(field_name) {
+        return parse_bool(&value)
+            .map_or(serde_json::Value::String(value), serde_json::Value::Bool);
+    }
+
+    if is_known_int_field(field_name) {
+        return parse_i64(&value);
+    }
+
+    if is_known_float_field(field_name) {
+        return parse_f64(&value);
+    }
+
+    serde_json::Value::String(value)
+}
+
+fn parse_bool(value: &str) -> Option<bool> {
+    match value {
+        "true" | "t" | "1" => Some(true),
+        "false" | "f" | "0" => Some(false),
+        _ => None,
+    }
+}
+
+fn parse_i64(value: &str) -> serde_json::Value {
+    value
+        .parse::<i64>()
+        .map(|n| serde_json::Value::Number(n.into()))
+        .unwrap_or_else(|_| serde_json::Value::String(value.to_string()))
+}
+
+fn parse_f64(value: &str) -> serde_json::Value {
+    value
+        .parse::<f64>()
+        .ok()
+        .and_then(serde_json::Number::from_f64)
+        .map(serde_json::Value::Number)
+        .unwrap_or_else(|| serde_json::Value::String(value.to_string()))
+}
+
+fn is_known_bool_field(field_name: &str) -> bool {
+    matches!(field_name, "is_active" | "is_read")
+}
+
+fn is_known_int_field(field_name: &str) -> bool {
+    matches!(
+        field_name,
+        "clicks"
+            | "payments"
+            | "quantity"
+            | "dp_percentage"
+            | "total_invoices"
+            | "max_invoices"
+            | "max_clients"
+            | "max_payment_links"
+            | "invoices_used"
+            | "clients_used"
+            | "payment_links_used"
+    )
+}
+
+fn is_known_float_field(field_name: &str) -> bool {
+    matches!(
+        field_name,
+        "amount"
+            | "subtotal"
+            | "tax"
+            | "discount"
+            | "total"
+            | "price"
+            | "dp_amount"
+            | "amount_paid"
+            | "amount_remaining"
+            | "exchange_rate_idr"
+            | "total_spent"
+            | "revenue"
+            | "total_revenue"
+            | "pending_amount"
+    )
 }

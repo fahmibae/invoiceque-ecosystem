@@ -179,6 +179,7 @@ export interface InvoiceItem {
 export interface Invoice {
   id: string;
   number: string;
+  invoice_number?: string;
   client_id: string;
   client_name: string;
   client_email: string;
@@ -203,6 +204,49 @@ export interface Invoice {
   exchange_rate_idr: number;
 }
 
+type InvoiceApiResponse = Invoice & {
+  invoice_number?: string;
+};
+
+function normalizeInvoice(invoice: InvoiceApiResponse): Invoice {
+  const invoiceNumber = invoice.number || invoice.invoice_number || '';
+
+  return {
+    ...invoice,
+    number: invoiceNumber,
+    invoice_number: invoice.invoice_number || invoiceNumber,
+    client_id: invoice.client_id || '',
+    client_name: invoice.client_name || '',
+    client_email: invoice.client_email || '',
+    items: invoice.items || [],
+    subtotal: invoice.subtotal ?? 0,
+    tax: invoice.tax ?? 0,
+    discount: invoice.discount ?? 0,
+    total: invoice.total ?? 0,
+    status: invoice.status || 'draft',
+    payment_type: invoice.payment_type || 'full',
+    dp_percentage: invoice.dp_percentage ?? 0,
+    dp_amount: invoice.dp_amount ?? 0,
+    amount_paid: invoice.amount_paid ?? 0,
+    amount_remaining: invoice.amount_remaining ?? 0,
+    due_date: invoice.due_date || '',
+    created_at: invoice.created_at || '',
+    paid_at: invoice.paid_at || '',
+    notes: invoice.notes || '',
+    payment_link: invoice.payment_link || '',
+    remaining_payment_link: invoice.remaining_payment_link || '',
+    currency: invoice.currency || 'IDR',
+    exchange_rate_idr: invoice.exchange_rate_idr ?? 0,
+  };
+}
+
+function normalizeInvoicePage(response: PaginatedResponse<InvoiceApiResponse>): PaginatedResponse<Invoice> {
+  return {
+    ...response,
+    data: (response.data || []).map(normalizeInvoice),
+  };
+}
+
 export interface CreateInvoiceRequest {
   client_id: string;
   client_name: string;
@@ -224,23 +268,24 @@ export const invoiceApi = {
     if (status) params.set('status', status);
     params.set('page', String(page));
     params.set('size', String(size));
-    return request<PaginatedResponse<Invoice>>(`/invoices?${params}`);
+    return request<PaginatedResponse<InvoiceApiResponse>>(`/invoices?${params}`)
+      .then(normalizeInvoicePage);
   },
 
   get: (id: string) =>
-    request<Invoice>(`/invoices/${id}`),
+    request<InvoiceApiResponse>(`/invoices/${id}`).then(normalizeInvoice),
 
   create: (body: CreateInvoiceRequest) =>
-    request<Invoice>('/invoices', {
+    request<InvoiceApiResponse>('/invoices', {
       method: 'POST',
       body: JSON.stringify(body),
-    }),
+    }).then(normalizeInvoice),
 
   update: (id: string, body: CreateInvoiceRequest) =>
-    request<Invoice>(`/invoices/${id}`, {
+    request<InvoiceApiResponse>(`/invoices/${id}`, {
       method: 'PUT',
       body: JSON.stringify(body),
-    }),
+    }).then(normalizeInvoice),
 
   delete: (id: string) =>
     request<{ message: string }>(`/invoices/${id}`, {
@@ -248,9 +293,9 @@ export const invoiceApi = {
     }),
 
   send: (id: string) =>
-    request<Invoice>(`/invoices/${id}/send`, {
+    request<InvoiceApiResponse>(`/invoices/${id}/send`, {
       method: 'PUT',
-    }),
+    }).then(normalizeInvoice),
 
   downloadPdf: async (id: string, filename: string) => {
     const token = localStorage.getItem('token');
@@ -277,7 +322,11 @@ export const invoiceApi = {
 
   /** Returns invoices that can still receive a payment link (not fully paid, or DP with remaining balance) */
   listLinkable: () =>
-    request<{ data: Invoice[] }>('/invoices/linkable'),
+    request<{ data: InvoiceApiResponse[] }>('/invoices/linkable')
+      .then((response) => ({
+        ...response,
+        data: (response.data || []).map(normalizeInvoice),
+      })),
 };
 
 // ── Dashboard API ─────────────────────────────────────
