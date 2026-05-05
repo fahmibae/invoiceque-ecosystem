@@ -108,7 +108,7 @@ impl NeonClient {
         params: &[serde_json::Value],
     ) -> Result<Vec<serde_json::Map<String, serde_json::Value>>> {
         let result = self.query(sql, params).await?;
-        Ok(result.rows)
+        Ok(result.rows.into_iter().map(coerce_map_values).collect())
     }
 
     /// Execute a query and deserialize rows into a typed Vec<T>.
@@ -172,5 +172,41 @@ impl NeonClient {
 
         serde_json::from_value(parsed_val)
             .map_err(|e| Error::RustError(format!("Scalar deserialize error: {}", e)))
+    }
+}
+
+/// Coerce string values in a map to proper JSON types.
+/// Neon HTTP API returns all values as strings - this converts them back
+/// to numbers/booleans/null for proper serde deserialization.
+fn coerce_map_values(map: serde_json::Map<String, serde_json::Value>) -> serde_json::Map<String, serde_json::Value> {
+    map.into_iter()
+        .map(|(k, v)| (k, coerce_value(v)))
+        .collect()
+}
+
+fn coerce_value(val: serde_json::Value) -> serde_json::Value {
+    match val {
+        serde_json::Value::String(ref s) => {
+            // null
+            if s == "null" || s.is_empty() {
+                return val; // keep as string, let serde handle Option
+            }
+            // boolean
+            if s == "true" { return serde_json::Value::Bool(true); }
+            if s == "false" { return serde_json::Value::Bool(false); }
+            // integer
+            if let Ok(n) = s.parse::<i64>() {
+                return serde_json::Value::Number(n.into());
+            }
+            // float
+            if let Ok(n) = s.parse::<f64>() {
+                if let Some(num) = serde_json::Number::from_f64(n) {
+                    return serde_json::Value::Number(num);
+                }
+            }
+            // keep as string
+            val
+        }
+        _ => val,
     }
 }
