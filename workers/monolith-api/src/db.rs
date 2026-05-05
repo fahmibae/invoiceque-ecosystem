@@ -16,6 +16,8 @@ pub struct NeonClient {
 struct NeonQuery {
     query: String,
     params: Vec<serde_json::Value>,
+    #[serde(rename = "arrayMode")]
+    array_mode: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -72,6 +74,7 @@ impl NeonClient {
         let payload = NeonQuery {
             query: sql.to_string(),
             params: params.to_vec(),
+            array_mode: true,
         };
 
         let body = serde_json::to_string(&payload)
