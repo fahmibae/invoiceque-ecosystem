@@ -10,13 +10,13 @@ use crate::utils;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PaymentLink {
     pub id: String,
-    #[serde(default)] pub user_id: String,
-    #[serde(default)] pub title: String,
-    #[serde(default)] pub description: String,
+    #[serde(default)] pub user_id: Option<String>,
+    #[serde(default)] pub title: Option<String>,
+    #[serde(default)] pub description: Option<String>,
     #[serde(default)] pub amount: f64,
-    #[serde(default)] pub currency: String,
-    #[serde(default)] pub status: String,
-    #[serde(default)] pub url: String,
+    #[serde(default)] pub currency: Option<String>,
+    #[serde(default)] pub status: Option<String>,
+    #[serde(default)] pub url: Option<String>,
     #[serde(default)] pub clicks: i32,
     #[serde(default)] pub payments: i32,
     pub invoice_id: Option<String>,
@@ -106,10 +106,10 @@ pub async fn update(mut req: Request, env: &Env, claims: &JwtClaims, id: &str) -
     if existing.is_none() { return utils::json_error("Payment link not found", 404); }
     let existing = existing.unwrap();
 
-    let title = body.get("title").and_then(|v| v.as_str()).unwrap_or(&existing.title);
-    let desc = body.get("description").and_then(|v| v.as_str()).unwrap_or(&existing.description);
+    let title = body.get("title").and_then(|v| v.as_str()).unwrap_or(existing.title.as_deref().unwrap_or(""));
+    let desc = body.get("description").and_then(|v| v.as_str()).unwrap_or(existing.description.as_deref().unwrap_or(""));
     let amount = body.get("amount").and_then(|v| v.as_f64()).unwrap_or(existing.amount);
-    let status = body.get("status").and_then(|v| v.as_str()).unwrap_or(&existing.status);
+    let status = body.get("status").and_then(|v| v.as_str()).unwrap_or(existing.status.as_deref().unwrap_or("active"));
 
     db.execute(
         "UPDATE payment_links SET title=$1, description=$2, amount=$3, status=$4, updated_at=NOW() WHERE id=$5 AND user_id=$6",
@@ -235,7 +235,7 @@ pub async fn check_status_public(env: &Env, id: &str) -> Result<Response> {
         &[serde_json::json!(id)],
     ).await?;
     match link {
-        Some(l) => utils::json_response(&serde_json::json!({"status": l.status, "provider_order_id": l.provider_order_id}), 200),
+        Some(l) => utils::json_response(&serde_json::json!({"status": l.status.as_deref().unwrap_or("unknown"), "provider_order_id": l.provider_order_id}), 200),
         None => utils::json_error("Not found", 404),
     }
 }
@@ -459,10 +459,10 @@ async fn create_paypal_order(env: &Env, db: &NeonClient, link: &PaymentLink, _bo
         "intent": "CAPTURE",
         "purchase_units": [{
             "amount": {
-                "currency_code": if link.currency == "IDR" { "USD" } else { &link.currency },
+                "currency_code": if link.currency.as_deref().unwrap_or("IDR") == "IDR" { "USD" } else { link.currency.as_deref().unwrap_or("USD") },
                 "value": format!("{:.2}", link.amount),
             },
-            "description": &link.title,
+            "description": link.title.as_deref().unwrap_or(""),
         }],
         "application_context": {
             "return_url": format!("https://app.invoicequ.my.id/pay/{}/success", link.id),

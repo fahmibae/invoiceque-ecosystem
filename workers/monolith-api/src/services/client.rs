@@ -10,13 +10,13 @@ use crate::utils;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Client {
     pub id: String,
-    pub user_id: String,
-    pub name: String,
-    pub email: String,
-    #[serde(default)] pub phone: String,
-    #[serde(default)] pub company: String,
-    #[serde(default)] pub address: String,
-    #[serde(default)] pub city: String,
+    #[serde(default)] pub user_id: Option<String>,
+    #[serde(default)] pub name: Option<String>,
+    #[serde(default)] pub email: Option<String>,
+    #[serde(default)] pub phone: Option<String>,
+    #[serde(default)] pub company: Option<String>,
+    #[serde(default)] pub address: Option<String>,
+    #[serde(default)] pub city: Option<String>,
     #[serde(default)] pub total_invoices: i32,
     #[serde(default)] pub total_spent: f64,
     pub created_at: Option<String>,
@@ -116,12 +116,12 @@ pub async fn update(mut req: Request, env: &Env, claims: &JwtClaims, id: &str) -
         None => return utils::json_error("Client not found", 404),
     };
 
-    let name = body.get("name").and_then(|v| v.as_str()).unwrap_or(&ex.name);
-    let email = body.get("email").and_then(|v| v.as_str()).unwrap_or(&ex.email);
-    let phone = body.get("phone").and_then(|v| v.as_str()).unwrap_or(&ex.phone);
-    let company = body.get("company").and_then(|v| v.as_str()).unwrap_or(&ex.company);
-    let address = body.get("address").and_then(|v| v.as_str()).unwrap_or(&ex.address);
-    let city = body.get("city").and_then(|v| v.as_str()).unwrap_or(&ex.city);
+    let name = body.get("name").and_then(|v| v.as_str()).unwrap_or(ex.name.as_deref().unwrap_or(""));
+    let email = body.get("email").and_then(|v| v.as_str()).unwrap_or(ex.email.as_deref().unwrap_or(""));
+    let phone = body.get("phone").and_then(|v| v.as_str()).unwrap_or(ex.phone.as_deref().unwrap_or(""));
+    let company = body.get("company").and_then(|v| v.as_str()).unwrap_or(ex.company.as_deref().unwrap_or(""));
+    let address = body.get("address").and_then(|v| v.as_str()).unwrap_or(ex.address.as_deref().unwrap_or(""));
+    let city = body.get("city").and_then(|v| v.as_str()).unwrap_or(ex.city.as_deref().unwrap_or(""));
 
     db.execute(
         "UPDATE clients SET name=$1,email=$2,phone=$3,company=$4,address=$5,city=$6,updated_at=NOW() WHERE id=$7 AND user_id=$8",

@@ -13,14 +13,14 @@ use crate::utils;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: String,
-    pub name: String,
-    pub email: String,
+    #[serde(default)] pub name: String,
+    #[serde(default)] pub email: String,
     #[serde(skip_serializing)]
     pub password: Option<String>,
     #[serde(default)]
-    pub company: String,
+    pub company: Option<String>,
     #[serde(default)]
-    pub phone: String,
+    pub phone: Option<String>,
     #[serde(default = "default_role")]
     pub role: String,
     pub created_at: Option<String>,
@@ -113,7 +113,7 @@ pub async fn register(mut req: Request, env: &Env) -> Result<Response> {
 
     let user = User {
         id: id.clone(), name: body.name, email: body.email.clone(),
-        password: None, company: body.company, phone: body.phone,
+        password: None, company: Some(body.company), phone: Some(body.phone),
         role: "user".into(), created_at: None, updated_at: None,
     };
 
@@ -204,7 +204,7 @@ pub async fn google_login(mut req: Request, env: &Env) -> Result<Response> {
 
             User {
                 id, name: name.to_string(), email: email.to_string(),
-                password: None, company: String::new(), phone: String::new(),
+                password: None, company: None, phone: None,
                 role: "user".into(), created_at: None, updated_at: None,
             }
         }
