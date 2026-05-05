@@ -15,7 +15,7 @@ pub struct Notification {
     #[serde(default)] pub title: String,
     #[serde(default)] pub message: String,
     #[serde(default)] pub is_read: bool,
-    pub created_at: Option<String>,
+    #[serde(default)] pub created_at: String,
 }
 
 /// Handle POST /events/invoice — process invoice notification events

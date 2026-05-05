@@ -186,11 +186,9 @@ fn coerce_map_values(map: serde_json::Map<String, serde_json::Value>) -> serde_j
 
 fn coerce_value(val: serde_json::Value) -> serde_json::Value {
     match val {
+        // Convert null to empty string so String fields work with serde(default)
+        serde_json::Value::Null => serde_json::Value::String(String::new()),
         serde_json::Value::String(ref s) => {
-            // null
-            if s == "null" || s.is_empty() {
-                return val; // keep as string, let serde handle Option
-            }
             // boolean
             if s == "true" { return serde_json::Value::Bool(true); }
             if s == "false" { return serde_json::Value::Bool(false); }

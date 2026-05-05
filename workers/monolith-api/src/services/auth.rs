@@ -18,13 +18,13 @@ pub struct User {
     #[serde(skip_serializing)]
     pub password: Option<String>,
     #[serde(default)]
-    pub company: Option<String>,
+    pub company: String,
     #[serde(default)]
-    pub phone: Option<String>,
+    pub phone: String,
     #[serde(default = "default_role")]
     pub role: String,
-    pub created_at: Option<String>,
-    pub updated_at: Option<String>,
+    #[serde(default)] pub created_at: String,
+    #[serde(default)] pub updated_at: String,
 }
 
 fn default_role() -> String { "user".into() }
@@ -113,8 +113,8 @@ pub async fn register(mut req: Request, env: &Env) -> Result<Response> {
 
     let user = User {
         id: id.clone(), name: body.name, email: body.email.clone(),
-        password: None, company: Some(body.company), phone: Some(body.phone),
-        role: "user".into(), created_at: None, updated_at: None,
+        password: None, company: body.company, phone: body.phone,
+        role: "user".into(), created_at: String::new(), updated_at: String::new(),
     };
 
     let token = middleware::generate_jwt(&id, &body.email, "user", &jwt_secret, 24)
@@ -204,8 +204,8 @@ pub async fn google_login(mut req: Request, env: &Env) -> Result<Response> {
 
             User {
                 id, name: name.to_string(), email: email.to_string(),
-                password: None, company: None, phone: None,
-                role: "user".into(), created_at: None, updated_at: None,
+                password: None, company: String::new(), phone: String::new(),
+                role: "user".into(), created_at: String::new(), updated_at: String::new(),
             }
         }
     };
