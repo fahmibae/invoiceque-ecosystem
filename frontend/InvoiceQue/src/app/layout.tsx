@@ -5,7 +5,6 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import IdleDetector from "@/components/IdleDetector";
-import AntiInspect from "@/components/AntiInspect";
 
 const sora = Sora({
   subsets: ['latin'],
@@ -31,7 +30,6 @@ export default function RootLayout({
     <html lang="id" suppressHydrationWarning className={sora.variable}>
       <body className={sora.className}>
         <IdleDetector />
-        <AntiInspect />
         <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "placeholder-client-id"}>
           <AuthProvider>
             <NotificationProvider>
