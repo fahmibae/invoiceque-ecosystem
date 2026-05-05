@@ -143,6 +143,7 @@ impl NeonClient {
     }
 
     /// Execute a query returning a single scalar value.
+    /// Handles Neon HTTP API returning numbers as strings.
     pub async fn query_scalar<T: serde::de::DeserializeOwned>(
         &self,
         sql: &str,
@@ -151,9 +152,25 @@ impl NeonClient {
         let result = self.query(sql, params).await?;
         let row = result.rows.into_iter().next()
             .ok_or_else(|| Error::RustError("No rows returned".into()))?;
-        let val = row.into_iter().next()
+        let (_key, val) = row.into_iter().next()
             .ok_or_else(|| Error::RustError("No columns returned".into()))?;
-        serde_json::from_value(val.1)
+
+        // Neon HTTP API may return numbers as strings, try parsing
+        let parsed_val = match &val {
+            serde_json::Value::String(s) => {
+                // Try to parse as number first
+                if let Ok(n) = s.parse::<i64>() {
+                    serde_json::Value::Number(n.into())
+                } else if let Ok(n) = s.parse::<f64>() {
+                    serde_json::json!(n)
+                } else {
+                    val
+                }
+            }
+            _ => val,
+        };
+
+        serde_json::from_value(parsed_val)
             .map_err(|e| Error::RustError(format!("Scalar deserialize error: {}", e)))
     }
 }
