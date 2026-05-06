@@ -109,6 +109,9 @@ export default function SettingsPage() {
         logo_url: logoUrl,
         accent_color: accentColor,
         footer_text: footerText,
+        bank_name: bankName,
+        bank_account_number: bankAccountNumber,
+        bank_account_name: bankAccountName,
       });
       setProfileMsg('✅ Berhasil disimpan!');
       setTimeout(() => setProfileMsg(''), 3000);
@@ -441,6 +444,7 @@ export default function SettingsPage() {
                   business_phone: bizPhone,
                   business_website: bizWebsite,
                   business_address: bizAddress,
+                  logo_url: logoUrl,
                   accent_color: accentColor,
                   footer_text: footerText,
                   bank_name: bankName,
