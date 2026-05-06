@@ -511,8 +511,14 @@ export interface UsageData {
 }
 
 export const subscriptionApi = {
-  getPlans: () =>
-    request<{ data: SubscriptionPlan[] }>('/subscriptions/plans'),
+  getPlans: async () => {
+    const res = await request<any>('/plans');
+    // backend may return either an array of plans or an object { data: [...] }
+    if (Array.isArray(res)) {
+      return { data: res as SubscriptionPlan[] };
+    }
+    return res as { data: SubscriptionPlan[] };
+  },
 
   getCurrent: () =>
     request<Subscription>('/subscriptions/current'),
