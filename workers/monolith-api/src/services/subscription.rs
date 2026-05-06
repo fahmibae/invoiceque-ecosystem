@@ -114,7 +114,7 @@ pub async fn list_plans(env: &Env) -> Result<Response> {
 pub async fn get_current(env: &Env, claims: &JwtClaims) -> Result<Response> {
     let db = get_db(env)?;
     let sub: Option<serde_json::Value> = db.query_one(
-        &format!("SELECT s.*, p.name as plan_name, p.display_name, p.max_invoices, p.max_clients, p.max_payment_links, p.features FROM subscriptions s JOIN subscription_plans p ON s.plan_id=p.id WHERE s.user_id=$1"),
+        &format!("SELECT s.*, p.name as plan_name, p.display_name, p.price, p.currency, p.billing_period, p.max_invoices, p.max_clients, p.max_payment_links, p.features, p.is_active FROM subscriptions s JOIN subscription_plans p ON s.plan_id=p.id WHERE s.user_id=$1"),
         &[serde_json::json!(claims.user_id)],
     ).await?;
 
@@ -150,7 +150,7 @@ pub async fn get_current(env: &Env, claims: &JwtClaims) -> Result<Response> {
             ).await?;
 
             let sub: Option<serde_json::Value> = db.query_one(
-                "SELECT s.*, p.name as plan_name, p.display_name, p.max_invoices, p.max_clients, p.max_payment_links, p.features FROM subscriptions s JOIN subscription_plans p ON s.plan_id=p.id WHERE s.user_id=$1",
+                "SELECT s.*, p.name as plan_name, p.display_name, p.price, p.currency, p.billing_period, p.max_invoices, p.max_clients, p.max_payment_links, p.features, p.is_active FROM subscriptions s JOIN subscription_plans p ON s.plan_id=p.id WHERE s.user_id=$1",
                 &[serde_json::json!(claims.user_id)],
             ).await?;
             match sub {
