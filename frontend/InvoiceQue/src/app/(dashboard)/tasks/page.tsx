@@ -110,11 +110,31 @@ export default function TasksKanbanPage() {
   };
 
   const moveTask = async (taskId: string, toStatus: string) => {
+    const task = Object.values(tasksByStatus).flat().find(t => t.id === taskId);
     try {
       await taskApi.update(taskId, { status: toStatus as Task['status'] });
       fetchTasks();
+      // Sync project status based on task completion
+      if (task?.project_id) {
+        syncProjectStatus(task.project_id);
+      }
     } catch { /* error */ }
     setMenuOpen(null);
+  };
+
+  const syncProjectStatus = async (projectId: string) => {
+    try {
+      const res = await taskApi.list({ per_page: 200 });
+      const projectTasks = res.data.filter(t => t.project_id === projectId);
+      if (projectTasks.length === 0) return;
+      const allDone = projectTasks.every(t => t.status === 'done');
+      const anyActive = projectTasks.some(t => t.status === 'inprogress' || t.status === 'todo');
+      let newStatus: Project['status'];
+      if (allDone) newStatus = 'completed';
+      else if (anyActive) newStatus = 'active';
+      else return; // all backlog, don't change
+      await projectApi.update(projectId, { status: newStatus });
+    } catch { /* silent */ }
   };
 
   const openBillingModal = (task: Task) => {

@@ -9,7 +9,7 @@ import {
 } from 'hugeicons-react';
 import Portal from '@/components/ui/Portal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
-import { taskApi, type Task } from '@/lib/api';
+import { taskApi, projectApi, type Task, type Project } from '@/lib/api';
 import { formatCurrency, convertToIDR, fetchExchangeRates } from '@/lib/utils';
 
 
@@ -93,7 +93,27 @@ export default function TasksListPage() {
   };
 
   const moveTask = async (taskId: string, toStatus: string) => {
-    try { await taskApi.update(taskId, { status: toStatus as Task['status'] }); fetchTasks(); fetchStats(); } catch { /* err */ }
+    const task = tasks.find(t => t.id === taskId);
+    try {
+      await taskApi.update(taskId, { status: toStatus as Task['status'] });
+      fetchTasks(); fetchStats();
+      if (task?.project_id) syncProjectStatus(task.project_id);
+    } catch { /* err */ }
+  };
+
+  const syncProjectStatus = async (projectId: string) => {
+    try {
+      const res = await taskApi.list({ per_page: 200 });
+      const projectTasks = res.data.filter(t => t.project_id === projectId);
+      if (projectTasks.length === 0) return;
+      const allDone = projectTasks.every(t => t.status === 'done');
+      const anyActive = projectTasks.some(t => t.status === 'inprogress' || t.status === 'todo');
+      let newStatus: Project['status'];
+      if (allDone) newStatus = 'completed';
+      else if (anyActive) newStatus = 'active';
+      else return;
+      await projectApi.update(projectId, { status: newStatus });
+    } catch { /* silent */ }
   };
 
   const openBillingModal = (task: Task) => {
