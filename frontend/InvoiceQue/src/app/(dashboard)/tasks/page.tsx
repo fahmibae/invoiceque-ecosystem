@@ -123,7 +123,7 @@ export default function TasksKanbanPage() {
     setMenuOpen(null);
   };
 
-  const openTaskBilling = (kind: 'quotation' | 'invoice') => {
+  const openTaskBilling = async (kind: 'quotation' | 'invoice') => {
     if (!billingTask) return;
     const amount = (billingTask.hourly_rate || 0) * (billingTask.estimated_hours || 0);
     const params = new URLSearchParams({
@@ -135,8 +135,10 @@ export default function TasksKanbanPage() {
       amount: String(amount),
       currency: billingTask.currency || 'IDR',
     });
+    try { await taskApi.update(billingTask.id, { invoice_generated: true }); } catch { /* silent */ }
     setShowBillingModal(false);
     setBillingTask(null);
+    fetchTasks();
     router.push(kind === 'quotation' ? `/quotations/create?${params.toString()}` : `/invoices/create?${params.toString()}`);
   };
 
