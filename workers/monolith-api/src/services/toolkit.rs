@@ -244,14 +244,14 @@ pub async fn create_item(req: Request, env: &Env, claims: &JwtClaims) -> Result<
     let item: Option<ToolkitItem> = db
         .query_one(
             &format!(
-                "INSERT INTO toolkit_items (user_id, toolkit_type, project_id, client_id, title, content, language, tags, sort_order) VALUES ($1::uuid, $2, $3::uuid, $4::uuid, $5, $6::jsonb, $7, $8::text[], $9) RETURNING {}",
+                "INSERT INTO toolkit_items (user_id, toolkit_type, project_id, client_id, title, content, language, tags, sort_order) VALUES ($1::uuid, $2, NULLIF($3, '')::uuid, NULLIF($4, '')::uuid, $5, $6::jsonb, $7, $8::text[], $9) RETURNING {}",
                 TOOLKIT_COLS
             ),
             &[
                 serde_json::json!(claims.user_id),
                 serde_json::json!(body.get("toolkit_type").and_then(|v| v.as_str()).unwrap_or("snippet")),
-                serde_json::json!(body.get("project_id").and_then(|v| v.as_str())),
-                serde_json::json!(body.get("client_id").and_then(|v| v.as_str())),
+                serde_json::json!(body.get("project_id").and_then(|v| v.as_str()).unwrap_or("")),
+                serde_json::json!(body.get("client_id").and_then(|v| v.as_str()).unwrap_or("")),
                 serde_json::json!(title),
                 serde_json::json!(content.to_string()),
                 serde_json::json!(body.get("language").and_then(|v| v.as_str()).unwrap_or("")),
@@ -326,12 +326,12 @@ pub async fn update_item(
         idx += 1;
     }
     if let Some(val) = body.get("project_id") {
-        sets.push(format!("project_id = ${}::uuid", idx));
+        sets.push(format!("project_id = NULLIF(${}, '')::uuid", idx));
         params.push(serde_json::json!(val.as_str()));
         idx += 1;
     }
     if let Some(val) = body.get("client_id") {
-        sets.push(format!("client_id = ${}::uuid", idx));
+        sets.push(format!("client_id = NULLIF(${}, '')::uuid", idx));
         params.push(serde_json::json!(val.as_str()));
         idx += 1;
     }
