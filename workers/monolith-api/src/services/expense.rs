@@ -123,22 +123,22 @@ async fn ensure_table(db: &NeonClient) -> Result<()> {
     db.execute(
         "CREATE TABLE IF NOT EXISTS expenses (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id UUID NOT NULL,
-            project_id UUID,
-            client_id UUID,
-            category VARCHAR(50) NOT NULL DEFAULT 'other',
-            title VARCHAR(500) NOT NULL DEFAULT '',
+            user_id TEXT NOT NULL,
+            project_id TEXT,
+            client_id TEXT,
+            category TEXT NOT NULL DEFAULT 'other',
+            title TEXT NOT NULL,
             description TEXT DEFAULT '',
-            amount NUMERIC(15,2) NOT NULL DEFAULT 0,
-            currency VARCHAR(10) DEFAULT 'IDR',
+            amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+            currency TEXT NOT NULL DEFAULT 'IDR',
             expense_date DATE DEFAULT CURRENT_DATE,
             receipt_url TEXT DEFAULT '',
-            is_tax_deductible BOOLEAN DEFAULT false,
-            is_recurring BOOLEAN DEFAULT false,
-            recurring_interval VARCHAR(20) DEFAULT '',
-            tags TEXT[] DEFAULT '{}',
-            created_at TIMESTAMPTZ DEFAULT NOW(),
-            updated_at TIMESTAMPTZ DEFAULT NOW()
+            is_tax_deductible BOOLEAN NOT NULL DEFAULT false,
+            is_recurring BOOLEAN NOT NULL DEFAULT false,
+            recurring_interval TEXT DEFAULT '',
+            tags JSONB DEFAULT '[]'::jsonb,
+            created_at TIMESTAMPTZ DEFAULT now(),
+            updated_at TIMESTAMPTZ DEFAULT now()
         )",
         &[],
     )
@@ -194,12 +194,12 @@ pub async fn list_expenses(req: &Request, env: &Env, claims: &JwtClaims) -> Resu
         idx += 1;
     }
     if !project_id.is_empty() {
-        conditions.push(format!("project_id = ${}::uuid", idx));
+        conditions.push(format!("project_id = ${}", idx));
         params.push(serde_json::json!(project_id));
         idx += 1;
     }
     if !client_id.is_empty() {
-        conditions.push(format!("client_id = ${}::uuid", idx));
+        conditions.push(format!("client_id = ${}", idx));
         params.push(serde_json::json!(client_id));
         idx += 1;
     }
@@ -245,7 +245,7 @@ pub async fn get_expense(env: &Env, claims: &JwtClaims, id: &str) -> Result<Resp
     let item: Option<Expense> = db
         .query_one(
             &format!(
-                "SELECT {} FROM expenses WHERE id = $1::uuid AND user_id = $2::uuid",
+                "SELECT {} FROM expenses WHERE id = $1::uuid AND user_id = $2",
                 EXPENSE_COLS
             ),
             &[serde_json::json!(id), serde_json::json!(claims.user_id)],
@@ -308,7 +308,7 @@ pub async fn create_expense(req: Request, env: &Env, claims: &JwtClaims) -> Resu
     let item: Option<Expense> = db
         .query_one(
             &format!(
-                "INSERT INTO expenses (user_id, project_id, client_id, category, title, description, amount, currency, expense_date, receipt_url, is_tax_deductible, is_recurring, recurring_interval, tags) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, COALESCE($9::date, CURRENT_DATE), $10, $11, $12, $13, $14::text[]) RETURNING {}",
+                "INSERT INTO expenses (user_id, project_id, client_id, category, title, description, amount, currency, expense_date, receipt_url, is_tax_deductible, is_recurring, recurring_interval, tags) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9::date, CURRENT_DATE), $10, $11, $12, $13, $14::jsonb) RETURNING {}",
                 EXPENSE_COLS
             ),
             &[
@@ -325,7 +325,7 @@ pub async fn create_expense(req: Request, env: &Env, claims: &JwtClaims) -> Resu
                 serde_json::json!(body.get("is_tax_deductible").and_then(|v| v.as_bool()).unwrap_or(false)),
                 serde_json::json!(body.get("is_recurring").and_then(|v| v.as_bool()).unwrap_or(false)),
                 serde_json::json!(body.get("recurring_interval").and_then(|v| v.as_str()).unwrap_or("")),
-                serde_json::json!(format!("{{{}}}", tags_str)),
+                serde_json::json!(serde_json::json!(body.get("tags").cloned().unwrap_or(serde_json::json!([]))).to_string()),
             ],
         )
         .await?;
@@ -418,23 +418,18 @@ pub async fn update_expense(
         idx += 1;
     }
     if let Some(val) = body.get("project_id") {
-        sets.push(format!("project_id = ${}::uuid", idx));
+        sets.push(format!("project_id = ${}", idx));
         params.push(serde_json::json!(val.as_str()));
         idx += 1;
     }
     if let Some(val) = body.get("client_id") {
-        sets.push(format!("client_id = ${}::uuid", idx));
+        sets.push(format!("client_id = ${}", idx));
         params.push(serde_json::json!(val.as_str()));
         idx += 1;
     }
-    if let Some(tags) = body.get("tags").and_then(|v| v.as_array()) {
-        let tags_str = tags
-            .iter()
-            .filter_map(|t| t.as_str())
-            .collect::<Vec<_>>()
-            .join(",");
-        sets.push(format!("tags = ${}::text[]", idx));
-        params.push(serde_json::json!(format!("{{{}}}", tags_str)));
+    if let Some(tags) = body.get("tags") {
+        sets.push(format!("tags = ${}::jsonb", idx));
+        params.push(serde_json::json!(tags.to_string()));
         idx += 1;
     }
 
@@ -448,7 +443,7 @@ pub async fn update_expense(
     params.push(serde_json::json!(claims.user_id));
 
     let sql = format!(
-        "UPDATE expenses SET {} WHERE id = ${}::uuid AND user_id = ${}::uuid RETURNING {}",
+        "UPDATE expenses SET {} WHERE id = ${}::uuid AND user_id = ${} RETURNING {}",
         sets.join(", "),
         idx,
         idx + 1,
@@ -465,7 +460,7 @@ pub async fn update_expense(
 pub async fn delete_expense(env: &Env, claims: &JwtClaims, id: &str) -> Result<Response> {
     let db = get_db(env)?;
     db.execute(
-        "DELETE FROM expenses WHERE id = $1::uuid AND user_id = $2::uuid",
+        "DELETE FROM expenses WHERE id = $1::uuid AND user_id = $2",
         &[serde_json::json!(id), serde_json::json!(claims.user_id)],
     )
     .await?;
@@ -492,7 +487,7 @@ pub async fn bulk_delete_expenses(
     let pg_arr = utils::to_pg_array(&ids);
     let deleted = db
         .execute(
-            "DELETE FROM expenses WHERE user_id = $1::uuid AND id = ANY($2::uuid[])",
+            "DELETE FROM expenses WHERE user_id = $1 AND id = ANY($2::uuid[])",
             &[
                 serde_json::json!(claims.user_id),
                 serde_json::json!(pg_arr),
@@ -524,7 +519,7 @@ pub async fn expense_stats(req: &Request, env: &Env, claims: &JwtClaims) -> Resu
     let total_amount: f64 = db
         .query_scalar(
             &format!(
-                "SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE user_id = $1::uuid{}",
+                "SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE user_id = $1{}",
                 year_filter
             ),
             &[serde_json::json!(claims.user_id)],
@@ -536,7 +531,7 @@ pub async fn expense_stats(req: &Request, env: &Env, claims: &JwtClaims) -> Resu
     let tax_deductible_total: f64 = db
         .query_scalar(
             &format!(
-                "SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE user_id = $1::uuid AND is_tax_deductible = true{}",
+                "SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE user_id = $1 AND is_tax_deductible = true{}",
                 year_filter
             ),
             &[serde_json::json!(claims.user_id)],
@@ -548,7 +543,7 @@ pub async fn expense_stats(req: &Request, env: &Env, claims: &JwtClaims) -> Resu
     let total_count: i64 = db
         .query_scalar(
             &format!(
-                "SELECT COUNT(*) FROM expenses WHERE user_id = $1::uuid{}",
+                "SELECT COUNT(*) FROM expenses WHERE user_id = $1{}",
                 year_filter
             ),
             &[serde_json::json!(claims.user_id)],
@@ -560,7 +555,7 @@ pub async fn expense_stats(req: &Request, env: &Env, claims: &JwtClaims) -> Resu
     let category_rows = db
         .query_as_maps(
             &format!(
-                "SELECT category, COUNT(*) as count, COALESCE(SUM(amount), 0) as total FROM expenses WHERE user_id = $1::uuid{} GROUP BY category ORDER BY total DESC",
+                "SELECT category, COUNT(*) as count, COALESCE(SUM(amount), 0) as total FROM expenses WHERE user_id = $1{} GROUP BY category ORDER BY total DESC",
                 year_filter
             ),
             &[serde_json::json!(claims.user_id)],
@@ -581,7 +576,7 @@ pub async fn expense_stats(req: &Request, env: &Env, claims: &JwtClaims) -> Resu
     // Monthly breakdown (last 12 months)
     let monthly_rows = db
         .query_as_maps(
-            "SELECT TO_CHAR(expense_date, 'YYYY-MM') as month, COALESCE(SUM(amount), 0) as total, COUNT(*) as count FROM expenses WHERE user_id = $1::uuid AND expense_date >= (CURRENT_DATE - INTERVAL '12 months') GROUP BY month ORDER BY month ASC",
+            "SELECT TO_CHAR(expense_date, 'YYYY-MM') as month, COALESCE(SUM(amount), 0) as total, COUNT(*) as count FROM expenses WHERE user_id = $1 AND expense_date >= (CURRENT_DATE - INTERVAL '12 months') GROUP BY month ORDER BY month ASC",
             &[serde_json::json!(claims.user_id)],
         )
         .await?;
@@ -600,7 +595,7 @@ pub async fn expense_stats(req: &Request, env: &Env, claims: &JwtClaims) -> Resu
     // This month vs last month
     let this_month: f64 = db
         .query_scalar(
-            "SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE user_id = $1::uuid AND expense_date >= DATE_TRUNC('month', CURRENT_DATE)",
+            "SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE user_id = $1 AND expense_date >= DATE_TRUNC('month', CURRENT_DATE)",
             &[serde_json::json!(claims.user_id)],
         )
         .await
@@ -608,7 +603,7 @@ pub async fn expense_stats(req: &Request, env: &Env, claims: &JwtClaims) -> Resu
 
     let last_month: f64 = db
         .query_scalar(
-            "SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE user_id = $1::uuid AND expense_date >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month') AND expense_date < DATE_TRUNC('month', CURRENT_DATE)",
+            "SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE user_id = $1 AND expense_date >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month') AND expense_date < DATE_TRUNC('month', CURRENT_DATE)",
             &[serde_json::json!(claims.user_id)],
         )
         .await
