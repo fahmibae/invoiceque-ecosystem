@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
-  Wrench01Icon, SourceCodeIcon, CheckListIcon,
+  Wrench01Icon, CheckListIcon,
   PaintBoardIcon, GoogleDocIcon, ArrowRight01Icon, Loading03Icon,
   FlashIcon, MoneyReceiveSquareIcon, StickyNote02Icon,
   LegalDocument01Icon, StarIcon,
@@ -61,18 +61,6 @@ const UNIVERSAL_TOOLS = [
 // ── Profession-Specific Tools ─────────────────────────────────
 
 const PROFESSION_PACKS = [
-  {
-    id: 'developer',
-    title: '💻 Developer Tools',
-    description: 'Code snippets, deployment checklists, dan dokumentasi API.',
-    color: '#3B82F6',
-    gradient: 'from-blue-500 to-indigo-600',
-    bgLight: 'bg-blue-50 dark:bg-blue-900/20',
-    icon: SourceCodeIcon,
-    tools: [
-      { href: '/toolkit/snippets', label: 'Code Snippets', desc: 'Simpan & reuse potongan kode', statKey: 'snippet' },
-    ],
-  },
   {
     id: 'designer',
     title: '🎨 Designer Tools',

@@ -95,7 +95,6 @@ const navEntries: NavEntry[] = [
           { href: '/toolkit/notes', label: 'Quick Notes' },
           { href: '/toolkit/rate-cards', label: 'Rate Cards' },
           { href: '/toolkit/intake-forms', label: 'Intake Forms' },
-          { href: '/toolkit/snippets', label: 'Code Snippets' },
           { href: '/toolkit/checklists', label: 'Checklists' },
         ],
       },
