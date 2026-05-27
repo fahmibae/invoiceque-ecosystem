@@ -38,6 +38,12 @@ const TOUR_STEPS: TourStep[] = [
     placement: 'right',
   },
   {
+    target: '[data-tour="task-sidebar"]',
+    title: '✅ Task & Project Management',
+    description: 'Sidebar kanan ini untuk mengelola tugas. Ada Kanban board, task list, project tracker, time tracking, dan kalender — semua dalam satu tempat!',
+    placement: 'left',
+  },
+  {
     target: '[data-tour="nav-reports"]',
     title: '📊 Laporan & Analitik',
     description: 'Lihat insight bisnis kamu — pendapatan, klien terbaik, dan tren. Buat keputusan berdasarkan data!',

@@ -99,7 +99,7 @@ export default function TaskManagementSidebar({
       )}
 
       {isDesktopOpen && (
-        <aside className="fixed right-0 top-0 z-[210] hidden h-screen w-[76px] flex-col border-l border-border-color bg-bg-card shadow-sm transition-transform duration-200 lg:flex">
+        <aside data-tour="task-sidebar" className="fixed right-0 top-0 z-[210] hidden h-screen w-[76px] flex-col border-l border-border-color bg-bg-card shadow-sm transition-transform duration-200 lg:flex">
           <button
             type="button"
             onClick={onToggleDesktop}
