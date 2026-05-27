@@ -4,6 +4,46 @@ import React from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import TaskManagementSidebar from './TaskManagementSidebar';
+import TourGuide, { type TourStep } from '@/components/ui/TourGuide';
+
+const TOUR_STEPS: TourStep[] = [
+  {
+    target: '[data-tour="nav-"]',
+    title: '👋 Selamat Datang di InvoiceQu!',
+    description: 'Ini adalah Dashboard utama kamu. Di sini kamu bisa melihat ringkasan bisnis, invoice terbaru, dan statistik pendapatan.',
+    placement: 'right',
+  },
+  {
+    target: '[data-tour="nav-invoices"]',
+    title: '📄 Kelola Invoice',
+    description: 'Buat, kirim, dan lacak semua invoice kamu di sini. Kamu juga bisa melihat invoice yang belum lunas.',
+    placement: 'right',
+  },
+  {
+    target: '[data-tour="nav-quotations"]',
+    title: '📝 Quotation & Penawaran',
+    description: 'Buat penawaran harga profesional untuk calon klien. Setelah deal, langsung convert jadi invoice!',
+    placement: 'right',
+  },
+  {
+    target: '[data-tour="nav-clients"]',
+    title: '👥 Database Klien',
+    description: 'Simpan data semua klien kamu. Dari kontak, alamat, hingga riwayat transaksi — semua ada di sini.',
+    placement: 'right',
+  },
+  {
+    target: '[data-tour="nav-toolkit"]',
+    title: '🧰 Toolkit Hub',
+    description: 'Koleksi tools freelancer: Expense Tracker, Contracts, Rate Cards, Intake Forms, Notes, dan banyak lagi!',
+    placement: 'right',
+  },
+  {
+    target: '[data-tour="nav-reports"]',
+    title: '📊 Laporan & Analitik',
+    description: 'Lihat insight bisnis kamu — pendapatan, klien terbaik, dan tren. Buat keputusan berdasarkan data!',
+    placement: 'right',
+  },
+];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [isCollapsed, setIsCollapsed] = React.useState(false);
@@ -63,6 +103,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {children}
         </div>
       </div>
+
+      {/* Tour Guide - shows on first visit */}
+      <TourGuide steps={TOUR_STEPS} storageKey="iq_tour_completed" />
     </div>
   );
 }
+

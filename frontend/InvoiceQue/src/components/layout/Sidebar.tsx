@@ -244,7 +244,7 @@ export default function Sidebar({ isCollapsed = false, toggleSidebar, isMobileOp
 
     if (hasDropdown && item.children) {
       return (
-        <div key={item.href} ref={(el) => { dropdownContainerRefs.current[item.href] = el; }} className="relative mb-[2px]">
+        <div key={item.href} ref={(el) => { dropdownContainerRefs.current[item.href] = el; }} className="relative mb-[2px]" data-tour={`nav-${item.href.replace(/\//g, '-').replace(/^-/, '')}`}>
           <button
             type="button"
             ref={(el) => { dropdownButtonRefs.current[item.href] = el; }}
@@ -290,6 +290,7 @@ export default function Sidebar({ isCollapsed = false, toggleSidebar, isMobileOp
       <Link
         key={item.href}
         href={item.href}
+        data-tour={`nav-${item.href.replace(/\//g, '-').replace(/^-/, '')}`}
         onClick={() => {
           closeMobileSidebar();
         }}
