@@ -8,6 +8,8 @@ import {
   MoneyReceiveSquareIcon, PercentSquareIcon, ArrowUp01Icon, ArrowDown01Icon,
   Edit02Icon, Cancel01Icon, CheckmarkCircle02Icon, MoreVerticalIcon,
 } from 'hugeicons-react';
+import Portal from '@/components/ui/Portal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import { expenseApi, type Expense, type CreateExpenseRequest, type ExpenseStats, type ExpenseCategory } from '@/lib/api';
 
 const CATEGORY_LABELS: Record<string, { label: string; emoji: string; color: string }> = {
@@ -132,13 +134,9 @@ export default function ExpenseTrackerPage() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    try {
-      await expenseApi.delete(deleteTarget);
-      setShowDeleteModal(false);
-      setDeleteTarget(null);
-      fetchExpenses();
-      fetchStats();
-    } catch { /* ignore */ }
+    try { await expenseApi.delete(deleteTarget); fetchExpenses(); fetchStats(); } catch { /* ignore */ }
+    setDeleteTarget(null);
+    setShowDeleteModal(false);
   };
 
   const monthChange = stats
@@ -157,6 +155,8 @@ export default function ExpenseTrackerPage() {
 
   return (
     <div className="animate-fade-in">
+      <ConfirmModal isOpen={showDeleteModal} title="Hapus Expense" message="Data yang dihapus tidak bisa dikembalikan. Lanjutkan?" confirmText="Hapus" onConfirm={handleDelete} onCancel={() => { setShowDeleteModal(false); setDeleteTarget(null); }} type="danger" />
+
       {/* Header */}
       <div className="page-header">
         <div className="page-header-left">
@@ -341,103 +341,81 @@ export default function ExpenseTrackerPage() {
 
       {/* Form Modal */}
       {showForm && (
-        <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) resetForm(); }}>
-          <div className="modal" style={{ maxWidth: 520 }}>
-            <div className="modal-header">
-              <h3 className="modal-title">{editingId ? 'Edit Expense' : 'Tambah Expense'}</h3>
-              <button className="modal-close" onClick={resetForm}><Cancel01Icon width={18} height={18} /></button>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <div className="modal-body space-y-4">
+        <Portal>
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] flex items-stretch sm:items-center justify-center p-0 sm:p-5" onClick={() => resetForm()}>
+            <div className="bg-bg-card w-full h-full sm:h-auto sm:max-w-[520px] sm:rounded-2xl sm:max-h-[90vh] shadow-xl overflow-hidden border border-border-color animate-fade-in flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border-light shrink-0">
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  <MoneyReceiveSquareIcon width={20} height={20} className="text-emerald-600" />
+                  {editingId ? 'Edit Expense' : 'Tambah Expense'}
+                </h3>
+                <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-bg-secondary transition-colors" onClick={resetForm}><Cancel01Icon width={20} height={20} /></button>
+              </div>
+              <div className="overflow-y-auto flex-1 px-6 py-5 flex flex-col gap-4">
                 <div>
-                  <label className="form-label">Judul *</label>
-                  <input type="text" className="form-input w-full" placeholder="e.g. Figma Pro, AWS Hosting" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
+                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Judul *</label>
+                  <input className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-emerald-400 transition-colors" placeholder="e.g. Figma Pro, AWS Hosting" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="form-label">Jumlah (Amount) *</label>
-                    <input type="number" className="form-input w-full" step="0.01" min="0" value={form.amount || ''} onChange={(e) => setForm({ ...form, amount: parseFloat(e.target.value) || 0 })} required />
+                    <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Jumlah *</label>
+                    <input type="number" className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-emerald-400 transition-colors" step="0.01" min="0" value={form.amount || ''} onChange={(e) => setForm({ ...form, amount: parseFloat(e.target.value) || 0 })} />
                   </div>
                   <div>
-                    <label className="form-label">Currency</label>
-                    <select className="form-input w-full" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
-                      <option value="IDR">IDR</option>
-                      <option value="USD">USD</option>
-                      <option value="EUR">EUR</option>
-                      <option value="GBP">GBP</option>
-                      <option value="SGD">SGD</option>
+                    <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Currency</label>
+                    <select className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-emerald-400 transition-colors" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
+                      <option value="IDR">IDR</option><option value="USD">USD</option><option value="EUR">EUR</option><option value="GBP">GBP</option><option value="SGD">SGD</option>
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="form-label">Kategori</label>
-                    <select className="form-input w-full" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as ExpenseCategory })}>
-                      {Object.entries(CATEGORY_LABELS).map(([key, val]) => (
-                        <option key={key} value={key}>{val.emoji} {val.label}</option>
-                      ))}
+                    <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Kategori</label>
+                    <select className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-emerald-400 transition-colors" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as ExpenseCategory })}>
+                      {Object.entries(CATEGORY_LABELS).map(([key, val]) => (<option key={key} value={key}>{val.emoji} {val.label}</option>))}
                     </select>
                   </div>
                   <div>
-                    <label className="form-label">Tanggal</label>
-                    <input type="date" className="form-input w-full" value={form.expense_date} onChange={(e) => setForm({ ...form, expense_date: e.target.value })} />
+                    <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Tanggal</label>
+                    <input type="date" className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-emerald-400 transition-colors" value={form.expense_date} onChange={(e) => setForm({ ...form, expense_date: e.target.value })} />
                   </div>
                 </div>
                 <div>
-                  <label className="form-label">Deskripsi</label>
-                  <textarea className="form-input w-full" rows={2} placeholder="Detail pengeluaran (optional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Deskripsi</label>
+                  <textarea className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-emerald-400 transition-colors resize-none" rows={2} placeholder="Detail pengeluaran (optional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
                 </div>
                 <div className="flex gap-6">
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input type="checkbox" className="form-checkbox" checked={form.is_tax_deductible} onChange={(e) => setForm({ ...form, is_tax_deductible: e.target.checked })} />
+                    <input type="checkbox" className="accent-emerald-500" checked={form.is_tax_deductible} onChange={(e) => setForm({ ...form, is_tax_deductible: e.target.checked })} />
                     <PercentSquareIcon width={14} height={14} className="text-emerald-500" /> Tax Deductible
                   </label>
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input type="checkbox" className="form-checkbox" checked={form.is_recurring} onChange={(e) => setForm({ ...form, is_recurring: e.target.checked })} />
+                    <input type="checkbox" className="accent-emerald-500" checked={form.is_recurring} onChange={(e) => setForm({ ...form, is_recurring: e.target.checked })} />
                     🔄 Recurring
                   </label>
                 </div>
                 {form.is_recurring && (
                   <div>
-                    <label className="form-label">Interval Recurring</label>
-                    <select className="form-input w-full" value={form.recurring_interval} onChange={(e) => setForm({ ...form, recurring_interval: e.target.value })}>
-                      <option value="">Pilih interval</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="quarterly">Quarterly</option>
-                      <option value="yearly">Yearly</option>
+                    <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Interval</label>
+                    <select className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-emerald-400 transition-colors" value={form.recurring_interval} onChange={(e) => setForm({ ...form, recurring_interval: e.target.value })}>
+                      <option value="">Pilih interval</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option>
                     </select>
                   </div>
                 )}
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={resetForm}>Batal</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>
+              <div className="flex gap-3 px-6 py-4 border-t border-border-light shrink-0">
+                <button className="btn btn-secondary flex-1" onClick={resetForm}>Batal</button>
+                <button className="btn btn-primary flex-1" onClick={handleSubmit} disabled={!form.title.trim() || form.amount <= 0 || saving} style={{ background: 'linear-gradient(135deg, #10B981, #0D9488)' }}>
                   {saving ? <Loading03Icon width={16} height={16} className="animate-spin" /> : <CheckmarkCircle02Icon width={16} height={16} />}
-                  {editingId ? 'Update' : 'Simpan'}
+                  {saving ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Simpan Expense'}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
-        </div>
+        </Portal>
       )}
 
-      {/* Delete Modal */}
-      {showDeleteModal && (
-        <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) setShowDeleteModal(false); }}>
-          <div className="modal" style={{ maxWidth: 400 }}>
-            <div className="modal-body text-center py-6">
-              <Delete02Icon width={40} height={40} className="mx-auto text-red-500 mb-3" />
-              <h3 className="text-lg font-bold mb-2">Hapus Expense?</h3>
-              <p className="text-sm text-text-tertiary">Data yang dihapus tidak bisa dikembalikan.</p>
-            </div>
-            <div className="modal-footer justify-center">
-              <button className="btn btn-secondary" onClick={() => setShowDeleteModal(false)}>Batal</button>
-              <button className="btn btn-primary bg-red-500 hover:bg-red-600" onClick={handleDelete}>Hapus</button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }
