@@ -7,6 +7,8 @@ import {
   Loading03Icon, LegalDocument01Icon, Edit02Icon, Cancel01Icon,
   CheckmarkCircle02Icon, MoreVerticalIcon, Copy01Icon, ViewIcon,
 } from 'hugeicons-react';
+import Portal from '@/components/ui/Portal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import { toolkitApi, type ToolkitItem, type CreateToolkitItemRequest } from '@/lib/api';
 
 const CONTRACT_TYPES = [
@@ -28,6 +30,8 @@ export default function ContractTemplatesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const [title, setTitle] = useState('');
   const [contractType, setContractType] = useState('service_agreement');
@@ -97,11 +101,11 @@ export default function ContractTemplatesPage() {
     setMenuOpen(null);
   };
 
-  const deleteContract = async (id: string) => {
-    try {
-      await toolkitApi.delete(id);
-      fetchContracts();
-    } catch { /* ignore */ }
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try { await toolkitApi.delete(deleteTarget); fetchContracts(); } catch { /* ignore */ }
+    setDeleteTarget(null);
+    setShowDeleteModal(false);
   };
 
   if (loading) {
@@ -114,6 +118,8 @@ export default function ContractTemplatesPage() {
 
   return (
     <div className="animate-fade-in">
+      <ConfirmModal isOpen={showDeleteModal} title="Hapus Contract" message="Apakah Anda yakin ingin menghapus contract template ini?" confirmText="Hapus" onConfirm={handleDelete} onCancel={() => { setShowDeleteModal(false); setDeleteTarget(null); }} type="danger" />
+
       {/* Header */}
       <div className="page-header">
         <div className="page-header-left">
@@ -177,7 +183,7 @@ export default function ContractTemplatesPage() {
                       <button className="w-full px-3 py-2 text-left text-sm hover:bg-bg-hover flex items-center gap-2" onClick={() => duplicateContract(item)}>
                         <Copy01Icon width={14} height={14} /> Duplicate
                       </button>
-                      <button className="w-full px-3 py-2 text-left text-sm hover:bg-bg-hover text-red-500 flex items-center gap-2" onClick={() => { deleteContract(item.id); setMenuOpen(null); }}>
+                      <button className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" onClick={() => { setDeleteTarget(item.id); setShowDeleteModal(true); setMenuOpen(null); }}>
                         <Delete02Icon width={14} height={14} /> Hapus
                       </button>
                     </div>
@@ -206,74 +212,75 @@ export default function ContractTemplatesPage() {
 
       {/* Create/Edit Form Modal */}
       {showForm && (
-        <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) resetForm(); }}>
-          <div className="modal" style={{ maxWidth: 640 }}>
-            <div className="modal-header">
-              <h3 className="modal-title">{editingId ? 'Edit Template' : 'Buat Contract Template'}</h3>
-              <button className="modal-close" onClick={resetForm}><Cancel01Icon width={18} height={18} /></button>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <div className="modal-body space-y-4">
+        <Portal>
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] flex items-stretch sm:items-center justify-center p-0 sm:p-5" onClick={() => resetForm()}>
+            <div className="bg-bg-card w-full h-full sm:h-auto sm:max-w-[640px] sm:rounded-2xl sm:max-h-[90vh] shadow-xl overflow-hidden border border-border-color animate-fade-in flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border-light shrink-0">
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  <LegalDocument01Icon width={20} height={20} className="text-indigo-600" />
+                  {editingId ? 'Edit Template' : 'Buat Contract Template'}
+                </h3>
+                <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-bg-secondary transition-colors" onClick={resetForm}><Cancel01Icon width={20} height={20} /></button>
+              </div>
+              <div className="overflow-y-auto flex-1 px-6 py-5 flex flex-col gap-4">
                 <div>
-                  <label className="form-label">Nama Template *</label>
-                  <input type="text" className="form-input w-full" placeholder="e.g. Web Development Service Agreement" value={title} onChange={(e) => setTitle(e.target.value)} required />
+                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Nama Template *</label>
+                  <input className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-indigo-400 transition-colors" placeholder="e.g. Web Development Service Agreement" value={title} onChange={(e) => setTitle(e.target.value)} />
                 </div>
                 <div>
-                  <label className="form-label">Tipe Kontrak</label>
-                  <select className="form-input w-full" value={contractType} onChange={(e) => setContractType(e.target.value)}>
-                    {CONTRACT_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>{t.emoji} {t.label}</option>
-                    ))}
+                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Tipe Kontrak</label>
+                  <select className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-indigo-400 transition-colors" value={contractType} onChange={(e) => setContractType(e.target.value)}>
+                    {CONTRACT_TYPES.map((t) => (<option key={t.value} value={t.value}>{t.emoji} {t.label}</option>))}
                   </select>
                 </div>
                 <div>
-                  <label className="form-label">Isi Kontrak / Template Body</label>
+                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Isi Kontrak / Template Body</label>
                   <textarea
-                    className="form-input w-full font-mono text-xs"
+                    className="w-full py-3 px-4 border border-border-color rounded-lg bg-slate-900 dark:bg-slate-950 text-sm outline-none focus:border-indigo-400 transition-colors resize-none font-mono text-slate-300 leading-relaxed"
                     rows={12}
-                    placeholder={"FREELANCE SERVICE AGREEMENT\n\nThis Agreement is entered into between:\n- Client: [CLIENT_NAME]\n- Freelancer: [YOUR_NAME]\n\n1. SCOPE OF WORK\n...\n\n2. PAYMENT TERMS\n...\n\n3. TIMELINE\n..."}
+                    placeholder={"FREELANCE SERVICE AGREEMENT\n\nThis Agreement is entered into between:\n- Client: [CLIENT_NAME]\n- Freelancer: [YOUR_NAME]\n\n1. SCOPE OF WORK\n...\n\n2. PAYMENT TERMS\n..."}
                     value={body}
                     onChange={(e) => setBody(e.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="form-label">Catatan Internal (tidak terlihat client)</label>
-                  <textarea className="form-input w-full" rows={2} placeholder="e.g. Gunakan untuk project di atas 5 juta" value={notes} onChange={(e) => setNotes(e.target.value)} />
+                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Catatan Internal</label>
+                  <textarea className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-indigo-400 transition-colors resize-none" rows={2} placeholder="e.g. Gunakan untuk project di atas 5 juta" value={notes} onChange={(e) => setNotes(e.target.value)} />
                 </div>
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={resetForm}>Batal</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>
+              <div className="flex gap-3 px-6 py-4 border-t border-border-light shrink-0">
+                <button className="btn btn-secondary flex-1" onClick={resetForm}>Batal</button>
+                <button className="btn btn-primary flex-1" onClick={handleSubmit} disabled={!title.trim() || saving} style={{ background: 'linear-gradient(135deg, #6366F1, #7C3AED)' }}>
                   {saving ? <Loading03Icon width={16} height={16} className="animate-spin" /> : <CheckmarkCircle02Icon width={16} height={16} />}
-                  {editingId ? 'Update' : 'Simpan'}
+                  {saving ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Simpan Template'}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* Preview Modal */}
       {showPreview && (
-        <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) setShowPreview(null); }}>
-          <div className="modal" style={{ maxWidth: 700 }}>
-            <div className="modal-header">
-              <h3 className="modal-title">📄 {showPreview.title}</h3>
-              <button className="modal-close" onClick={() => setShowPreview(null)}><Cancel01Icon width={18} height={18} /></button>
-            </div>
-            <div className="modal-body">
-              <pre className="whitespace-pre-wrap text-sm text-text-primary font-sans leading-relaxed">
-                {(showPreview.content?.body as string) || 'No content...'}
-              </pre>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowPreview(null)}>Tutup</button>
-              <button className="btn btn-primary" onClick={() => { openEdit(showPreview); setShowPreview(null); }}>
-                <Edit02Icon width={14} height={14} /> Edit
-              </button>
+        <Portal>
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] flex items-stretch sm:items-center justify-center p-0 sm:p-5" onClick={() => setShowPreview(null)}>
+            <div className="bg-bg-card w-full h-full sm:h-auto sm:max-w-[700px] sm:rounded-2xl sm:max-h-[85vh] shadow-xl overflow-hidden border border-border-color animate-fade-in flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border-light shrink-0">
+                <h3 className="text-lg font-bold">📄 {showPreview.title}</h3>
+                <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-bg-secondary transition-colors" onClick={() => setShowPreview(null)}><Cancel01Icon width={20} height={20} /></button>
+              </div>
+              <div className="overflow-y-auto flex-1 px-6 py-5">
+                <pre className="whitespace-pre-wrap text-sm text-text-primary font-sans leading-relaxed">{(showPreview.content?.body as string) || 'No content...'}</pre>
+              </div>
+              <div className="flex gap-3 px-6 py-4 border-t border-border-light shrink-0">
+                <button className="btn btn-secondary flex-1" onClick={() => setShowPreview(null)}>Tutup</button>
+                <button className="btn btn-primary flex-1" onClick={() => { openEdit(showPreview); setShowPreview(null); }} style={{ background: 'linear-gradient(135deg, #6366F1, #7C3AED)' }}>
+                  <Edit02Icon width={14} height={14} /> Edit
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       )}
     </div>
   );

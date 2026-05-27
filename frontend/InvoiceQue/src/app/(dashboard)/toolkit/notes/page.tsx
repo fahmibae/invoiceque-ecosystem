@@ -7,6 +7,8 @@ import {
   Loading03Icon, StickyNote02Icon, Edit02Icon, Cancel01Icon,
   CheckmarkCircle02Icon, StarIcon, PinIcon,
 } from 'hugeicons-react';
+import Portal from '@/components/ui/Portal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import { toolkitApi, type ToolkitItem, type CreateToolkitItemRequest } from '@/lib/api';
 
 export default function QuickNotesPage() {
@@ -16,6 +18,8 @@ export default function QuickNotesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [color, setColor] = useState('#FEF3C7');
@@ -86,11 +90,16 @@ export default function QuickNotesPage() {
     } catch { /* ignore */ }
   };
 
-  const deleteNote = async (id: string) => {
-    try {
-      await toolkitApi.delete(id);
-      fetchNotes();
-    } catch { /* ignore */ }
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try { await toolkitApi.delete(deleteTarget); fetchNotes(); } catch { /* ignore */ }
+    setDeleteTarget(null);
+    setShowDeleteModal(false);
+  };
+
+  const requestDelete = (id: string) => {
+    setDeleteTarget(id);
+    setShowDeleteModal(true);
   };
 
   if (loading) {
@@ -106,6 +115,8 @@ export default function QuickNotesPage() {
 
   return (
     <div className="animate-fade-in">
+      <ConfirmModal isOpen={showDeleteModal} title="Hapus Note" message="Apakah Anda yakin ingin menghapus note ini?" confirmText="Hapus" onConfirm={handleDelete} onCancel={() => { setShowDeleteModal(false); setDeleteTarget(null); }} type="danger" />
+
       {/* Header */}
       <div className="page-header">
         <div className="page-header-left">
@@ -150,7 +161,7 @@ export default function QuickNotesPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
             {pinnedNotes.map((note) => (
-              <NoteCard key={note.id} note={note} onEdit={openEdit} onDelete={deleteNote} onTogglePin={toggleFavorite} />
+              <NoteCard key={note.id} note={note} onEdit={openEdit} onDelete={requestDelete} onTogglePin={toggleFavorite} />
             ))}
           </div>
         </>
@@ -166,7 +177,7 @@ export default function QuickNotesPage() {
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {otherNotes.map((note) => (
-              <NoteCard key={note.id} note={note} onEdit={openEdit} onDelete={deleteNote} onTogglePin={toggleFavorite} />
+              <NoteCard key={note.id} note={note} onEdit={openEdit} onDelete={requestDelete} onTogglePin={toggleFavorite} />
             ))}
           </div>
         </>
@@ -182,35 +193,34 @@ export default function QuickNotesPage() {
 
       {/* Form Modal */}
       {showForm && (
-        <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) resetForm(); }}>
-          <div className="modal" style={{ maxWidth: 520 }}>
-            <div className="modal-header">
-              <h3 className="modal-title">{editingId ? 'Edit Note' : 'Buat Note Baru'}</h3>
-              <button className="modal-close" onClick={resetForm}><Cancel01Icon width={18} height={18} /></button>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <div className="modal-body space-y-4">
+        <Portal>
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] flex items-stretch sm:items-center justify-center p-0 sm:p-5" onClick={() => resetForm()}>
+            <div className="bg-bg-card w-full h-full sm:h-auto sm:max-w-[520px] sm:rounded-2xl sm:max-h-[90vh] shadow-xl overflow-hidden border border-border-color animate-fade-in flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border-light shrink-0">
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  <StickyNote02Icon width={20} height={20} className="text-amber-500" />
+                  {editingId ? 'Edit Note' : 'Buat Note Baru'}
+                </h3>
+                <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-bg-secondary transition-colors" onClick={resetForm}><Cancel01Icon width={20} height={20} /></button>
+              </div>
+              <div className="overflow-y-auto flex-1 px-6 py-5 flex flex-col gap-4">
                 <div>
-                  <label className="form-label">Judul *</label>
-                  <input type="text" className="form-input w-full" placeholder="Judul note" value={title} onChange={(e) => setTitle(e.target.value)} required />
+                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Judul *</label>
+                  <input className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-amber-400 transition-colors" placeholder="Judul note" value={title} onChange={(e) => setTitle(e.target.value)} />
                 </div>
                 <div>
-                  <label className="form-label">Isi Note</label>
-                  <textarea className="form-input w-full" rows={6} placeholder="Tulis catatan kamu di sini..." value={body} onChange={(e) => setBody(e.target.value)} />
+                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Isi Note</label>
+                  <textarea className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-amber-400 transition-colors resize-none" rows={6} placeholder="Tulis catatan kamu di sini..." value={body} onChange={(e) => setBody(e.target.value)} />
                 </div>
                 <div>
-                  <label className="form-label">Warna</label>
+                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Warna</label>
                   <div className="flex gap-2">
                     {NOTE_COLORS.map((c) => (
                       <button
                         key={c.value}
                         type="button"
                         className="w-7 h-7 rounded-lg border-2 transition-all"
-                        style={{
-                          backgroundColor: c.value,
-                          borderColor: color === c.value ? '#3B82F6' : 'transparent',
-                          transform: color === c.value ? 'scale(1.15)' : 'scale(1)',
-                        }}
+                        style={{ backgroundColor: c.value, borderColor: color === c.value ? '#3B82F6' : 'transparent', transform: color === c.value ? 'scale(1.15)' : 'scale(1)' }}
                         onClick={() => setColor(c.value)}
                         title={c.label}
                       />
@@ -218,16 +228,16 @@ export default function QuickNotesPage() {
                   </div>
                 </div>
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={resetForm}>Batal</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>
+              <div className="flex gap-3 px-6 py-4 border-t border-border-light shrink-0">
+                <button className="btn btn-secondary flex-1" onClick={resetForm}>Batal</button>
+                <button className="btn btn-primary flex-1" onClick={handleSubmit} disabled={!title.trim() || saving} style={{ background: 'linear-gradient(135deg, #F59E0B, #EA580C)' }}>
                   {saving ? <Loading03Icon width={16} height={16} className="animate-spin" /> : <CheckmarkCircle02Icon width={16} height={16} />}
-                  {editingId ? 'Update' : 'Simpan'}
+                  {saving ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Simpan Note'}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
-        </div>
+        </Portal>
       )}
     </div>
   );

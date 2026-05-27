@@ -8,6 +8,8 @@ import {
   CheckmarkCircle02Icon, MoreVerticalIcon, Copy01Icon,
   MoneyReceiveSquareIcon, DollarSquareIcon,
 } from 'hugeicons-react';
+import Portal from '@/components/ui/Portal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import { toolkitApi, type ToolkitItem, type CreateToolkitItemRequest } from '@/lib/api';
 
 const RATE_TYPES = [
@@ -40,24 +42,20 @@ export default function RateCardsPage() {
   const [rateCards, setRateCards] = useState<ToolkitItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [showForm, setShowForm] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   // Form state
-  const [title, setTitle] = useState('');
-  const [serviceCategory, setServiceCategory] = useState('development');
-  const [rateType, setRateType] = useState('hourly');
-  const [rate, setRate] = useState('');
-  const [currency, setCurrency] = useState('IDR');
-  const [minRate, setMinRate] = useState('');
-  const [maxRate, setMaxRate] = useState('');
-  const [description, setDescription] = useState('');
-  const [deliverables, setDeliverables] = useState('');
-  const [turnaround, setTurnaround] = useState('');
-  const [revisions, setRevisions] = useState('');
+  const [form, setForm] = useState({
+    title: '', serviceCategory: 'development', rateType: 'hourly',
+    rate: '', currency: 'IDR', minRate: '', maxRate: '',
+    description: '', deliverables: '', turnaround: '', revisions: '',
+  });
 
   const fetchRateCards = useCallback(async () => {
     try {
@@ -73,48 +71,57 @@ export default function RateCardsPage() {
   }, [fetchRateCards]);
 
   const resetForm = () => {
-    setTitle(''); setServiceCategory('development'); setRateType('hourly');
-    setRate(''); setCurrency('IDR'); setMinRate(''); setMaxRate('');
-    setDescription(''); setDeliverables(''); setTurnaround(''); setRevisions('');
-    setEditingId(null); setShowForm(false);
+    setForm({
+      title: '', serviceCategory: 'development', rateType: 'hourly',
+      rate: '', currency: 'IDR', minRate: '', maxRate: '',
+      description: '', deliverables: '', turnaround: '', revisions: '',
+    });
+    setEditingId(null);
+    setShowModal(false);
+  };
+
+  const openCreate = () => {
+    resetForm();
+    setShowModal(true);
   };
 
   const openEdit = (item: ToolkitItem) => {
-    setTitle(item.title);
-    setServiceCategory((item.content?.service_category as string) || 'development');
-    setRateType((item.content?.rate_type as string) || 'hourly');
-    setRate(String((item.content?.rate as number) || ''));
-    setCurrency((item.content?.currency as string) || 'IDR');
-    setMinRate(String((item.content?.min_rate as number) || ''));
-    setMaxRate(String((item.content?.max_rate as number) || ''));
-    setDescription((item.content?.description as string) || '');
-    setDeliverables((item.content?.deliverables as string) || '');
-    setTurnaround((item.content?.turnaround as string) || '');
-    setRevisions(String((item.content?.revisions as number) || ''));
+    setForm({
+      title: item.title,
+      serviceCategory: (item.content?.service_category as string) || 'development',
+      rateType: (item.content?.rate_type as string) || 'hourly',
+      rate: String((item.content?.rate as number) || ''),
+      currency: (item.content?.currency as string) || 'IDR',
+      minRate: String((item.content?.min_rate as number) || ''),
+      maxRate: String((item.content?.max_rate as number) || ''),
+      description: (item.content?.description as string) || '',
+      deliverables: (item.content?.deliverables as string) || '',
+      turnaround: (item.content?.turnaround as string) || '',
+      revisions: String((item.content?.revisions as number) || ''),
+    });
     setEditingId(item.id);
-    setShowForm(true);
+    setShowModal(true);
     setMenuOpen(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim() || !rate) return;
+  const handleSubmit = async () => {
+    if (!form.title.trim() || !form.rate || saving) return;
     setSaving(true);
     try {
       const data: CreateToolkitItemRequest = {
         toolkit_type: 'rate_card',
-        title: title.trim(),
+        title: form.title.trim(),
         content: {
-          service_category: serviceCategory,
-          rate_type: rateType,
-          rate: parseFloat(rate) || 0,
-          currency,
-          min_rate: minRate ? parseFloat(minRate) : null,
-          max_rate: maxRate ? parseFloat(maxRate) : null,
-          description,
-          deliverables,
-          turnaround,
-          revisions: revisions ? parseInt(revisions) : null,
+          service_category: form.serviceCategory,
+          rate_type: form.rateType,
+          rate: parseFloat(form.rate) || 0,
+          currency: form.currency,
+          min_rate: form.minRate ? parseFloat(form.minRate) : null,
+          max_rate: form.maxRate ? parseFloat(form.maxRate) : null,
+          description: form.description,
+          deliverables: form.deliverables,
+          turnaround: form.turnaround,
+          revisions: form.revisions ? parseInt(form.revisions) : null,
         },
       };
       if (editingId) await toolkitApi.update(editingId, data);
@@ -122,7 +129,7 @@ export default function RateCardsPage() {
       resetForm();
       fetchRateCards();
     } catch { /* ignore */ }
-    setSaving(false);
+    finally { setSaving(false); }
   };
 
   const duplicateCard = async (item: ToolkitItem) => {
@@ -137,8 +144,11 @@ export default function RateCardsPage() {
     setMenuOpen(null);
   };
 
-  const deleteCard = async (id: string) => {
-    try { await toolkitApi.delete(id); fetchRateCards(); } catch { /* ignore */ }
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try { await toolkitApi.delete(deleteTarget); fetchRateCards(); } catch { /* ignore */ }
+    setDeleteTarget(null);
+    setShowDeleteModal(false);
   };
 
   if (loading) {
@@ -151,6 +161,8 @@ export default function RateCardsPage() {
 
   return (
     <div className="animate-fade-in">
+      <ConfirmModal isOpen={showDeleteModal} title="Hapus Rate Card" message="Apakah Anda yakin ingin menghapus rate card ini?" confirmText="Hapus" onConfirm={handleDelete} onCancel={() => { setShowDeleteModal(false); setDeleteTarget(null); }} type="danger" />
+
       {/* Header */}
       <div className="page-header">
         <div className="page-header-left">
@@ -167,7 +179,7 @@ export default function RateCardsPage() {
           </div>
           <p className="page-subtitle">Kelola tarif & pricing untuk setiap layanan freelancemu</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { resetForm(); setShowForm(true); }}>
+        <button className="btn btn-primary" onClick={openCreate}>
           <Add01Icon width={16} height={16} /> Tambah Rate Card
         </button>
       </div>
@@ -192,7 +204,7 @@ export default function RateCardsPage() {
           <MoneyReceiveSquareIcon width={48} height={48} className="mx-auto text-text-tertiary mb-3 opacity-40" />
           <p className="text-text-tertiary font-medium">Belum ada rate cards</p>
           <p className="text-text-tertiary text-xs mt-1">Buat pricing rate card pertamamu</p>
-          <button className="btn btn-primary mt-4" onClick={() => { resetForm(); setShowForm(true); }}>
+          <button className="btn btn-primary mt-4" onClick={openCreate}>
             <Add01Icon width={16} height={16} /> Buat Rate Card Pertama
           </button>
         </div>
@@ -214,14 +226,15 @@ export default function RateCardsPage() {
                     <MoreVerticalIcon width={16} height={16} />
                   </button>
                   {menuOpen === item.id && (
-                    <div className="absolute right-0 top-full mt-1 bg-bg-primary border border-border-color rounded-xl shadow-lg z-50 min-w-[160px] py-1">
-                      <button className="w-full px-3 py-2 text-left text-sm hover:bg-bg-hover flex items-center gap-2" onClick={() => openEdit(item)}>
+                    <div className="absolute right-0 top-full mt-1 w-44 bg-bg-card border border-border-color rounded-lg shadow-lg z-50 py-1 animate-fade-in">
+                      <button className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-text-secondary hover:bg-bg-hover transition-colors" onClick={() => openEdit(item)}>
                         <Edit02Icon width={14} height={14} /> Edit
                       </button>
-                      <button className="w-full px-3 py-2 text-left text-sm hover:bg-bg-hover flex items-center gap-2" onClick={() => duplicateCard(item)}>
+                      <button className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-text-secondary hover:bg-bg-hover transition-colors" onClick={() => duplicateCard(item)}>
                         <Copy01Icon width={14} height={14} /> Duplicate
                       </button>
-                      <button className="w-full px-3 py-2 text-left text-sm hover:bg-bg-hover text-red-500 flex items-center gap-2" onClick={() => { deleteCard(item.id); setMenuOpen(null); }}>
+                      <div className="border-t border-border-light my-1" />
+                      <button className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" onClick={() => { setDeleteTarget(item.id); setShowDeleteModal(true); setMenuOpen(null); }}>
                         <Delete02Icon width={14} height={14} /> Hapus
                       </button>
                     </div>
@@ -267,42 +280,49 @@ export default function RateCardsPage() {
         </div>
       )}
 
-      {/* Create/Edit Form Modal */}
-      {showForm && (
-        <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) resetForm(); }}>
-          <div className="modal" style={{ maxWidth: 600 }}>
-            <div className="modal-header">
-              <h3 className="modal-title">{editingId ? 'Edit Rate Card' : 'Tambah Rate Card'}</h3>
-              <button className="modal-close" onClick={resetForm}><Cancel01Icon width={18} height={18} /></button>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <div className="modal-body space-y-4">
+      {/* Create/Edit Modal via Portal */}
+      {showModal && (
+        <Portal>
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] flex items-stretch sm:items-center justify-center p-0 sm:p-5" onClick={() => setShowModal(false)}>
+            <div className="bg-bg-card w-full h-full sm:h-auto sm:max-w-[600px] sm:rounded-2xl sm:max-h-[90vh] shadow-xl overflow-hidden border border-border-color animate-fade-in flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border-light shrink-0">
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  <DollarSquareIcon width={20} height={20} className="text-emerald-600" />
+                  {editingId ? 'Edit Rate Card' : 'Tambah Rate Card'}
+                </h3>
+                <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-bg-secondary transition-colors" onClick={() => setShowModal(false)}>
+                  <Cancel01Icon width={20} height={20} />
+                </button>
+              </div>
+
+              <div className="overflow-y-auto flex-1 px-6 py-5 flex flex-col gap-4">
                 <div>
-                  <label className="form-label">Nama Layanan *</label>
-                  <input type="text" className="form-input w-full" placeholder="e.g. Website Development" value={title} onChange={(e) => setTitle(e.target.value)} required />
+                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Nama Layanan *</label>
+                  <input className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-emerald-400 transition-colors" placeholder="e.g. Website Development"
+                    value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="form-label">Kategori</label>
-                    <select className="form-input w-full" value={serviceCategory} onChange={(e) => setServiceCategory(e.target.value)}>
+                    <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Kategori</label>
+                    <select className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-emerald-400 transition-colors" value={form.serviceCategory} onChange={e => setForm(p => ({ ...p, serviceCategory: e.target.value }))}>
                       {SERVICE_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.emoji} {c.label}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="form-label">Tipe Tarif</label>
-                    <select className="form-input w-full" value={rateType} onChange={(e) => setRateType(e.target.value)}>
+                    <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Tipe Tarif</label>
+                    <select className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-emerald-400 transition-colors" value={form.rateType} onChange={e => setForm(p => ({ ...p, rateType: e.target.value }))}>
                       {RATE_TYPES.map((r) => <option key={r.value} value={r.value}>{r.emoji} {r.label}</option>)}
                     </select>
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="form-label">Tarif *</label>
-                    <input type="number" className="form-input w-full" placeholder="500000" value={rate} onChange={(e) => setRate(e.target.value)} required />
+                    <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Tarif *</label>
+                    <input type="number" className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-emerald-400 transition-colors" placeholder="500000" value={form.rate} onChange={e => setForm(p => ({ ...p, rate: e.target.value }))} />
                   </div>
                   <div>
-                    <label className="form-label">Currency</label>
-                    <select className="form-input w-full" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                    <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Currency</label>
+                    <select className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-emerald-400 transition-colors" value={form.currency} onChange={e => setForm(p => ({ ...p, currency: e.target.value }))}>
                       <option value="IDR">IDR (Rp)</option>
                       <option value="USD">USD ($)</option>
                       <option value="EUR">EUR (€)</option>
@@ -310,43 +330,44 @@ export default function RateCardsPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="form-label">Revisi</label>
-                    <input type="number" className="form-input w-full" placeholder="3" value={revisions} onChange={(e) => setRevisions(e.target.value)} />
+                    <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Revisi</label>
+                    <input type="number" className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-emerald-400 transition-colors" placeholder="3" value={form.revisions} onChange={e => setForm(p => ({ ...p, revisions: e.target.value }))} />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="form-label">Min Rate (opsional)</label>
-                    <input type="number" className="form-input w-full" placeholder="300000" value={minRate} onChange={(e) => setMinRate(e.target.value)} />
+                    <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Min Rate (opsional)</label>
+                    <input type="number" className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-emerald-400 transition-colors" placeholder="300000" value={form.minRate} onChange={e => setForm(p => ({ ...p, minRate: e.target.value }))} />
                   </div>
                   <div>
-                    <label className="form-label">Max Rate (opsional)</label>
-                    <input type="number" className="form-input w-full" placeholder="800000" value={maxRate} onChange={(e) => setMaxRate(e.target.value)} />
+                    <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Max Rate (opsional)</label>
+                    <input type="number" className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-emerald-400 transition-colors" placeholder="800000" value={form.maxRate} onChange={e => setForm(p => ({ ...p, maxRate: e.target.value }))} />
                   </div>
                 </div>
                 <div>
-                  <label className="form-label">Deskripsi</label>
-                  <textarea className="form-input w-full" rows={2} placeholder="Jelaskan layanan ini..." value={description} onChange={(e) => setDescription(e.target.value)} />
+                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Deskripsi</label>
+                  <textarea className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-emerald-400 transition-colors resize-none" rows={2} placeholder="Jelaskan layanan ini..." value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="form-label">Deliverables</label>
-                  <textarea className="form-input w-full" rows={2} placeholder="e.g. Desain UI, Slicing, Responsive, Testing" value={deliverables} onChange={(e) => setDeliverables(e.target.value)} />
+                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Deliverables</label>
+                  <textarea className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-emerald-400 transition-colors resize-none" rows={2} placeholder="e.g. Desain UI, Slicing, Responsive, Testing" value={form.deliverables} onChange={e => setForm(p => ({ ...p, deliverables: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="form-label">Turnaround</label>
-                  <input type="text" className="form-input w-full" placeholder="e.g. 5-7 hari kerja" value={turnaround} onChange={(e) => setTurnaround(e.target.value)} />
+                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Turnaround</label>
+                  <input className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-emerald-400 transition-colors" placeholder="e.g. 5-7 hari kerja" value={form.turnaround} onChange={e => setForm(p => ({ ...p, turnaround: e.target.value }))} />
                 </div>
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={resetForm}>Batal</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>
+
+              <div className="flex gap-3 px-6 py-4 border-t border-border-light shrink-0">
+                <button className="btn btn-secondary flex-1" onClick={() => setShowModal(false)}>Batal</button>
+                <button className="btn btn-primary flex-1" onClick={handleSubmit} disabled={!form.title.trim() || !form.rate || saving} style={{ background: 'linear-gradient(135deg, #10B981, #0D9488)' }}>
                   {saving ? <Loading03Icon width={16} height={16} className="animate-spin" /> : <CheckmarkCircle02Icon width={16} height={16} />}
-                  {editingId ? 'Update' : 'Simpan'}
+                  {saving ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Simpan Rate Card'}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
-        </div>
+        </Portal>
       )}
     </div>
   );

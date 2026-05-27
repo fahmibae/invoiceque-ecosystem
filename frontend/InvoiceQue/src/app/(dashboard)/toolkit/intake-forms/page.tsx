@@ -8,6 +8,8 @@ import {
   CheckmarkCircle02Icon, MoreVerticalIcon, Copy01Icon, ViewIcon,
   UserAdd01Icon, TextIcon,
 } from 'hugeicons-react';
+import Portal from '@/components/ui/Portal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import { toolkitApi, type ToolkitItem, type CreateToolkitItemRequest } from '@/lib/api';
 
 const FIELD_TYPES = [
@@ -88,6 +90,8 @@ export default function IntakeFormsPage() {
   const [saving, setSaving] = useState(false);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [showPresets, setShowPresets] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   // Form builder state
   const [title, setTitle] = useState('');
@@ -187,8 +191,11 @@ export default function IntakeFormsPage() {
     setMenuOpen(null);
   };
 
-  const deleteForm = async (id: string) => {
-    try { await toolkitApi.delete(id); fetchForms(); } catch { /* ignore */ }
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try { await toolkitApi.delete(deleteTarget); fetchForms(); } catch { /* ignore */ }
+    setDeleteTarget(null);
+    setShowDeleteModal(false);
   };
 
   if (loading) {
@@ -201,6 +208,8 @@ export default function IntakeFormsPage() {
 
   return (
     <div className="animate-fade-in">
+      <ConfirmModal isOpen={showDeleteModal} title="Hapus Intake Form" message="Apakah Anda yakin ingin menghapus intake form ini?" confirmText="Hapus" onConfirm={handleDelete} onCancel={() => { setShowDeleteModal(false); setDeleteTarget(null); }} type="danger" />
+
       {/* Header */}
       <div className="page-header">
         <div className="page-header-left">
@@ -277,7 +286,7 @@ export default function IntakeFormsPage() {
                       <button className="w-full px-3 py-2 text-left text-sm hover:bg-bg-hover flex items-center gap-2" onClick={() => duplicateForm(item)}>
                         <Copy01Icon width={14} height={14} /> Duplicate
                       </button>
-                      <button className="w-full px-3 py-2 text-left text-sm hover:bg-bg-hover text-red-500 flex items-center gap-2" onClick={() => { deleteForm(item.id); setMenuOpen(null); }}>
+                      <button className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" onClick={() => { setDeleteTarget(item.id); setShowDeleteModal(true); setMenuOpen(null); }}>
                         <Delete02Icon width={14} height={14} /> Hapus
                       </button>
                     </div>
@@ -325,51 +334,56 @@ export default function IntakeFormsPage() {
 
       {/* Preset Templates Picker */}
       {showPresets && (
-        <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) setShowPresets(false); }}>
-          <div className="modal" style={{ maxWidth: 500 }}>
-            <div className="modal-header">
-              <h3 className="modal-title">Pilih Template</h3>
-              <button className="modal-close" onClick={() => setShowPresets(false)}><Cancel01Icon width={18} height={18} /></button>
-            </div>
-            <div className="modal-body space-y-3">
-              {PRESET_TEMPLATES.map((preset) => (
-                <button
-                  key={preset.name}
-                  className="w-full p-4 rounded-xl border border-border-color hover:border-amber-400 hover:bg-amber-50/50 dark:hover:bg-amber-900/10 transition-all text-left"
-                  onClick={() => { loadPreset(preset); setShowForm(true); }}
-                >
-                  <div className="font-bold text-sm mb-1">{preset.name}</div>
-                  <div className="text-xs text-text-tertiary">{preset.fields.length} fields • {preset.fields.filter((f) => f.required).length} required</div>
-                </button>
-              ))}
+        <Portal>
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] flex items-stretch sm:items-center justify-center p-0 sm:p-5" onClick={() => setShowPresets(false)}>
+            <div className="bg-bg-card w-full h-full sm:h-auto sm:max-w-[500px] sm:rounded-2xl sm:max-h-[90vh] shadow-xl overflow-hidden border border-border-color animate-fade-in flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border-light shrink-0">
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  <TextIcon width={20} height={20} className="text-amber-600" /> Pilih Template
+                </h3>
+                <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-bg-secondary transition-colors" onClick={() => setShowPresets(false)}><Cancel01Icon width={20} height={20} /></button>
+              </div>
+              <div className="overflow-y-auto flex-1 px-6 py-5 flex flex-col gap-3">
+                {PRESET_TEMPLATES.map((preset) => (
+                  <button
+                    key={preset.name}
+                    className="w-full p-4 rounded-xl border border-border-color hover:border-amber-400 hover:bg-amber-50/50 dark:hover:bg-amber-900/10 transition-all text-left"
+                    onClick={() => { loadPreset(preset); setShowForm(true); }}
+                  >
+                    <div className="font-bold text-sm mb-1">{preset.name}</div>
+                    <div className="text-xs text-text-tertiary">{preset.fields.length} fields • {preset.fields.filter((f) => f.required).length} required</div>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* Form Builder Modal */}
       {showForm && (
-        <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) resetForm(); }}>
-          <div className="modal" style={{ maxWidth: 700, maxHeight: '85vh', overflow: 'auto' }}>
-            <div className="modal-header">
-              <h3 className="modal-title">{editingId ? 'Edit Intake Form' : 'Buat Intake Form'}</h3>
-              <button className="modal-close" onClick={resetForm}><Cancel01Icon width={18} height={18} /></button>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <div className="modal-body space-y-4">
+        <Portal>
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] flex items-stretch sm:items-center justify-center p-0 sm:p-5" onClick={() => resetForm()}>
+            <div className="bg-bg-card w-full h-full sm:h-auto sm:max-w-[700px] sm:rounded-2xl sm:max-h-[90vh] shadow-xl overflow-hidden border border-border-color animate-fade-in flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border-light shrink-0">
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  <UserAdd01Icon width={20} height={20} className="text-amber-600" />
+                  {editingId ? 'Edit Intake Form' : 'Buat Intake Form'}
+                </h3>
+                <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-bg-secondary transition-colors" onClick={resetForm}><Cancel01Icon width={20} height={20} /></button>
+              </div>
+              <div className="overflow-y-auto flex-1 px-6 py-5 flex flex-col gap-4">
                 <div>
-                  <label className="form-label">Nama Form *</label>
-                  <input type="text" className="form-input w-full" placeholder="e.g. Web Development Client Intake" value={title} onChange={(e) => setTitle(e.target.value)} required />
+                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Nama Form *</label>
+                  <input className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-amber-400 transition-colors" placeholder="e.g. Web Development Client Intake" value={title} onChange={(e) => setTitle(e.target.value)} />
                 </div>
                 <div>
-                  <label className="form-label">Deskripsi (opsional)</label>
-                  <textarea className="form-input w-full" rows={2} placeholder="Deskripsi singkat form ini..." value={description} onChange={(e) => setDescription(e.target.value)} />
+                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2">Deskripsi (opsional)</label>
+                  <textarea className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-amber-400 transition-colors resize-none" rows={2} placeholder="Deskripsi singkat form ini..." value={description} onChange={(e) => setDescription(e.target.value)} />
                 </div>
-
-                {/* Fields Builder */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="form-label mb-0">Form Fields ({fields.length})</label>
+                    <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-0">Form Fields ({fields.length})</label>
                     <button type="button" className="btn btn-secondary text-xs px-3 py-1.5" onClick={addField}>
                       <Add01Icon width={12} height={12} /> Add Field
                     </button>
@@ -379,10 +393,10 @@ export default function IntakeFormsPage() {
                       <div key={field.id} className="p-3 rounded-xl border border-border-color bg-bg-secondary/30">
                         <div className="grid grid-cols-12 gap-2 items-start">
                           <div className="col-span-5">
-                            <input type="text" className="form-input w-full text-xs" placeholder="Label" value={field.label} onChange={(e) => updateField(field.id, { label: e.target.value })} />
+                            <input type="text" className="w-full py-2 px-2.5 border border-border-color rounded-lg bg-bg-secondary text-xs outline-none focus:border-amber-400" placeholder="Label" value={field.label} onChange={(e) => updateField(field.id, { label: e.target.value })} />
                           </div>
                           <div className="col-span-3">
-                            <select className="form-input w-full text-xs" value={field.type} onChange={(e) => updateField(field.id, { type: e.target.value })}>
+                            <select className="w-full py-2 px-2.5 border border-border-color rounded-lg bg-bg-secondary text-xs outline-none focus:border-amber-400" value={field.type} onChange={(e) => updateField(field.id, { type: e.target.value })}>
                               {FIELD_TYPES.map((t) => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
                             </select>
                           </div>
@@ -402,85 +416,82 @@ export default function IntakeFormsPage() {
                         </div>
                         {field.type === 'select' && (
                           <div className="mt-2">
-                            <input type="text" className="form-input w-full text-xs" placeholder="Opsi (pisah dengan koma): Option 1, Option 2, Option 3" value={(field.options || []).join(', ')} onChange={(e) => updateField(field.id, { options: e.target.value.split(',').map((o) => o.trim()).filter(Boolean) })} />
+                            <input type="text" className="w-full py-2 px-2.5 border border-border-color rounded-lg bg-bg-secondary text-xs outline-none focus:border-amber-400" placeholder="Opsi (pisah dengan koma): Option 1, Option 2" value={(field.options || []).join(', ')} onChange={(e) => updateField(field.id, { options: e.target.value.split(',').map((o) => o.trim()).filter(Boolean) })} />
                           </div>
                         )}
                         {(field.type === 'text' || field.type === 'textarea') && (
                           <div className="mt-2">
-                            <input type="text" className="form-input w-full text-xs" placeholder="Placeholder text (opsional)" value={field.placeholder || ''} onChange={(e) => updateField(field.id, { placeholder: e.target.value })} />
+                            <input type="text" className="w-full py-2 px-2.5 border border-border-color rounded-lg bg-bg-secondary text-xs outline-none focus:border-amber-400" placeholder="Placeholder text (opsional)" value={field.placeholder || ''} onChange={(e) => updateField(field.id, { placeholder: e.target.value })} />
                           </div>
                         )}
                       </div>
                     ))}
                     {fields.length === 0 && (
-                      <div className="text-center py-6 text-text-tertiary text-xs">
-                        Belum ada field. Klik &quot;Add Field&quot; untuk mulai.
-                      </div>
+                      <div className="text-center py-6 text-text-tertiary text-xs">Belum ada field. Klik &quot;Add Field&quot; untuk mulai.</div>
                     )}
                   </div>
                 </div>
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={resetForm}>Batal</button>
-                <button type="submit" className="btn btn-primary" disabled={saving || fields.length === 0}>
+              <div className="flex gap-3 px-6 py-4 border-t border-border-light shrink-0">
+                <button className="btn btn-secondary flex-1" onClick={resetForm}>Batal</button>
+                <button className="btn btn-primary flex-1" onClick={(e) => { e.preventDefault(); handleSubmit(e as unknown as React.FormEvent); }} disabled={saving || fields.length === 0} style={{ background: 'linear-gradient(135deg, #F59E0B, #EA580C)' }}>
                   {saving ? <Loading03Icon width={16} height={16} className="animate-spin" /> : <CheckmarkCircle02Icon width={16} height={16} />}
-                  {editingId ? 'Update' : 'Simpan'}
+                  {saving ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Simpan Form'}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* Preview Modal */}
       {showPreview && (
-        <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) setShowPreview(null); }}>
-          <div className="modal" style={{ maxWidth: 600, maxHeight: '80vh', overflow: 'auto' }}>
-            <div className="modal-header">
-              <h3 className="modal-title">📋 Preview: {showPreview.title}</h3>
-              <button className="modal-close" onClick={() => setShowPreview(null)}><Cancel01Icon width={18} height={18} /></button>
-            </div>
-            <div className="modal-body">
-              {(showPreview.content?.description as string) && (
-                <p className="text-sm text-text-secondary mb-4">{showPreview.content.description as string}</p>
-              )}
-              <div className="space-y-4">
-                {((showPreview.content?.fields as FormField[]) || []).map((field) => {
-                  const ft = FIELD_TYPES.find((t) => t.value === field.type);
-                  return (
-                    <div key={field.id}>
-                      <label className="form-label flex items-center gap-1">
-                        <span className="text-xs">{ft?.icon}</span>
-                        {field.label}
-                        {field.required && <span className="text-red-500">*</span>}
-                      </label>
-                      {field.type === 'textarea' ? (
-                        <textarea className="form-input w-full" rows={3} placeholder={field.placeholder || field.label} disabled />
-                      ) : field.type === 'select' ? (
-                        <select className="form-input w-full" disabled>
-                          <option>Pilih {field.label}...</option>
-                          {(field.options || []).map((opt) => <option key={opt}>{opt}</option>)}
-                        </select>
-                      ) : field.type === 'checkbox' ? (
-                        <label className="flex items-center gap-2">
-                          <input type="checkbox" disabled /> <span className="text-sm text-text-secondary">{field.label}</span>
+        <Portal>
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] flex items-stretch sm:items-center justify-center p-0 sm:p-5" onClick={() => setShowPreview(null)}>
+            <div className="bg-bg-card w-full h-full sm:h-auto sm:max-w-[600px] sm:rounded-2xl sm:max-h-[85vh] shadow-xl overflow-hidden border border-border-color animate-fade-in flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border-light shrink-0">
+                <h3 className="text-lg font-bold">📋 Preview: {showPreview.title}</h3>
+                <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-bg-secondary transition-colors" onClick={() => setShowPreview(null)}><Cancel01Icon width={20} height={20} /></button>
+              </div>
+              <div className="overflow-y-auto flex-1 px-6 py-5">
+                {(showPreview.content?.description as string) && (
+                  <p className="text-sm text-text-secondary mb-4">{showPreview.content.description as string}</p>
+                )}
+                <div className="space-y-4">
+                  {((showPreview.content?.fields as FormField[]) || []).map((field) => {
+                    const ft = FIELD_TYPES.find((t) => t.value === field.type);
+                    return (
+                      <div key={field.id}>
+                        <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2 flex items-center gap-1">
+                          <span>{ft?.icon}</span> {field.label}
+                          {field.required && <span className="text-red-500">*</span>}
                         </label>
-                      ) : (
-                        <input type={field.type === 'email' ? 'email' : field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : field.type === 'url' ? 'url' : 'text'} className="form-input w-full" placeholder={field.placeholder || field.label} disabled />
-                      )}
-                    </div>
-                  );
-                })}
+                        {field.type === 'textarea' ? (
+                          <textarea className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm" rows={3} placeholder={field.placeholder || field.label} disabled />
+                        ) : field.type === 'select' ? (
+                          <select className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm" disabled>
+                            <option>Pilih {field.label}...</option>
+                            {(field.options || []).map((opt) => <option key={opt}>{opt}</option>)}
+                          </select>
+                        ) : field.type === 'checkbox' ? (
+                          <label className="flex items-center gap-2"><input type="checkbox" disabled /> <span className="text-sm text-text-secondary">{field.label}</span></label>
+                        ) : (
+                          <input type={field.type === 'email' ? 'email' : field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : field.type === 'url' ? 'url' : 'text'} className="w-full py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm" placeholder={field.placeholder || field.label} disabled />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="flex gap-3 px-6 py-4 border-t border-border-light shrink-0">
+                <button className="btn btn-secondary flex-1" onClick={() => setShowPreview(null)}>Tutup</button>
+                <button className="btn btn-primary flex-1" onClick={() => { openEdit(showPreview); setShowPreview(null); }} style={{ background: 'linear-gradient(135deg, #F59E0B, #EA580C)' }}>
+                  <Edit02Icon width={14} height={14} /> Edit Form
+                </button>
               </div>
             </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowPreview(null)}>Tutup</button>
-              <button className="btn btn-primary" onClick={() => { openEdit(showPreview); setShowPreview(null); }}>
-                <Edit02Icon width={14} height={14} /> Edit Form
-              </button>
-            </div>
           </div>
-        </div>
+        </Portal>
       )}
     </div>
   );
