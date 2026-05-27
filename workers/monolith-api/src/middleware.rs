@@ -34,8 +34,8 @@ pub fn validate_jwt(token: &str, secret: &str) -> std::result::Result<JwtClaims,
 
     // Decode payload
     let payload_bytes = base64_url_decode(parts[1])?;
-    let payload: serde_json::Value = serde_json::from_slice(&payload_bytes)
-        .map_err(|_| "Invalid token payload".to_string())?;
+    let payload: serde_json::Value =
+        serde_json::from_slice(&payload_bytes).map_err(|_| "Invalid token payload".to_string())?;
 
     // Check expiration
     if let Some(exp) = payload.get("exp").and_then(|v| v.as_f64()) {
@@ -46,9 +46,21 @@ pub fn validate_jwt(token: &str, secret: &str) -> std::result::Result<JwtClaims,
     }
 
     Ok(JwtClaims {
-        user_id: payload.get("user_id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-        email: payload.get("email").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-        role: payload.get("role").and_then(|v| v.as_str()).unwrap_or("user").to_string(),
+        user_id: payload
+            .get("user_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        email: payload
+            .get("email")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        role: payload
+            .get("role")
+            .and_then(|v| v.as_str())
+            .unwrap_or("user")
+            .to_string(),
     })
 }
 
@@ -85,10 +97,7 @@ pub fn generate_jwt(
 }
 
 /// Generate a refresh token (7 days).
-pub fn generate_refresh_token(
-    user_id: &str,
-    secret: &str,
-) -> std::result::Result<String, String> {
+pub fn generate_refresh_token(user_id: &str, secret: &str) -> std::result::Result<String, String> {
     let header = serde_json::json!({"alg": "HS256", "typ": "JWT"});
     let now = chrono::Utc::now().timestamp();
 
@@ -117,17 +126,23 @@ pub fn extract_auth(req: &Request, jwt_secret: &str) -> std::result::Result<JwtC
     let auth_header = req.headers().get("Authorization").ok().flatten();
     let auth_header = match auth_header {
         Some(h) => h,
-        None => return Err(Response::from_json(&serde_json::json!({"error": "Authorization header required"}))
+        None => {
+            return Err(Response::from_json(
+                &serde_json::json!({"error": "Authorization header required"}),
+            )
             .unwrap()
-            .with_status(401)),
+            .with_status(401))
+        }
     };
 
     let token = if auth_header.to_lowercase().starts_with("bearer ") {
         &auth_header[7..]
     } else {
-        return Err(Response::from_json(&serde_json::json!({"error": "Invalid authorization format"}))
-            .unwrap()
-            .with_status(401));
+        return Err(Response::from_json(
+            &serde_json::json!({"error": "Invalid authorization format"}),
+        )
+        .unwrap()
+        .with_status(401));
     };
 
     validate_jwt(token, jwt_secret).map_err(|e| {
@@ -139,7 +154,12 @@ pub fn extract_auth(req: &Request, jwt_secret: &str) -> std::result::Result<JwtC
 
 /// Build CORS headers for a response.
 pub fn cors_headers(req: &Request, allowed_origins: &str) -> Headers {
-    let origin = req.headers().get("Origin").ok().flatten().unwrap_or_default();
+    let origin = req
+        .headers()
+        .get("Origin")
+        .ok()
+        .flatten()
+        .unwrap_or_default();
     cors_headers_from_origin(&origin, allowed_origins)
 }
 
@@ -152,8 +172,14 @@ pub fn cors_headers_from_origin(origin: &str, allowed_origins: &str) -> Headers 
         let _ = headers.set("Access-Control-Allow-Origin", origin);
     }
 
-    let _ = headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
-    let _ = headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-ID, X-User-Email");
+    let _ = headers.set(
+        "Access-Control-Allow-Methods",
+        "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+    );
+    let _ = headers.set(
+        "Access-Control-Allow-Headers",
+        "Content-Type, Authorization, X-User-ID, X-User-Email",
+    );
     let _ = headers.set("Access-Control-Max-Age", "86400");
     let _ = headers.set("Access-Control-Allow-Credentials", "true");
     headers
@@ -161,7 +187,12 @@ pub fn cors_headers_from_origin(origin: &str, allowed_origins: &str) -> Headers 
 
 /// Build a CORS preflight response.
 pub fn cors_preflight(req: &Request, allowed_origins: &str) -> Result<Response> {
-    let origin = req.headers().get("Origin").ok().flatten().unwrap_or_default();
+    let origin = req
+        .headers()
+        .get("Origin")
+        .ok()
+        .flatten()
+        .unwrap_or_default();
     cors_preflight_with_origin(&origin, allowed_origins)
 }
 
@@ -177,18 +208,28 @@ pub fn cors_preflight_with_origin(origin: &str, allowed_origins: &str) -> Result
 
 /// Apply CORS headers to an existing response.
 pub fn with_cors(mut resp: Response, req: &Request, allowed_origins: &str) -> Result<Response> {
-    let origin = req.headers().get("Origin").ok().flatten().unwrap_or_default();
+    let origin = req
+        .headers()
+        .get("Origin")
+        .ok()
+        .flatten()
+        .unwrap_or_default();
     with_cors_origin(resp, &origin, allowed_origins)
 }
 
 /// Apply CORS headers using a pre-extracted origin string.
-pub fn with_cors_origin(mut resp: Response, origin: &str, allowed_origins: &str) -> Result<Response> {
+pub fn with_cors_origin(
+    mut resp: Response,
+    origin: &str,
+    allowed_origins: &str,
+) -> Result<Response> {
     let cors = cors_headers_from_origin(origin, allowed_origins);
     for (k, v) in cors.entries() {
         resp.headers_mut().set(&k, &v)?;
     }
     // Security headers
-    resp.headers_mut().set("X-Content-Type-Options", "nosniff")?;
+    resp.headers_mut()
+        .set("X-Content-Type-Options", "nosniff")?;
     resp.headers_mut().set("X-Frame-Options", "DENY")?;
     Ok(resp)
 }

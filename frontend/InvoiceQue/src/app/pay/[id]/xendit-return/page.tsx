@@ -100,8 +100,7 @@ export default function XenditReturnPage() {
             await new Promise(resolve => setTimeout(resolve, 2000));
             return poll();
           } else {
-            // Xendit webhook should finalize — show success
-            setStatus('success');
+            setStatus('error');
           }
         } catch {
           attempts++;

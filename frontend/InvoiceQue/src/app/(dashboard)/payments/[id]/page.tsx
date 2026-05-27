@@ -6,7 +6,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { paymentLinkApi, type PaymentLink } from '@/lib/api';
 import { formatCurrency, formatDate, getStatusColor } from '@/lib/utils';
 import ConfirmModal from '@/components/ui/ConfirmModal';
-import { Copy01Icon, Delete02Icon, ArrowLeft02Icon, Edit02Icon, FlashIcon, ChartIcon, Clock01Icon, Payment01Icon, ViewIcon } from 'hugeicons-react';
+import { Copy01Icon, Delete02Icon, ArrowLeft02Icon, Edit02Icon, FlashIcon, ChartIcon, Clock01Icon, Payment01Icon, ViewIcon, WhatsappIcon } from 'hugeicons-react';
+import { createPaymentWhatsAppUrl } from '@/lib/payment-share';
 
 export default function PaymentDetailPage() {
   const params = useParams();
@@ -60,7 +61,7 @@ export default function PaymentDetailPage() {
           <div className="text-5xl mb-4 opacity-50 flex justify-center"><Payment01Icon width={48} height={48} /></div>
           <h3 className="text-lg font-semibold mb-2">Payment link tidak ditemukan</h3>
           <p className="text-sm text-text-secondary mb-6">{error || 'Link tidak ada.'}</p>
-          <Link href="/payments" className="flex items-center gap-2 btn btn-primary"><ArrowLeft02Icon/> Kembali</Link>
+          <Link href="/payments" className="flex items-center gap-2 btn btn-primary"><ArrowLeft02Icon /> Kembali</Link>
         </div>
       </div>
     );
@@ -72,16 +73,16 @@ export default function PaymentDetailPage() {
     <div className="animate-fade-in">
       <ConfirmModal isOpen={showDeleteModal} title="Hapus Payment Link" message="Yakin ingin menghapus payment link ini? Tidak dapat dibatalkan." confirmText="Ya, Hapus" onConfirm={handleDelete} onCancel={() => setShowDeleteModal(false)} isLoading={isDeleting} type="danger" />
 
-      <div className="page-header">
-        <div className="page-header-left">
-          <div className="flex items-center gap-2">
-            <Link href="/payments" className="btn btn-icon btn-transparent border-none hover:bg-transparent hover:-translate-x-1 transition"><ArrowLeft02Icon/></Link>
-            <h1 className="page-title">{link.title}</h1>
-          </div>
-          <p className="page-subtitle">Detail payment link</p>
+      <div className="flex items-start gap-3 mb-6">
+        <Link href="/payments" className="btn btn-icon btn-transparent border-none hover:bg-transparent hover:-translate-x-1 transition">
+          <ArrowLeft02Icon width={18} height={18} />
+        </Link>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-lg sm:text-xl font-bold text-text-primary truncate" title={link.title}>{link.title}</h1>
+          <p className="text-xs text-text-secondary mt-0.5">Detail Payment Link</p>
         </div>
-        <div className="flex gap-2">
-          {link.status === 'active' && <Link href={`/payments/${link.id}/edit`} className="btn btn-primary flex items-center gap-2"><Edit02Icon/> Edit</Link>}
+        <div className="flex gap-2 shrink-0">
+          {link.status === 'active' && <Link href={`/payments/${link.id}/edit`} className="btn btn-primary flex items-center gap-2 text-sm"><Edit02Icon width={16} height={16} /> <span className="hidden sm:inline">Edit</span></Link>}
         </div>
       </div>
 
@@ -92,8 +93,8 @@ export default function PaymentDetailPage() {
             <div className="h-[4px] bg-gradient-to-r from-red-600 to-red-500" />
             <div className="p-8 max-sm:p-5">
               <div className="flex justify-between items-start mb-6 max-sm:flex-col max-sm:gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-[52px] h-[52px] bg-gradient-to-br from-red-50 to-red-100/50 rounded-lg flex items-center justify-center">
+                <div className="flex items-start gap-4">
+                  <div className="lg:w-[52px] lg:h-[52px] bg-transparent lg:bg-red-500/10 rounded-lg flex items-center justify-center">
                     <Payment01Icon className="text-red-600" width={28} height={28} />
                   </div>
                   <div>
@@ -121,6 +122,14 @@ export default function PaymentDetailPage() {
                   <button className="px-3 py-1.5 flex items-center gap-1.5 rounded-md bg-bg-card border border-border-color text-xs font-medium transition-all duration-150 hover:bg-red-50 hover:border-red-300 hover:text-red-600" onClick={() => handleCopy(link.url)}>
                     <Copy01Icon width={14} height={14} /> {copied ? 'Tersalin!' : 'Salin'}
                   </button>
+                  <a
+                    href={createPaymentWhatsAppUrl(link)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 flex items-center gap-1.5 rounded-md bg-bg-card border border-border-color text-xs font-medium transition-all duration-150 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-600"
+                  >
+                    <WhatsappIcon width={14} height={14} /> WhatsApp
+                  </a>
                 </div>
               </div>
 
@@ -166,6 +175,9 @@ export default function PaymentDetailPage() {
             <h3 className="text-[15px] font-bold mb-3.5 flex items-center gap-2"><FlashIcon /> Aksi</h3>
             <div className="flex flex-col gap-2">
               <button className="btn btn-primary w-full" onClick={() => handleCopy(link.url)}><Copy01Icon width={16} height={16} /> {copied ? 'Tersalin!' : 'Salin Link'}</button>
+              <a href={createPaymentWhatsAppUrl(link)} target="_blank" rel="noopener noreferrer" className="btn btn-secondary w-full text-center text-emerald-600 hover:text-emerald-700">
+                <WhatsappIcon width={16} height={16} /> Bagikan WhatsApp
+              </a>
               {link.status === 'active' && <Link href={`/payments/${link.id}/edit`} className="btn btn-secondary w-full text-center"><Edit02Icon width={16} height={16} /> Edit</Link>}
               <a href={link.url} target="_blank" rel="noopener noreferrer" className="btn btn-secondary w-full text-center"><ViewIcon width={16} height={16} /> Buka Link</a>
               <button className="btn btn-ghost w-full text-danger hover:text-red-600" onClick={() => setShowDeleteModal(true)}><Delete02Icon width={16} height={16} /> Hapus</button>

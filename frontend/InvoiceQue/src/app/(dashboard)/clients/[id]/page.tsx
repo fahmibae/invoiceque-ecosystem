@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { clientApi, invoiceApi, type Client, type Invoice } from '@/lib/api';
 import { formatCurrency, getStatusColor, convertToIDR, fetchExchangeRates } from '@/lib/utils';
 import { User02Icon, Mail01Icon, SmartPhone01Icon, ArrowLeft02Icon, Edit02Icon, Delete02Icon, Location01Icon, Calendar01Icon, File01Icon, CheckmarkCircle01Icon, MoneyBag02Icon } from 'hugeicons-react';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 export default function ClientDetailPage() {
   const params = useParams();
@@ -15,6 +16,8 @@ export default function ClientDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [exchangeRates, setExchangeRates] = useState<Record<string, number> | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Compute real totals from invoices instead of stale DB fields
   const computedStats = React.useMemo(() => {
@@ -50,12 +53,14 @@ export default function ClientDetailPage() {
   }, [params.id]);
 
   const handleDelete = async () => {
-    if (!confirm('Yakin ingin menghapus klien ini beserta seluruh datanya?')) return;
+    setIsDeleting(true);
     try {
       await clientApi.delete(params.id as string);
       router.push('/clients');
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Gagal menghapus klien');
+      setIsDeleting(false);
+      setShowDeleteModal(false);
     }
   };
 
@@ -72,17 +77,27 @@ export default function ClientDetailPage() {
     return (
       <div className="animate-fade-in p-10 text-center flex flex-col items-center justify-center min-h-[400px]">
         <p className="text-red-500 mb-4">{error || 'Klien tidak ditemukan'}</p>
-        <Link href="/clients" className="btn btn-primary flex items-center gap-2"><ArrowLeft02Icon/> Kembali</Link>
+        <Link href="/clients" className="btn btn-primary flex items-center gap-2"><ArrowLeft02Icon /> Kembali</Link>
       </div>
     );
   }
 
   return (
     <div className="animate-fade-in">
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        title="Hapus Klien"
+        message={`Yakin ingin menghapus klien ${client.name} beserta seluruh datanya? Tindakan ini tidak dapat dibatalkan.`}
+        confirmText="Ya, Hapus"
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteModal(false)}
+        isLoading={isDeleting}
+        type="danger"
+      />
       <div className="page-header">
         <div className="page-header-left">
           <div className="flex items-center gap-2">
-            <Link href="/clients" className="btn btn-icon btn-transparent border-none hover:bg-transparent hover:-translate-x-1 transition"><ArrowLeft02Icon/></Link>
+            <Link href="/clients" className="btn btn-icon btn-transparent border-none hover:bg-transparent hover:-translate-x-1 transition"><ArrowLeft02Icon /></Link>
             <h1 className="page-title">
               Detail Klien
             </h1>
@@ -90,8 +105,8 @@ export default function ClientDetailPage() {
           <p className="page-subtitle">Informasi lengkap dan riwayat transaksi {client.name}</p>
         </div>
         <div className="flex gap-2">
-          <Link href={`/clients/${params.id}/edit`} className="btn btn-primary flex items-center gap-2"><Edit02Icon/> Edit Klien</Link>
-          <button onClick={handleDelete} className="btn btn-danger flex items-center gap-2"><Delete02Icon/> Hapus Klien</button>
+          <Link href={`/clients/${params.id}/edit`} className="btn btn-primary flex items-center gap-2"><Edit02Icon /> Edit Klien</Link>
+          <button onClick={() => setShowDeleteModal(true)} className="btn btn-danger flex items-center gap-2"><Delete02Icon /> Hapus Klien</button>
         </div>
       </div>
 
@@ -101,7 +116,7 @@ export default function ClientDetailPage() {
           <div className="card relative overflow-hidden before:absolute before:top-0 before:inset-x-0 before:h-[4px] before:bg-gradient-to-r before:from-red-600 before:to-red-400">
             <div className="flex flex-col items-center text-center mb-6 pt-4">
               <div className="w-24 h-24 bg-gradient-to-br from-red-600 to-red-400 rounded-full flex items-center justify-center font-bold text-3xl text-white shadow-lg shadow-red-500/20 mb-4">
-                {client.name.split(' ').map((n) => n[0]).join('').substring(0,2)}
+                {client.name.split(' ').map((n) => n[0]).join('').substring(0, 2)}
               </div>
               <h2 className="text-xl font-bold text-text-primary mb-1">{client.name}</h2>
               <p className="text-sm font-medium text-red-600">{client.company}</p>
@@ -128,7 +143,7 @@ export default function ClientDetailPage() {
                   <div className="text-[11px] font-bold text-text-tertiary uppercase tracking-wider mb-0.5">Alamat</div>
                   <div className="text-text-secondary leading-relaxed">
                     {client.address || '-'}
-                    {client.city && <><br/>{client.city}</>}
+                    {client.city && <><br />{client.city}</>}
                   </div>
                 </div>
               </div>
@@ -150,27 +165,27 @@ export default function ClientDetailPage() {
               <div className="w-14 h-14 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 flex items-center justify-center shrink-0 mr-4">
                 <File01Icon width={28} height={28} />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-medium text-text-secondary mb-1">Total Invoice</p>
-                <h3 className="text-3xl font-bold text-text-primary">{computedStats.totalInvoices}</h3>
+                <h3 className="text-3xl font-bold text-text-primary truncate">{computedStats.totalInvoices}</h3>
               </div>
             </div>
             <div className="card bg-gradient-to-br from-bg-card to-green-50/30 dark:to-green-900/10 flex items-center p-6">
               <div className="w-14 h-14 rounded-full bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 flex items-center justify-center shrink-0 mr-4">
                 <CheckmarkCircle01Icon width={28} height={28} />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-medium text-text-secondary mb-1">Total Dibayar</p>
-                <h3 className="text-2xl font-bold text-text-primary">{formatCurrency(computedStats.totalSpent)}</h3>
+                <h3 className="text-2xl font-bold text-text-primary truncate">{formatCurrency(computedStats.totalSpent)}</h3>
               </div>
             </div>
             <div className="card bg-gradient-to-br from-bg-card to-amber-50/30 dark:to-amber-900/10 flex items-center p-6">
               <div className="w-14 h-14 rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 flex items-center justify-center shrink-0 mr-4">
                 <MoneyBag02Icon width={28} height={28} />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-medium text-text-secondary mb-1">Belum Dibayar</p>
-                <h3 className="text-2xl font-bold text-text-primary">{formatCurrency(computedStats.pendingAmount)}</h3>
+                <h3 className="text-2xl font-bold text-text-primary truncate">{formatCurrency(computedStats.pendingAmount)}</h3>
               </div>
             </div>
           </div>

@@ -6,7 +6,7 @@ const faqs = [
   {
     question: "Apa itu InvoiceQu?",
     answer:
-      "InvoiceQu adalah platform SaaS modern yang membantu bisnis membuat invoice profesional, mengirim payment link instan, dan melacak pembayaran secara real-time. Semua bisa diakses dari browser tanpa perlu install aplikasi.",
+      "InvoiceQu adalah platform SaaS modern yang membantu bisnis jasa mengelola tugas, membuat invoice profesional, mengirim payment link instan, dan melacak pembayaran secara real-time. Semua bisa diakses dari browser tanpa perlu install aplikasi.",
   },
   {
     question: "Apakah ada biaya tersembunyi?",
@@ -17,6 +17,11 @@ const faqs = [
     question: "Payment gateway apa yang didukung?",
     answer:
       "InvoiceQu mendukung berbagai payment gateway populer di Indonesia seperti Xendit, Midtrans, dan lainnya. Klien Anda bisa membayar melalui transfer bank, e-wallet (GoPay, OVO, DANA), kartu kredit, dan QRIS.",
+  },
+  {
+    question: "Apakah InvoiceQu bisa untuk manajemen tugas?",
+    answer:
+      "Bisa. Anda dapat membuat tugas, mengelompokkannya per proyek atau klien, mengatur prioritas dan deadline, melihatnya dalam kanban atau list, lalu mengubah tugas selesai menjadi invoice saat sudah siap ditagihkan.",
   },
   {
     question: "Apakah data saya aman?",
@@ -54,6 +59,7 @@ function FAQItem({
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+  const [contentHeight, setContentHeight] = useState(0);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -69,6 +75,11 @@ function FAQItem({
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (!contentRef.current) return;
+    setContentHeight(contentRef.current.scrollHeight);
+  }, [faq.answer, isOpen]);
 
   return (
     <div
@@ -107,7 +118,7 @@ function FAQItem({
           ref={contentRef}
           className="overflow-hidden transition-all duration-400"
           style={{
-            maxHeight: isOpen ? contentRef.current?.scrollHeight ?? 200 : 0,
+            maxHeight: isOpen ? contentHeight : 0,
           }}
         >
           <div className="px-5 md:px-6 pb-5 md:pb-6 text-sm text-white/50 leading-relaxed border-t border-white/5 pt-4">

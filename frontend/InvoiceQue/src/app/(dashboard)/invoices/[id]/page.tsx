@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { invoiceApi, paymentLinkApi, type Invoice, invoiceSettingsApi, type InvoiceSettingsData } from '@/lib/api';
+import { invoiceApi, paymentLinkApi, clientApi, type Invoice, invoiceSettingsApi, type InvoiceSettingsData, type PaymentLink, authApi } from '@/lib/api';
 import { formatCurrency, formatDate, getStatusColor } from '@/lib/utils';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { Download02Icon, ArrowLeft02Icon, Delete02Icon, FlashIcon, ChartIcon, SentIcon, Clock01Icon, Edit02Icon } from 'hugeicons-react';
@@ -12,20 +12,53 @@ export default function InvoiceDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [paymentLink, setPaymentLink] = useState<PaymentLink | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [bizName, setBizName] = useState('');
-  const [bizEmail, setBizEmail] = useState('');
   const [companyInitial, setCompanyInitial] = useState('');
+  const [logoCompany, setLogoCompany] = useState('');
+  const [bizAddress, setBizAddress] = useState('');
+  const [bizPhone, setBizPhone] = useState('');
+  const [clientAddress, setClientAddress] = useState('');
+  const [clientCompany, setClientCompany] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+  const [clientCity, setClientCity] = useState('');
+  const [zip, setZip] = useState('');
+  const [clientState, setClientState] = useState('');
+  const [clientCountry, setClientCountry] = useState('');
+  const [bizBankName, setBizBankName] = useState('');
+  const [bankAccountNumber, setBankAccountNumber] = useState('');
+  const [bankAccountName, setBankAccountName] = useState('');
+  const hasLogo = !!logoCompany;
+  const hasInitial = !!companyInitial;
 
   const loadSettings = async () => {
     try {
       const s = await invoiceSettingsApi.get();
       setBizName(s.business_name || '');
-      setBizEmail(s.business_email || '');
-      setCompanyInitial(s.business_name.substring(0, 2).toUpperCase() || '');
+      setCompanyInitial((s.business_name || '').substring(0, 2).toUpperCase());
+      setLogoCompany(s.logo_url || '');
+      setBizAddress(s.business_address || '');
+      setBizPhone(s.business_phone || '');
+      setBizBankName(s.bank_name || '');
+      setBankAccountNumber(s.bank_account_number || '');
+      setBankAccountName(s.bank_account_name || '');
+
+    } catch {
+      // Use defaults if API not available
+    }
+  };
+  const loadAuth = async () => {
+    try {
+      const s = await invoiceSettingsApi.get();
+      setBizName(s.business_name || '');
+      setCompanyInitial((s.business_name || '').substring(0, 2).toUpperCase());
+      setLogoCompany(s.logo_url || '');
+      setBizAddress(s.business_address || '');
+      setBizPhone(s.business_phone || '');
     } catch {
       // Use defaults if API not available
     }
@@ -38,8 +71,39 @@ export default function InvoiceDetailPage() {
   useEffect(() => {
     async function fetchInvoice() {
       try {
-        const res = await invoiceApi.get(params.id as string);
+        const id = params.id as string;
+        const res = await invoiceApi.get(id);
         setInvoice(res);
+
+        // Fetch client address from clients table
+        if (res.client_id) {
+          try {
+            const clientData = await clientApi.get(res.client_id);
+            if (clientData.address) {
+              setClientAddress(clientData.address);
+              setClientCompany(clientData.company);
+              setClientPhone(clientData.phone);
+              setClientCity(clientData.city);
+              setZip(clientData.zip);
+              setClientState(clientData.state);
+              setClientCountry(clientData.country);
+            }
+          } catch (e) {
+            // Client data optional
+          }
+        }
+
+        if (res.payment_type === 'dp') {
+          try {
+            const linksRes = await paymentLinkApi.list(1, 100);
+            const link = linksRes.data.find(l => l.invoice_id === id && l.status === 'active');
+            if (link) {
+              setPaymentLink(link);
+            }
+          } catch (e) {
+            console.error('Failed to fetch payment links', e);
+          }
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Invoice tidak ditemukan');
       } finally {
@@ -48,6 +112,19 @@ export default function InvoiceDetailPage() {
     }
     fetchInvoice();
   }, [params.id]);
+
+  useEffect(() => {
+    if (!loading && invoice) {
+      const isPrint = new URLSearchParams(window.location.search).get('print') === 'true';
+      const isDownload = new URLSearchParams(window.location.search).get('download') === 'true';
+
+      if (isPrint || isDownload) {
+        setTimeout(() => {
+          window.print();
+        }, 800);
+      }
+    }
+  }, [loading, invoice]);
 
   const handleSend = async () => {
     if (!invoice) return;
@@ -132,32 +209,79 @@ export default function InvoiceDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
         {/* Invoice Document */}
-        <div className="card p-8 max-sm:p-5">
+        <div id="invoice-document" className="card p-8 max-sm:p-5">
           <div className="flex justify-between items-start mb-7 pb-5 border-b-[3px] border-red-500 max-sm:flex-col max-sm:gap-4">
             <div>
-              <div className="w-[44px] h-[44px] bg-gradient-to-br from-red-600 to-red-500 rounded-sm flex items-center justify-center font-extrabold text-base text-white mb-2">{companyInitial || 'IQ'}</div>
-              <h2 className="text-[28px] font-black tracking-[3px] bg-gradient-to-br from-red-600 to-red-500 bg-clip-text text-transparent">INVOICE</h2>
-              <p className="text-xs text-text-tertiary">{bizName || 'InvoiceQu Platform'}</p>
+              <div className={`w-[44px] h-[44px] rounded-sm flex items-center justify-center font-extrabold text-base text-white mb-2 overflow-hidden ${!logoCompany ? 'bg-gradient-to-br from-red-600 to-red-500' : ''}`}>
+                {hasLogo ? (
+                  <img
+                    src={logoCompany}
+                    alt="Logo"
+                    className="w-auto h-10 object-cover"
+                  />
+                ) : hasInitial ? (
+                  companyInitial
+                ) : (
+                  'IQ'
+                )}
+              </div>
+              <h2 className="text-[28px] font-black tracking-[3px] bg-gradient-to-br from-red-600 to-red-500 bg-clip-text text-transparent print:!text-red-600 print:!bg-none">INVOICE</h2>
             </div>
             <div className="text-right max-sm:text-left flex flex-col max-sm:items-start items-end">
-              <div className="text-base font-bold mb-1">{invoice.number}</div>
-              <div className="text-[13px] text-text-secondary">Tanggal: {formatDate(invoice.created_at)}</div>
-              <div className="text-[13px] text-text-secondary">Jatuh Tempo: {invoice.due_date ? formatDate(invoice.due_date) : '-'}</div>
-              <span className={`badge ${getStatusColor(invoice.status)} mt-2`}>
-                {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
-              </span>
+              <div className="text-base font-bold mb-1">{bizName || 'InvoiceQu Platform'}</div>
+              <div className="text-[13px] text-text-secondary">{bizAddress}</div>
+              <div className="text-[13px] text-text-secondary">{bizPhone}</div>
             </div>
           </div>
 
           <div className="mb-6">
-            <div className="p-4 bg-bg-secondary rounded-md border-l-[3px] border-red-500">
-              <span className="block text-[11px] font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-1">Tagihan untuk:</span>
-              <div className="font-bold text-base">{invoice.client_name}</div>
-              <div className="text-[13px] text-text-secondary">{invoice.client_email}</div>
+            <div className="p-4 bg-bg-secondary rounded-md border-l-[3px] border-red-500 flex justify-between items-start max-sm:flex-col max-sm:gap-4">
+              <div>
+                <span className="block text-[11px] font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-1">Tagihan untuk:</span>
+                <div className="font-bold text-base">{invoice.client_name}</div>
+                {clientCompany && (
+                  <div className="text-[13px] text-text-secondary">{clientCompany}</div>
+                )}
+                {clientPhone && (
+                  <div className="text-[13px] text-text-secondary">{clientPhone}</div>
+                )}
+                <div className="text-[13px] text-text-secondary">{invoice.client_email}</div>
+                <div className="text-[13px] text-text-secondary flex items-center gap-1">
+                  {clientAddress && (
+                    <span>{clientAddress},</span>
+                  )}
+                  {clientCity && (
+                    <span>{clientCity},</span>
+                  )}
+                </div>
+                <div className="text-[13px] text-text-secondary flex items-center gap-1">
+                  {clientState && (
+                    <span>{clientState},</span>
+                  )}
+                  {clientCountry && (
+                    <span>{clientCountry},</span>
+                  )}
+                </div>
+                <div className="text-[13px] text-text-secondary">
+                  {zip && (
+                    <span>{zip}</span>
+                  )}
+                </div>
+              </div>
+              <div className="text-right max-sm:text-left flex flex-col max-sm:items-start items-end">
+                <div className="text-base font-bold mb-1">{invoice.number}</div>
+                <div className="text-[13px] text-text-secondary">Tanggal: {formatDate(invoice.created_at)}</div>
+                <div className="text-[13px] text-text-secondary">Jatuh Tempo: {invoice.due_date ? formatDate(invoice.due_date) : '-'}</div>
+                <span className={`badge ${getStatusColor(invoice.status)} mt-2`}>
+                  {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                </span>
+                <div className="text-[13px] text-text-secondary">Catatan: {invoice.notes}</div>
+              </div>
             </div>
           </div>
 
           <div className="mb-5 overflow-x-auto">
+
             <table className="w-full border-collapse min-w-[500px]">
               <thead>
                 <tr>
@@ -182,33 +306,82 @@ export default function InvoiceDetailPage() {
             </table>
           </div>
 
-          <div className="ml-auto max-w-[300px] py-4 max-sm:max-w-full">
-            <div className="flex justify-between py-2 text-sm text-text-secondary">
-              <span>Subtotal</span>
-              <span>{formatCurrency(invoice.subtotal, invoice.currency)}</span>
-            </div>
-            <div className="flex justify-between py-2 text-sm text-text-secondary">
-              <span>Pajak</span>
-              <span>{formatCurrency(invoice.tax, invoice.currency)}</span>
-            </div>
-            {invoice.discount > 0 && (
-              <div className="flex justify-between py-2 text-sm text-text-secondary">
-                <span>Diskon</span>
-                <span className="text-success">-{formatCurrency(invoice.discount, invoice.currency)}</span>
+          <div className="flex gap-8 max-sm:flex-col">
+            {/* LEFT: Penerima Dana */}
+            <div className="w-full text-sm text-text-secondary">
+              <div className="mb-2 font-semibold text-text-primary">Referensi</div>
+
+              <div className="py-1">
+                <span className="block">Nama Perusahaan</span>
+                <span className="text-text-primary">{bizName || "-"}</span>
               </div>
-            )}
-            <div className="flex justify-between py-2 text-sm text-text-secondary text-xl font-extrabold text-text-primary pt-3 mt-2 border-t-[2px] border-red-500">
-              <span>Grand Total</span>
-              <span>{formatCurrency(invoice.total, invoice.currency)}</span>
+
+              <div className="py-1">
+                <span className="block">Bank</span>
+                <span className="text-text-primary">{bizBankName || "-"}</span>
+              </div>
+
+              <div className="py-1">
+                <span className="block">No. Rekening</span>
+                <span className="text-text-primary">{bankAccountNumber || "-"}</span>
+              </div>
+
+              <div className="py-1">
+                <span className="block">Nama Pemilik Rekening</span>
+                <span className="text-text-primary">{bankAccountName || "-"}</span>
+              </div>
+            </div>
+
+            {/* RIGHT: Nominal */}
+
+            <div className="w-full py-4">
+              <div className="flex justify-between py-2 text-sm text-text-secondary">
+                <span>Subtotal</span>
+                <span>{formatCurrency(invoice.subtotal, invoice.currency)}</span>
+              </div>
+              {invoice.payment_type === 'dp' && invoice.status === 'partially_paid' && invoice.amount_remaining > 0 && (
+                <div className="flex justify-between py-2 text-sm text-text-secondary">
+                  <span>Uang Muka</span>
+                  <span>{formatCurrency(invoice.amount_paid, invoice.currency)}</span>
+                </div>
+              )}
+              {invoice.payment_type === 'dp' && invoice.status === 'paid' && invoice.amount_remaining > 0 && (
+                <div className="flex justify-between py-2 text-sm text-text-secondary">
+                  <span>Sisa Tagihan</span>
+                  <span>{formatCurrency(invoice.amount_remaining, invoice.currency)}</span>
+                </div>
+              )}
+              <div className="flex justify-between py-2 text-sm text-text-secondary">
+                <span>Pajak</span>
+                <span>{formatCurrency(invoice.tax, invoice.currency)}</span>
+              </div>
+              {invoice.discount > 0 && (
+                <div className="flex justify-between py-2 text-sm text-text-secondary">
+                  <span>Diskon</span>
+                  <span className="text-success">
+                    -{formatCurrency(invoice.discount, invoice.currency)}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between py-2 text-sm text-text-secondary text-xl font-extrabold text-text-primary pt-3 mt-2 border-t-[2px] border-red-500">
+                <span>Grand Total</span>
+                <span>{formatCurrency(invoice.total, invoice.currency)}</span>
+              </div>
+              {invoice.payment_type === 'dp' && paymentLink && (
+                <div className="mt-8 flex justify-end max-sm:justify-center max-sm:w-full">
+                  <a
+                    href={paymentLink.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg flex items-center justify-center transition-colors print:!bg-red-600 print:!text-white print:!py-3 print:!px-8"
+                    style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
+                  >
+                    Bayar Sekarang
+                  </a>
+                </div>
+              )}
             </div>
           </div>
-
-          {invoice.notes && (
-            <div className="p-4 bg-bg-secondary rounded-md mt-5 text-[13px] text-text-secondary">
-              <span className="block text-[11px] font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-1">Catatan:</span>
-              <p>{invoice.notes}</p>
-            </div>
-          )}
 
           <div className="text-center pt-6 mt-6 border-t border-border-light text-[13px] text-text-secondary">
             <p>Terima kasih atas kepercayaan Anda 🙏</p>
@@ -217,7 +390,7 @@ export default function InvoiceDetailPage() {
         </div>
 
         {/* Sidebar Info */}
-        <div className="flex flex-col gap-4 sticky top-[calc(var(--header-height)+24px)] max-lg:relative max-lg:top-0">
+        <div className="flex flex-col gap-4 sticky top-[calc(var(--header-height)+24px)] max-lg:relative max-lg:top-0 print-hidden">
           <div className="card">
             <h3 className="text-[15px] font-bold mb-3.5 flex items-center gap-2"><FlashIcon /> Aksi</h3>
             <div className="flex flex-col gap-2">

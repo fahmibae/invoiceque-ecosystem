@@ -5,12 +5,16 @@ compatibility_date = "2024-12-01"
 [build]
 command = "cargo install -q worker-build && worker-build --release"
 
+[triggers]
+crons = ["5 * * * *"]
+
 # ── Environment Variables (non-secret, overridable) ──
 [vars]
 ALLOWED_ORIGINS = "https://app.invoicequ.my.id,https://invoicequ.my.id,https://invoiceque-ecosystem.vercel.app"
+FRONTEND_URL = "https://app.invoicequ.my.id"
 BASE_PAYMENT_URL = "https://app.invoicequ.my.id/pay"
 XENDIT_BASE_URL = "https://api.xendit.co"
-PAYPAL_BASE_URL = "https://api-m.paypal.com"
+PAYPAL_BASE_URL = "https://api-m.sandbox.paypal.com"
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = "587"
 FROM_EMAIL = "noreply@invoicequ.my.id"
@@ -27,6 +31,7 @@ FROM_EMAIL = "noreply@invoicequ.my.id"
 # PAYPAL_CLIENT_ID
 # PAYPAL_SECRET
 # PAYPAL_WEBHOOK_ID
+# TASK_DB_URL
 # SMTP_USER
 # SMTP_PASS
 # RESEND_API_KEY

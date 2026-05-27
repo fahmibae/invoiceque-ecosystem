@@ -285,7 +285,7 @@ export default function OutstandingInvoicesPage() {
           </h1>
           <p className="page-subtitle">Invoice dengan Down Payment yang belum dilunasi</p>
         </div>
-        <Link href="/invoices" className="btn btn-secondary flex items-center gap-2">Semua Invoice</Link>
+        <Link href="/invoices" className="btn btn-secondary flex items-center gap-2">Download</Link>
       </div>
 
       {/* Success Message */}

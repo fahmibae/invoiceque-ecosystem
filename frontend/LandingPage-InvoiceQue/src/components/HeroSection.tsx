@@ -32,7 +32,7 @@ export default function HeroSection() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
           </span>
-          <span className="text-white/80">Platform Invoice #1 di Indonesia</span>
+          <span className="text-white/80">Workflow tugas, invoice, dan pembayaran untuk bisnis jasa</span>
         </div>
 
         {/* Main Title */}
@@ -40,9 +40,9 @@ export default function HeroSection() {
           className="hero-title text-5xl md:text-6xl lg:text-7xl font-extrabold leading-[1.08] tracking-tight mb-6 animate-fade-in-up"
           style={{ animationDelay: "0.1s" }}
         >
-          Kelola Invoice &<br />
-          Payment Link dengan{" "}
-          <span className="text-gradient-red">Mudah</span>
+          Kelola Tugas,<br />
+          Invoice & Pembayaran<br />
+          dalam <span className="text-gradient-red">Satu Alur</span>
         </h1>
 
         {/* Subtitle */}
@@ -50,8 +50,8 @@ export default function HeroSection() {
           className="text-lg md:text-xl text-white/60 max-w-2xl mx-auto mb-10 leading-relaxed animate-fade-in-up"
           style={{ animationDelay: "0.25s" }}
         >
-          Platform SaaS modern untuk membuat invoice profesional, mengirim
-          payment link instan, dan melacak pembayaran secara real-time.
+          Dari manajemen tugas, tracking waktu, pembuatan invoice, sampai
+          payment link dan reminder pembayaran. Semua rapi dalam satu dashboard.
         </p>
 
         {/* CTA Buttons */}
@@ -85,8 +85,8 @@ export default function HeroSection() {
         >
           {[
             { value: "10K+", label: "Invoice Terkirim" },
-            { value: "2.5K+", label: "Pengguna Aktif" },
-            { value: "99.9%", label: "Uptime" },
+            { value: "3.8K+", label: "Tugas Dikelola" },
+            { value: "24/7", label: "Tracking Pembayaran" },
             { value: "4.8★", label: "Rating Pengguna" },
           ].map((stat) => (
             <div key={stat.label} className="text-center">
@@ -118,7 +118,7 @@ export default function HeroSection() {
                     <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
-                    app.invoicequ.my.id/dashboard
+                    app.invoicequ.my.id/tasks/dashboard
                   </div>
                 </div>
               </div>
@@ -126,13 +126,13 @@ export default function HeroSection() {
               <div className="p-6 md:p-8">
                 {/* Dashboard Header */}
                 <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <div className="text-lg font-bold text-white mb-1">Dashboard Overview</div>
-                    <div className="text-sm text-white/40">Selamat datang kembali, Fahmi 👋</div>
+                  <div className="text-start">
+                    <div className="text-lg font-bold text-white mb-1">Workflow Dashboard</div>
+                    <div className="text-sm text-white/40">Tugas, invoice, dan pembayaran dalam satu tempat</div>
                   </div>
                   <div className="hidden md:flex items-center gap-3">
                     <div className="px-4 py-2 bg-red-600/20 text-red-400 text-xs font-semibold rounded-lg border border-red-600/30">
-                      + Buat Invoice
+                      + Buat Tugas
                     </div>
                   </div>
                 </div>
@@ -140,10 +140,10 @@ export default function HeroSection() {
                 {/* Stat Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                   {[
-                    { title: "Total Invoice", value: "Rp 45.2M", change: "+12.5%", color: "text-emerald-400" },
-                    { title: "Belum Dibayar", value: "Rp 8.7M", change: "3 invoice", color: "text-amber-400" },
+                    { title: "Tugas Aktif", value: "18", change: "5 prioritas tinggi", color: "text-amber-400" },
+                    { title: "Siap Invoice", value: "Rp 12.4M", change: "7 tugas selesai", color: "text-emerald-400" },
                     { title: "Payment Links", value: "24 aktif", change: "+5 baru", color: "text-blue-400" },
-                    { title: "Klien", value: "156", change: "+8 bulan ini", color: "text-purple-400" },
+                    { title: "Belum Dibayar", value: "Rp 8.7M", change: "3 invoice", color: "text-red-400" },
                   ].map((card) => (
                     <div
                       key={card.title}
@@ -159,13 +159,13 @@ export default function HeroSection() {
                 {/* Table Preview */}
                 <div className="rounded-xl border border-white/5 overflow-hidden">
                   <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
-                    <div className="text-sm font-semibold text-white/80">Invoice Terbaru</div>
-                    <div className="text-xs text-red-400 cursor-pointer">Lihat Semua →</div>
+                    <div className="text-sm font-semibold text-white/80">Tugas Siap Ditagih</div>
+                    <div className="text-xs text-red-400 cursor-pointer">Generate Invoice →</div>
                   </div>
                   {[
-                    { id: "INV-001", client: "PT. Maju Jaya", amount: "Rp 5.200.000", status: "Lunas", statusColor: "bg-emerald-500/20 text-emerald-400" },
-                    { id: "INV-002", client: "CV. Teknologi", amount: "Rp 3.800.000", status: "Pending", statusColor: "bg-amber-500/20 text-amber-400" },
-                    { id: "INV-003", client: "UD. Berkah", amount: "Rp 1.500.000", status: "Lunas", statusColor: "bg-emerald-500/20 text-emerald-400" },
+                    { id: "TASK-014", client: "Landing Page Redesign", amount: "Rp 4.500.000", status: "Siap Invoice", statusColor: "bg-emerald-500/20 text-emerald-400" },
+                    { id: "TASK-021", client: "Maintenance API", amount: "Rp 3.200.000", status: "In Progress", statusColor: "bg-blue-500/20 text-blue-400" },
+                    { id: "TASK-028", client: "Setup Payment Gateway", amount: "Rp 2.700.000", status: "Review", statusColor: "bg-amber-500/20 text-amber-400" },
                   ].map((row) => (
                     <div
                       key={row.id}

@@ -1,8 +1,8 @@
 //! Shared utilities — replaces worker::Response helpers with actix-web HttpResponse.
 
-use actix_web::HttpResponse;
-use crate::error::AppError;
 use crate::db::NeonClient;
+use crate::error::AppError;
+use actix_web::HttpResponse;
 
 pub fn generate_id() -> String {
     let mut buf = [0u8; 16];
@@ -11,15 +11,18 @@ pub fn generate_id() -> String {
 }
 
 pub fn json_response<T: serde::Serialize>(data: &T, status: u16) -> Result<HttpResponse, AppError> {
-    Ok(HttpResponse::build(actix_web::http::StatusCode::from_u16(status)
-        .unwrap_or(actix_web::http::StatusCode::OK))
-        .json(data))
+    Ok(HttpResponse::build(
+        actix_web::http::StatusCode::from_u16(status).unwrap_or(actix_web::http::StatusCode::OK),
+    )
+    .json(data))
 }
 
 pub fn json_error(message: &str, status: u16) -> Result<HttpResponse, AppError> {
-    Ok(HttpResponse::build(actix_web::http::StatusCode::from_u16(status)
-        .unwrap_or(actix_web::http::StatusCode::INTERNAL_SERVER_ERROR))
-        .json(serde_json::json!({"error": message})))
+    Ok(HttpResponse::build(
+        actix_web::http::StatusCode::from_u16(status)
+            .unwrap_or(actix_web::http::StatusCode::INTERNAL_SERVER_ERROR),
+    )
+    .json(serde_json::json!({"error": message})))
 }
 
 pub fn get_env(name: &str) -> String {
@@ -39,11 +42,18 @@ pub fn get_db(env_key: &str, http: &reqwest::Client) -> Result<NeonClient, AppEr
 /// Parse pagination from query string.
 pub fn parse_pagination(query: &str) -> (i32, i32) {
     let params: Vec<(String, String)> = url::form_urlencoded::parse(query.as_bytes())
-        .into_owned().collect();
-    let page = params.iter().find(|(k, _)| k == "page")
-        .and_then(|(_, v)| v.parse::<i32>().ok()).unwrap_or(1);
-    let per_page = params.iter().find(|(k, _)| k == "per_page" || k == "size")
-        .and_then(|(_, v)| v.parse::<i32>().ok()).unwrap_or(10);
+        .into_owned()
+        .collect();
+    let page = params
+        .iter()
+        .find(|(k, _)| k == "page")
+        .and_then(|(_, v)| v.parse::<i32>().ok())
+        .unwrap_or(1);
+    let per_page = params
+        .iter()
+        .find(|(k, _)| k == "per_page" || k == "size")
+        .and_then(|(_, v)| v.parse::<i32>().ok())
+        .unwrap_or(10);
     (page.max(1), per_page.clamp(1, 100))
 }
 

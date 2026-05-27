@@ -5,6 +5,8 @@ import { invoiceApi, clientApi, paymentLinkApi, dashboardApi, type Invoice, type
 import { formatCurrency, formatDate, convertToIDR, fetchExchangeRates, getStatusColor } from '@/lib/utils';
 import { ChartIcon, MoneyBag02Icon, GoogleDocIcon, UserGroupIcon, Payment01Icon, ArrowDown01Icon, ArrowUp01Icon, Calendar01Icon, FilterIcon } from 'hugeicons-react';
 import ClickableAmount from '@/components/ui/ClickableAmount';
+import ExportDropdown from '@/components/ui/ExportDropdown';
+import { exportReportToExcel, printReportPDF, type ReportData } from '@/lib/exportReport';
 
 type Period = '7d' | '30d' | '90d' | '1y' | 'all';
 
@@ -162,6 +164,24 @@ export default function ReportsPage() {
     return buckets;
   }, [filtered, rates]);
 
+  // ── Build report data for export ──
+  function buildReportData(): ReportData {
+    return {
+      invoices: filtered,
+      clients,
+      paymentLinks: filteredPL,
+      rates,
+      period: getPeriodLabel(period),
+      kpis: {
+        totalRevenue, totalPending, totalOverdue, avgInvoice, collectionRate,
+        paidCount, sentCount, overdueCount, draftCount, dpCount,
+      },
+      topClients,
+      agingBuckets,
+      monthlyRevenue,
+    };
+  }
+
   if (loading) {
     return (
       <div className="animate-fade-in p-10 text-center text-text-secondary flex flex-col items-center justify-center min-h-[400px]">
@@ -188,13 +208,43 @@ export default function ReportsPage() {
           <h1 className="page-title">Laporan</h1>
           <p className="page-subtitle">Analisis lengkap performa bisnis Anda</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {(['7d', '30d', '90d', '1y', 'all'] as Period[]).map(p => (
             <button key={p} onClick={() => setPeriod(p)}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-150 ${period === p ? 'bg-red-500 text-white shadow-sm' : 'bg-bg-secondary text-text-secondary hover:text-text-primary border border-border-color'}`}>
               {getPeriodLabel(p)}
             </button>
           ))}
+          <div className="print-hidden" style={{ marginLeft: '4px' }}>
+            <ExportDropdown
+              options={[
+                {
+                  label: 'Export Excel',
+                  description: 'Download file .xlsx',
+                  icon: (
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                      <rect x="3" y="3" width="18" height="18" rx="3" fill="#16a34a" opacity="0.15"/>
+                      <path d="M8 8l3.5 4L8 16M12.5 8L16 12l-3.5 4" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  ),
+                  onClick: () => exportReportToExcel(buildReportData()),
+                },
+                {
+                  label: 'Print / PDF',
+                  description: 'Cetak atau simpan sebagai PDF',
+                  icon: (
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                      <rect x="3" y="3" width="18" height="18" rx="3" fill="#dc2626" opacity="0.15"/>
+                      <path d="M7 17V7h6l4 4v6H7z" stroke="#dc2626" strokeWidth="1.5" strokeLinejoin="round"/>
+                      <path d="M13 7v4h4" stroke="#dc2626" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M9 13h6M9 15.5h4" stroke="#dc2626" strokeWidth="1.2" strokeLinecap="round"/>
+                    </svg>
+                  ),
+                  onClick: () => printReportPDF(buildReportData()),
+                },
+              ]}
+            />
+          </div>
         </div>
       </div>
 

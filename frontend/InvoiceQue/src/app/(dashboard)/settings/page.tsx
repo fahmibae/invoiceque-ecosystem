@@ -366,7 +366,7 @@ export default function SettingsPage() {
             </div>
 
             {logoUrl && (
-              <div className="mt-3 p-3 bg-transparent border border-border-light rounded-md max-w-xs flex items-center justify-center h-24 relative group">
+              <div className="mt-3 p-3 bg-transparent border border-border-light rounded-md flex items-center justify-center h-24 relative group">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               </div>

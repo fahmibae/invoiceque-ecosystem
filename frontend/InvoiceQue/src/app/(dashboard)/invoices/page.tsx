@@ -5,12 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { invoiceApi, paymentLinkApi, type Invoice } from '@/lib/api';
 import { formatCurrency, formatDate, getStatusColor, convertToIDR, fetchExchangeRates } from '@/lib/utils';
-import { Download02Icon, Delete02Icon, Edit01Icon, Search01Icon, GoogleDocIcon, FilterIcon, Cancel01Icon, SortingUpIcon, GoogleDriveIcon, MoneyBag02Icon, CheckmarkBadge02Icon, HourglassIcon } from 'hugeicons-react';
+import { Download02Icon, Delete02Icon, Edit01Icon, Search01Icon, GoogleDocIcon, FilterIcon, Cancel01Icon, SortingUpIcon, MoneyBag02Icon, CheckmarkBadge02Icon, HourglassIcon, LockedIcon } from 'hugeicons-react';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import ClickableAmount from '@/components/ui/ClickableAmount';
 import Portal from '@/components/ui/Portal';
+import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
 
-const statusFilters = ['Semua', 'draft', 'sent', 'paid', 'overdue', 'cancelled'];
+const statusFilters = ['Semua', 'draft', 'sent', 'partially_paid', 'paid', 'overdue', 'cancelled'];
 
 export default function InvoicesPage() {
   const router = useRouter();
@@ -26,6 +27,8 @@ export default function InvoicesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [exchangeRates, setExchangeRates] = useState<Record<string, number> | null>(null);
+  const subscription = useSubscriptionUsage();
+  const invoiceLocked = subscription.isResourceLocked('invoices');
 
   // Filter states
   const [filterMinAmount, setFilterMinAmount] = useState<string>('');
@@ -297,12 +300,16 @@ export default function InvoicesPage() {
               <Delete02Icon color='red' /> Hapus {selected.size} Invoice
             </button>
           )}
-          <Link href="/invoices/outstanding" className="btn btn-secondary flex items-center gap-2">
-            <span>DP Belum Lunas</span>
-          </Link>
-          <Link href="/invoices/create" className="btn btn-primary">
-            <span>＋</span> Buat Invoice
-          </Link>
+         
+          {invoiceLocked ? (
+            <button className="btn btn-primary opacity-60 cursor-not-allowed" disabled title={subscription.limitMessage('invoices')}>
+              <LockedIcon width={16} height={16} /> Buat Invoice
+            </button>
+          ) : (
+            <Link href="/invoices/create" className="btn btn-primary">
+              <span>＋</span> Buat Invoice
+            </Link>
+          )}
         </div>
       </div>
 
@@ -472,7 +479,7 @@ export default function InvoicesPage() {
                   </td>
                   <td className="px-5 py-4 align-middle text-sm text-text-primary">
                     <span className={`badge ${getStatusColor(inv.status)}`}>
-                      {inv.status.charAt(0).toUpperCase() + inv.status.slice(1)}
+                      {inv.status === 'partially_paid' ? 'DP Dibayar' : inv.status.charAt(0).toUpperCase() + inv.status.slice(1)}
                     </span>
                   </td>
                   <td className="px-5 py-4 align-middle text-[13px] text-text-secondary">{inv.due_date ? formatDate(inv.due_date) : '-'}</td>
@@ -502,7 +509,13 @@ export default function InvoicesPage() {
           <div className="text-5xl mb-4 opacity-50"><GoogleDocIcon width={48} height={48}/></div>
           <h3 className="text-lg font-semibold mb-2">Belum ada invoice</h3>
           <p className="text-sm text-text-secondary mb-6">Buat invoice pertama Anda untuk memulai</p>
-          <Link href="/invoices/create" className="btn btn-primary">Buat Invoice</Link>
+          {invoiceLocked ? (
+            <button className="btn btn-primary opacity-60 cursor-not-allowed" disabled title={subscription.limitMessage('invoices')}>
+              <LockedIcon width={16} height={16} /> Buat Invoice
+            </button>
+          ) : (
+            <Link href="/invoices/create" className="btn btn-primary">Buat Invoice</Link>
+          )}
         </div>
       )}
 

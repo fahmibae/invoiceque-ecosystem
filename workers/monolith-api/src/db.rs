@@ -158,6 +158,12 @@ impl NeonClient {
         params: &[serde_json::Value],
     ) -> Result<T> {
         let result = self.query(sql, params).await?;
+        let field_name = result
+            .fields
+            .first()
+            .map(|field| field.name.clone())
+            .unwrap_or_default();
+        let data_type_id = result.fields.first().and_then(|field| field.data_type_id);
         let row = result
             .rows
             .into_iter()
@@ -168,20 +174,7 @@ impl NeonClient {
             .next()
             .ok_or_else(|| Error::RustError("No columns returned".into()))?;
 
-        // Neon HTTP API may return numbers as strings, try parsing
-        let parsed_val = match &val {
-            serde_json::Value::String(s) => {
-                // Try to parse as number first
-                if let Ok(n) = s.parse::<i64>() {
-                    serde_json::Value::Number(n.into())
-                } else if let Ok(n) = s.parse::<f64>() {
-                    serde_json::json!(n)
-                } else {
-                    val
-                }
-            }
-            _ => val,
-        };
+        let parsed_val = coerce_value(&field_name, val, data_type_id);
 
         serde_json::from_value(parsed_val)
             .map_err(|e| Error::RustError(format!("Scalar deserialize error: {}", e)))
@@ -233,6 +226,9 @@ fn coerce_string_value(
         }
         Some(20 | 21 | 23 | 26) => parse_i64(&value),
         Some(700 | 701 | 1700) => parse_f64(&value),
+        // PostgreSQL array types: _text(1009), _varchar(1015), _int4(1007),
+        // _int8(1016), _bool(1000), _uuid(2951)
+        Some(1009 | 1015 | 1007 | 1016 | 1000 | 2951) => parse_pg_array(&value),
         Some(_) => serde_json::Value::String(value),
         None => coerce_string_without_type(field_name, value),
     }
@@ -243,6 +239,8 @@ fn default_value_for_type(data_type_id: Option<i32>) -> serde_json::Value {
         Some(16) => serde_json::Value::Bool(false),
         Some(20 | 21 | 23 | 26) => serde_json::Value::Number(0.into()),
         Some(700 | 701 | 1700) => serde_json::json!(0.0),
+        // PostgreSQL array types — default to empty JSON array
+        Some(1009 | 1015 | 1007 | 1016 | 1000 | 2951) => serde_json::Value::Array(vec![]),
         // Preserve the previous behavior for text/date fields that are modeled
         // as non-optional Strings with #[serde(default)].
         Some(25 | 1042 | 1043 | 1082 | 1083 | 1114 | 1184 | 2950) | None => {
@@ -284,6 +282,37 @@ fn parse_i64(value: &str) -> serde_json::Value {
         .unwrap_or_else(|_| serde_json::Value::String(value.to_string()))
 }
 
+/// Parse a PostgreSQL array literal like `{a,b,c}` into a JSON array.
+fn parse_pg_array(value: &str) -> serde_json::Value {
+    let trimmed = value.trim();
+    // Empty array
+    if trimmed == "{}" {
+        return serde_json::Value::Array(vec![]);
+    }
+    // Strip outer braces
+    if trimmed.starts_with('{') && trimmed.ends_with('}') {
+        let inner = &trimmed[1..trimmed.len() - 1];
+        let elements: Vec<serde_json::Value> = inner
+            .split(',')
+            .map(|s| {
+                let s = s.trim().trim_matches('"');
+                if s.eq_ignore_ascii_case("null") {
+                    serde_json::Value::Null
+                } else {
+                    serde_json::Value::String(s.to_string())
+                }
+            })
+            .collect();
+        return serde_json::Value::Array(elements);
+    }
+    // If it's already valid JSON array, try parsing
+    if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(trimmed) {
+        return serde_json::Value::Array(arr);
+    }
+    // Fallback: return as string
+    serde_json::Value::String(value.to_string())
+}
+
 fn parse_f64(value: &str) -> serde_json::Value {
     value
         .parse::<f64>()
@@ -294,7 +323,7 @@ fn parse_f64(value: &str) -> serde_json::Value {
 }
 
 fn is_known_bool_field(field_name: &str) -> bool {
-    matches!(field_name, "is_active" | "is_read")
+    matches!(field_name, "is_active" | "is_read" | "invoice_generated" | "is_favorited" | "is_tax_deductible" | "is_recurring")
 }
 
 fn is_known_int_field(field_name: &str) -> bool {
@@ -311,6 +340,14 @@ fn is_known_int_field(field_name: &str) -> bool {
             | "invoices_used"
             | "clients_used"
             | "payment_links_used"
+            | "total_reminders_sent"
+            | "day_offset"
+            | "overdue_count"
+            | "invoice_count"
+            | "sort_order"
+            | "hourly_rate"
+            | "budget"
+            | "duration_seconds"
     )
 }
 
@@ -331,5 +368,12 @@ fn is_known_float_field(field_name: &str) -> bool {
             | "revenue"
             | "total_revenue"
             | "pending_amount"
+            | "amount_due"
+            | "total_paid"
+            | "total_outstanding"
+            | "total_value"
+            | "total_amount_chasing"
+            | "client_total"
+            | "estimated_hours"
     )
 }

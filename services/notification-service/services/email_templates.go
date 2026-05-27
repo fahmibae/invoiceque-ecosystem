@@ -9,8 +9,25 @@ import (
 // Brand colors: Primary Red #DC2626, Dark #1a1a2e, Light BG #f8f9fa
 
 func emailLayout(title, content, footerNote string) string {
+	return emailLayoutWithLocale(title, content, footerNote, "id")
+}
+
+func clientEmailLayout(title, content, footerNote string) string {
+	return emailLayoutWithLocale(title, content, footerNote, "en")
+}
+
+func emailLayoutWithLocale(title, content, footerNote, lang string) string {
+	tagline := "Platform Invoice & Payment Link"
+	autoText := "Email ini dikirim otomatis oleh"
+	replyText := "Anda tidak perlu membalas email ini."
+	if lang == "en" {
+		tagline = "Invoice & Payment Link Platform"
+		autoText = "This email was sent automatically by"
+		replyText = "You do not need to reply to this email."
+	}
+
 	return fmt.Sprintf(`<!DOCTYPE html>
-<html lang="id">
+<html lang="%s">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -32,7 +49,7 @@ func emailLayout(title, content, footerNote string) string {
 		<div style="display:inline-block;background:rgba(255,255,255,0.15);border-radius:12px;padding:8px 20px;margin-bottom:16px;">
 			<span style="font-weight:800;font-size:22px;color:#ffffff;letter-spacing:1px;">InvoiceQu</span>
 		</div>
-		<p style="color:rgba(255,255,255,0.9);margin:0;font-size:14px;letter-spacing:0.5px;">Platform Invoice & Payment Link</p>
+		<p style="color:rgba(255,255,255,0.9);margin:0;font-size:14px;letter-spacing:0.5px;">%s</p>
 	</td>
 	</tr>
 	</table>
@@ -54,8 +71,8 @@ func emailLayout(title, content, footerNote string) string {
 	<td align="center">
 		%s
 		<p style="margin:12px 0 0;font-size:12px;color:#9ca3af;">
-			Email ini dikirim otomatis oleh <strong style="color:#DC2626;">InvoiceQu</strong><br>
-			Anda tidak perlu membalas email ini.
+			%s <strong style="color:#DC2626;">InvoiceQu</strong><br>
+			%s
 		</p>
 		<p style="margin:8px 0 0;font-size:11px;color:#d1d5db;">
 			© 2026 InvoiceQu. All rights reserved.
@@ -72,7 +89,7 @@ func emailLayout(title, content, footerNote string) string {
 </td></tr>
 </table>
 </body>
-</html>`, title, content, footerNote)
+</html>`, lang, title, tagline, content, footerNote, autoText, replyText)
 }
 
 func statusBadge(text, bgColor, textColor string) string {
@@ -111,35 +128,35 @@ func TemplatePaymentCompletedClient(clientName, paymentTitle, amount string) str
 	content := fmt.Sprintf(`
 	<div style="text-align:center;margin-bottom:28px;">
 		%s
-		<h2 style="margin:20px 0 8px;font-size:22px;color:#111827;">Pembayaran Berhasil</h2>
-		<p style="margin:0;font-size:15px;color:#6b7280;">Terima kasih atas pembayaran Anda</p>
+		<h2 style="margin:20px 0 8px;font-size:22px;color:#111827;">Payment Successful</h2>
+		<p style="margin:0;font-size:15px;color:#6b7280;">Thank you for your payment</p>
 	</div>
 
 	<p style="font-size:15px;color:#374151;line-height:1.7;">
-		Halo <strong>%s</strong>,<br>
-		Pembayaran Anda telah berhasil diproses. Berikut detail transaksinya:
+		Hi <strong>%s</strong>,<br>
+		Your payment has been processed successfully. Here are the transaction details:
 	</p>
 
 	%s
 
 	<div style="background:linear-gradient(135deg,#ECFDF5,#D1FAE5);border-radius:12px;padding:20px;text-align:center;margin:24px 0;">
-		<p style="margin:0 0 4px;font-size:13px;color:#065F46;">TOTAL DIBAYAR</p>
+		<p style="margin:0 0 4px;font-size:13px;color:#065F46;">TOTAL PAID</p>
 		<p style="margin:0;font-size:28px;font-weight:800;color:#059669;">Rp %s</p>
 	</div>
 
 	<p style="font-size:14px;color:#6b7280;line-height:1.6;">
-		Simpan email ini sebagai bukti pembayaran Anda. Jika ada pertanyaan, silakan hubungi penyedia layanan.
+		Please keep this email as your payment receipt. If you have any questions, contact the service provider.
 	</p>`,
-		statusBadge("✓ Berhasil", "#ECFDF5", "#059669"),
+		statusBadge("✓ Paid", "#ECFDF5", "#059669"),
 		escapeHTML(clientName),
 		detailTable(
-			detailRow("Deskripsi", escapeHTML(paymentTitle))+
-				detailRow("Status", "Lunas")),
+			detailRow("Description", escapeHTML(paymentTitle))+
+				detailRow("Status", "Paid")),
 		amount,
 	)
 
-	return emailLayout("Pembayaran Berhasil - InvoiceQu", content,
-		`<p style="margin:0 0 4px;font-size:13px;color:#6b7280;">Terima kasih atas kepercayaan Anda 🙏</p>`)
+	return clientEmailLayout("Payment Successful - InvoiceQu", content,
+		`<p style="margin:0 0 4px;font-size:13px;color:#6b7280;">Thank you for your trust.</p>`)
 }
 
 // ─── Payment Completed → Business Owner ─────────────────
@@ -186,35 +203,35 @@ func TemplatePaymentFailed(clientName, paymentTitle, amount string) string {
 	content := fmt.Sprintf(`
 	<div style="text-align:center;margin-bottom:28px;">
 		%s
-		<h2 style="margin:20px 0 8px;font-size:22px;color:#111827;">Pembayaran Gagal</h2>
-		<p style="margin:0;font-size:15px;color:#6b7280;">Terjadi masalah saat memproses pembayaran</p>
+		<h2 style="margin:20px 0 8px;font-size:22px;color:#111827;">Payment Failed</h2>
+		<p style="margin:0;font-size:15px;color:#6b7280;">We could not process your payment</p>
 	</div>
 
 	<p style="font-size:15px;color:#374151;line-height:1.7;">
-		Halo <strong>%s</strong>,<br>
-		Maaf, pembayaran Anda tidak dapat diproses. Silakan coba lagi.
+		Hi <strong>%s</strong>,<br>
+		Sorry, your payment could not be processed. Please try again.
 	</p>
 
 	%s
 
 	<div style="background:#FEF2F2;border-radius:12px;padding:20px;text-align:center;margin:24px 0;">
-		<p style="margin:0 0 4px;font-size:13px;color:#991B1B;">GAGAL DIPROSES</p>
+		<p style="margin:0 0 4px;font-size:13px;color:#991B1B;">FAILED TO PROCESS</p>
 		<p style="margin:0;font-size:28px;font-weight:800;color:#DC2626;">Rp %s</p>
 	</div>
 
 	<p style="font-size:14px;color:#6b7280;line-height:1.6;">
-		Jika masalah berlanjut, silakan hubungi penyedia layanan atau gunakan metode pembayaran lain.
+		If the issue continues, contact the service provider or use another payment method.
 	</p>`,
-		statusBadge("✕ Gagal", "#FEF2F2", "#DC2626"),
+		statusBadge("✕ Failed", "#FEF2F2", "#DC2626"),
 		escapeHTML(clientName),
 		detailTable(
-			detailRow("Deskripsi", escapeHTML(paymentTitle))+
-				detailRow("Status", "Gagal")),
+			detailRow("Description", escapeHTML(paymentTitle))+
+				detailRow("Status", "Failed")),
 		amount,
 	)
 
-	return emailLayout("Pembayaran Gagal - InvoiceQu", content,
-		`<p style="margin:0 0 4px;font-size:13px;color:#6b7280;">Silakan coba lagi atau hubungi support</p>`)
+	return clientEmailLayout("Payment Failed - InvoiceQu", content,
+		`<p style="margin:0 0 4px;font-size:13px;color:#6b7280;">Please try again or contact support.</p>`)
 }
 
 // ─── Invoice Created → Client ───────────────────────────
@@ -222,45 +239,45 @@ func TemplatePaymentFailed(clientName, paymentTitle, amount string) string {
 func TemplateInvoiceCreated(clientName, invoiceNum, amount, dueDate, paymentLink, itemsHTML string) string {
 	paymentBtn := ""
 	if paymentLink != "" {
-		paymentBtn = actionButton("💳 Bayar Sekarang", paymentLink) +
+		paymentBtn = actionButton("Pay Now", paymentLink) +
 			fmt.Sprintf(`<p style="text-align:center;font-size:12px;color:#9ca3af;margin-top:-12px;">
-				Atau klik: <a href="%s" style="color:#DC2626;">%s</a>
+				Or open this link: <a href="%s" style="color:#DC2626;">%s</a>
 			</p>`, paymentLink, paymentLink)
 	}
 
 	content := fmt.Sprintf(`
 	<div style="text-align:center;margin-bottom:28px;">
 		%s
-		<h2 style="margin:20px 0 8px;font-size:22px;color:#111827;">Invoice Baru</h2>
-		<p style="margin:0;font-size:15px;color:#6b7280;">Anda memiliki tagihan baru</p>
+		<h2 style="margin:20px 0 8px;font-size:22px;color:#111827;">New Invoice</h2>
+		<p style="margin:0;font-size:15px;color:#6b7280;">You have a new invoice</p>
 	</div>
 
 	<p style="font-size:15px;color:#374151;line-height:1.7;">
-		Halo <strong>%s</strong>,<br>
-		Invoice baru telah dibuat untuk Anda. Berikut detailnya:
+		Hi <strong>%s</strong>,<br>
+		A new invoice has been issued for you. Here are the details:
 	</p>
 
 	%s
 
 	<div style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border-radius:12px;padding:20px;text-align:center;margin:24px 0;">
-		<p style="margin:0 0 4px;font-size:13px;color:#1E40AF;">TOTAL TAGIHAN</p>
+		<p style="margin:0 0 4px;font-size:13px;color:#1E40AF;">TOTAL DUE</p>
 		<p style="margin:0;font-size:28px;font-weight:800;color:#2563EB;">Rp %s</p>
 	</div>
 
 	%s
 
 	<p style="font-size:14px;color:#6b7280;line-height:1.6;">
-		Mohon lakukan pembayaran sebelum tanggal jatuh tempo. Terima kasih.
+		Please complete the payment before the due date. Thank you.
 	</p>`,
-		statusBadge("📄 Invoice Baru", "#EFF6FF", "#1D4ED8"),
+		statusBadge("New Invoice", "#EFF6FF", "#1D4ED8"),
 		escapeHTML(clientName),
 		itemsHTML,
 		amount,
 		paymentBtn,
 	)
 
-	return emailLayout("Invoice Baru - InvoiceQu", content,
-		`<p style="margin:0 0 4px;font-size:13px;color:#6b7280;">Mohon segera lakukan pembayaran 🙏</p>`)
+	return clientEmailLayout("New Invoice - InvoiceQu", content,
+		`<p style="margin:0 0 4px;font-size:13px;color:#6b7280;">Please complete your payment at your earliest convenience.</p>`)
 }
 
 // ─── Invoice Paid → Client ──────────────────────────────
@@ -269,35 +286,35 @@ func TemplateInvoicePaid(clientName, invoiceNum, amount string) string {
 	content := fmt.Sprintf(`
 	<div style="text-align:center;margin-bottom:28px;">
 		%s
-		<h2 style="margin:20px 0 8px;font-size:22px;color:#111827;">Invoice Telah Dibayar</h2>
-		<p style="margin:0;font-size:15px;color:#6b7280;">Pembayaran invoice Anda berhasil</p>
+		<h2 style="margin:20px 0 8px;font-size:22px;color:#111827;">Invoice Paid</h2>
+		<p style="margin:0;font-size:15px;color:#6b7280;">Your invoice payment was successful</p>
 	</div>
 
 	<p style="font-size:15px;color:#374151;line-height:1.7;">
-		Halo <strong>%s</strong>,<br>
-		Pembayaran untuk invoice berikut telah diterima dengan baik.
+		Hi <strong>%s</strong>,<br>
+		Your payment for the following invoice has been received.
 	</p>
 
 	%s
 
 	<div style="background:linear-gradient(135deg,#ECFDF5,#D1FAE5);border-radius:12px;padding:20px;text-align:center;margin:24px 0;">
-		<p style="margin:0 0 4px;font-size:13px;color:#065F46;">TOTAL DIBAYAR</p>
+		<p style="margin:0 0 4px;font-size:13px;color:#065F46;">TOTAL PAID</p>
 		<p style="margin:0;font-size:28px;font-weight:800;color:#059669;">Rp %s</p>
 	</div>
 
 	<p style="font-size:14px;color:#6b7280;line-height:1.6;">
-		Simpan email ini sebagai bukti pembayaran. Terima kasih!
+		Please keep this email as your payment receipt. Thank you.
 	</p>`,
-		statusBadge("✓ Lunas", "#ECFDF5", "#059669"),
+		statusBadge("✓ Paid", "#ECFDF5", "#059669"),
 		escapeHTML(clientName),
 		detailTable(
-			detailRow("No. Invoice", invoiceNum)+
-				detailRow("Status", "Lunas")),
+			detailRow("Invoice No.", invoiceNum)+
+				detailRow("Status", "Paid")),
 		amount,
 	)
 
-	return emailLayout("Invoice Lunas - InvoiceQu", content,
-		`<p style="margin:0 0 4px;font-size:13px;color:#6b7280;">Terima kasih atas pembayaran Anda 🙏</p>`)
+	return clientEmailLayout("Invoice Paid - InvoiceQu", content,
+		`<p style="margin:0 0 4px;font-size:13px;color:#6b7280;">Thank you for your payment.</p>`)
 }
 
 // ─── Invoice Overdue → Client ───────────────────────────
@@ -306,38 +323,38 @@ func TemplateInvoiceOverdue(clientName, invoiceNum, amount, dueDate string) stri
 	content := fmt.Sprintf(`
 	<div style="text-align:center;margin-bottom:28px;">
 		%s
-		<h2 style="margin:20px 0 8px;font-size:22px;color:#111827;">Invoice Jatuh Tempo</h2>
-		<p style="margin:0;font-size:15px;color:#6b7280;">Tagihan Anda telah melewati batas waktu</p>
+		<h2 style="margin:20px 0 8px;font-size:22px;color:#111827;">Invoice Overdue</h2>
+		<p style="margin:0;font-size:15px;color:#6b7280;">This invoice has passed its due date</p>
 	</div>
 
 	<p style="font-size:15px;color:#374151;line-height:1.7;">
-		Halo <strong>%s</strong>,<br>
-		Invoice berikut telah melewati tanggal jatuh tempo. Mohon segera lakukan pembayaran.
+		Hi <strong>%s</strong>,<br>
+		The following invoice is overdue. Please complete the payment as soon as possible.
 	</p>
 
 	%s
 
 	<div style="background:#FEF2F2;border-radius:12px;padding:20px;text-align:center;margin:24px 0;border:2px dashed #FECACA;">
-		<p style="margin:0 0 4px;font-size:13px;color:#991B1B;">⚠️ JATUH TEMPO</p>
+		<p style="margin:0 0 4px;font-size:13px;color:#991B1B;">OVERDUE</p>
 		<p style="margin:0;font-size:28px;font-weight:800;color:#DC2626;">Rp %s</p>
-		<p style="margin:8px 0 0;font-size:12px;color:#B91C1C;">Jatuh tempo: %s</p>
+		<p style="margin:8px 0 0;font-size:12px;color:#B91C1C;">Due date: %s</p>
 	</div>
 
 	<p style="font-size:14px;color:#6b7280;line-height:1.6;">
-		Jika Anda sudah melakukan pembayaran, abaikan email ini. Jika belum, mohon segera selesaikan tagihan Anda.
+		If you have already paid, please ignore this email. Otherwise, please settle the invoice.
 	</p>`,
-		statusBadge("⚠ Jatuh Tempo", "#FEF2F2", "#DC2626"),
+		statusBadge("Overdue", "#FEF2F2", "#DC2626"),
 		escapeHTML(clientName),
 		detailTable(
-			detailRow("No. Invoice", invoiceNum)+
-				detailRow("Jatuh Tempo", dueDate)+
-				detailRow("Status", "⚠️ Jatuh Tempo")),
+			detailRow("Invoice No.", invoiceNum)+
+				detailRow("Due Date", dueDate)+
+				detailRow("Status", "Overdue")),
 		amount,
 		dueDate,
 	)
 
-	return emailLayout("Invoice Jatuh Tempo - InvoiceQu", content,
-		`<p style="margin:0 0 4px;font-size:13px;color:#6b7280;">Mohon segera lakukan pembayaran</p>`)
+	return clientEmailLayout("Invoice Overdue - InvoiceQu", content,
+		`<p style="margin:0 0 4px;font-size:13px;color:#6b7280;">Please complete your payment soon.</p>`)
 }
 
 // ─── Invoice Sent → Client (with payment link) ─────────
@@ -345,9 +362,9 @@ func TemplateInvoiceOverdue(clientName, invoiceNum, amount, dueDate string) stri
 func TemplateInvoiceSent(clientName, invoiceNum, amount, dueDate, paymentLink, itemsHTML string) string {
 	paymentBtn := ""
 	if paymentLink != "" {
-		paymentBtn = actionButton("💳 Bayar Sekarang", paymentLink) +
+		paymentBtn = actionButton("Pay Now", paymentLink) +
 			fmt.Sprintf(`<p style="text-align:center;font-size:12px;color:#9ca3af;margin-top:-12px;">
-				Atau klik: <a href="%s" style="color:#DC2626;">%s</a>
+				Or open this link: <a href="%s" style="color:#DC2626;">%s</a>
 			</p>`, paymentLink, paymentLink)
 	}
 
@@ -355,27 +372,27 @@ func TemplateInvoiceSent(clientName, invoiceNum, amount, dueDate, paymentLink, i
 	<div style="text-align:center;margin-bottom:28px;">
 		%s
 		<h2 style="margin:20px 0 8px;font-size:22px;color:#111827;">Invoice %s</h2>
-		<p style="margin:0;font-size:15px;color:#6b7280;">Tagihan dari InvoiceQu</p>
+		<p style="margin:0;font-size:15px;color:#6b7280;">Invoice from InvoiceQu</p>
 	</div>
 
 	<p style="font-size:15px;color:#374151;line-height:1.7;">
-		Halo <strong>%s</strong>,<br>
-		Anda menerima invoice baru. Berikut rinciannya:
+		Hi <strong>%s</strong>,<br>
+		You have received a new invoice. Here are the details:
 	</p>
 
 	%s
 
 	<div style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border-radius:12px;padding:20px;text-align:center;margin:24px 0;">
-		<p style="margin:0 0 4px;font-size:13px;color:#1E40AF;">TOTAL TAGIHAN</p>
+		<p style="margin:0 0 4px;font-size:13px;color:#1E40AF;">TOTAL DUE</p>
 		<p style="margin:0;font-size:28px;font-weight:800;color:#DC2626;">Rp %s</p>
 	</div>
 
 	%s
 
 	<p style="font-size:14px;color:#9ca3af;margin-top:20px;">
-		📎 Invoice lengkap terlampir dalam format PDF.
+		The full invoice is attached as a PDF.
 	</p>`,
-		statusBadge("📧 Invoice Terkirim", "#EFF6FF", "#1D4ED8"),
+		statusBadge("Invoice Sent", "#EFF6FF", "#1D4ED8"),
 		invoiceNum,
 		escapeHTML(clientName),
 		itemsHTML,
@@ -383,8 +400,8 @@ func TemplateInvoiceSent(clientName, invoiceNum, amount, dueDate, paymentLink, i
 		paymentBtn,
 	)
 
-	return emailLayout("Invoice "+invoiceNum+" - InvoiceQu", content,
-		`<p style="margin:0 0 4px;font-size:13px;color:#6b7280;">Terima kasih atas kepercayaan Anda 🙏</p>`)
+	return clientEmailLayout("Invoice "+invoiceNum+" - InvoiceQu", content,
+		`<p style="margin:0 0 4px;font-size:13px;color:#6b7280;">Thank you for your trust.</p>`)
 }
 
 // ─── Payment Link Created → Client Email ────────────────
@@ -392,53 +409,53 @@ func TemplateInvoiceSent(clientName, invoiceNum, amount, dueDate, paymentLink, i
 func TemplatePaymentLinkCreated(clientName, title, description, amount, paymentURL string) string {
 	paymentBtn := ""
 	if paymentURL != "" {
-		paymentBtn = actionButton("💳 Bayar Sekarang", paymentURL) +
+		paymentBtn = actionButton("Pay Now", paymentURL) +
 			fmt.Sprintf(`<p style="text-align:center;font-size:12px;color:#9ca3af;margin-top:-12px;">
-				Atau klik: <a href="%s" style="color:#DC2626;">%s</a>
+				Or open this link: <a href="%s" style="color:#DC2626;">%s</a>
 			</p>`, paymentURL, paymentURL)
 	}
 
 	descHTML := ""
 	if description != "" {
-		descHTML = detailRow("Keterangan", escapeHTML(description))
+		descHTML = detailRow("Notes", escapeHTML(description))
 	}
 
 	content := fmt.Sprintf(`
 	<div style="text-align:center;margin-bottom:28px;">
 		%s
-		<h2 style="margin:20px 0 8px;font-size:22px;color:#111827;">Tagihan Pembayaran</h2>
-		<p style="margin:0;font-size:15px;color:#6b7280;">Anda menerima tagihan baru</p>
+		<h2 style="margin:20px 0 8px;font-size:22px;color:#111827;">Payment Request</h2>
+		<p style="margin:0;font-size:15px;color:#6b7280;">You have received a new payment request</p>
 	</div>
 
 	<p style="font-size:15px;color:#374151;line-height:1.7;">
-		Halo <strong>%s</strong>,<br>
-		Anda telah menerima tagihan pembayaran baru. Berikut rinciannya:
+		Hi <strong>%s</strong>,<br>
+		You have received a new payment request. Here are the details:
 	</p>
 
 	%s
 
 	<div style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border-radius:12px;padding:20px;text-align:center;margin:24px 0;">
-		<p style="margin:0 0 4px;font-size:13px;color:#1E40AF;">TOTAL TAGIHAN</p>
+		<p style="margin:0 0 4px;font-size:13px;color:#1E40AF;">TOTAL DUE</p>
 		<p style="margin:0;font-size:28px;font-weight:800;color:#DC2626;">Rp %s</p>
 	</div>
 
 	%s
 
 	<p style="font-size:14px;color:#6b7280;line-height:1.6;">
-		Klik tombol di atas untuk melakukan pembayaran secara aman. Terima kasih.
+		Click the button above to complete your payment securely. Thank you.
 	</p>`,
-		statusBadge("💳 Tagihan Baru", "#EFF6FF", "#1D4ED8"),
+		statusBadge("Payment Request", "#EFF6FF", "#1D4ED8"),
 		escapeHTML(clientName),
 		detailTable(
-			detailRow("Deskripsi", escapeHTML(title))+
+			detailRow("Description", escapeHTML(title))+
 				descHTML+
-				detailRow("Status", "Menunggu Pembayaran")),
+				detailRow("Status", "Awaiting Payment")),
 		amount,
 		paymentBtn,
 	)
 
-	return emailLayout("Tagihan Pembayaran - InvoiceQu", content,
-		`<p style="margin:0 0 4px;font-size:13px;color:#6b7280;">Mohon segera lakukan pembayaran 🙏</p>`)
+	return clientEmailLayout("Payment Request - InvoiceQu", content,
+		`<p style="margin:0 0 4px;font-size:13px;color:#6b7280;">Please complete your payment at your earliest convenience.</p>`)
 }
 
 // ─── Subscription Checkout → User Email ─────────────────

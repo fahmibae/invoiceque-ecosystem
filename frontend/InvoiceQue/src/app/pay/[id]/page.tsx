@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { invoiceSettingsApi, type InvoiceSettingsData } from '@/lib/api';
+import { invoiceSettingsApi } from '@/lib/api';
 import {
   detectPaymentLocale,
   getPaymentTranslations,
@@ -24,7 +24,24 @@ interface PaymentData {
   provider_order_id?: string;
 }
 
+interface CheckoutErrorResponse {
+  error?: string;
+  details?: {
+    error?: string;
+    message?: string;
+  };
+}
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+
+const isCompletedStatus = (value?: string) => {
+  const status = value?.toLowerCase();
+  return status === 'completed' || status === 'paid';
+};
+
+const getCheckoutError = (json: CheckoutErrorResponse, fallback: string) => {
+  return json?.details?.message || json?.details?.error || json?.error || fallback;
+};
 
 export default function PublicPaymentPage() {
   const params = useParams();
@@ -48,7 +65,7 @@ export default function PublicPaymentPage() {
   const loadSettings = async () => {
     try {
       const s = await invoiceSettingsApi.get();
-      setCompanyInitial(s.business_name?.substring(0, 2).toUpperCase() || '');
+      setCompanyInitial((s.business_name || '').substring(0, 2).toUpperCase());
       setCompanyName(s.business_name || '');
       setCompanyLogo(s.logo_url || '');
       setCompanyEmail(s.business_email || '');
@@ -127,7 +144,31 @@ export default function PublicPaymentPage() {
         // Redirect to PayPal
         window.location.href = json.approve_url;
       } else {
-        setError(json.error || t.failedToProcess);
+        setError(getCheckoutError(json, t.failedToProcess));
+        setCheckingOut(false);
+      }
+    } catch {
+      setError(t.connectionFailed);
+      setCheckingOut(false);
+    }
+  };
+
+  const handleXenditCheckout = async () => {
+    setCheckingOut(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_BASE}/pay-checkout/${params.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'xendit' }),
+      });
+      const json = await res.json();
+      const checkoutUrl = json.checkout_url || json.invoice_url;
+
+      if (res.ok && checkoutUrl) {
+        window.location.href = checkoutUrl;
+      } else {
+        setError(getCheckoutError(json, t.failedToProcess));
         setCheckingOut(false);
       }
     } catch {
@@ -175,7 +216,7 @@ export default function PublicPaymentPage() {
     );
   }
 
-  if (data?.status === 'completed') {
+  if (isCompletedStatus(data?.status)) {
     return (
       <div className="min-h-screen bg-bg-secondary flex items-center justify-center p-6" dir={t.dir}>
         <div className="w-full max-w-[520px]">
@@ -335,11 +376,29 @@ export default function PublicPaymentPage() {
                 <div className="max-w-md mx-auto">
                   <p className="text-center text-sm text-text-secondary mb-5">{t.xenditRedirectNotice}</p>
 
+                  {error && (
+                    <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 font-medium">
+                      ⚠️ {error}
+                    </div>
+                  )}
+
                   <button
-                    onClick={() => { if (data?.url) window.location.href = data.url; }}
-                    className="w-full py-4 rounded-lg font-bold text-white text-[15px] transition-all duration-200 shadow-md hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 bg-gradient-to-r from-emerald-600 to-emerald-500"
+                    onClick={handleXenditCheckout}
+                    disabled={checkingOut}
+                    className="w-full py-4 rounded-lg font-bold text-white text-[15px] transition-all duration-200 shadow-md hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-70 disabled:hover:translate-y-0 disabled:hover:shadow-md cursor-pointer disabled:cursor-wait bg-gradient-to-r from-emerald-600 to-emerald-500"
                   >
-                    🔒 {t.payViaXendit} — {formatAmount(amount, currency)}
+                    <span className="flex items-center justify-center gap-2">
+                      {checkingOut ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          {t.processing}
+                        </>
+                      ) : (
+                        <>
+                          🔒 {t.payViaXendit} — {formatAmount(amount, currency)}
+                        </>
+                      )}
+                    </span>
                   </button>
                 </div>
               ) : (

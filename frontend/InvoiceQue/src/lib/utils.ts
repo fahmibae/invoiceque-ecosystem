@@ -1,12 +1,26 @@
+import { NO_DECIMAL_CURRENCIES } from './currencies';
+
+/** Locale map for common currencies; others use 'en-US' as a safe default. */
+const CURRENCY_LOCALE: Record<string, string> = {
+  IDR: 'id-ID', USD: 'en-US', EUR: 'de-DE', GBP: 'en-GB', JPY: 'ja-JP',
+  CNY: 'zh-CN', KRW: 'ko-KR', INR: 'en-IN', BRL: 'pt-BR', RUB: 'ru-RU',
+  TRY: 'tr-TR', THB: 'th-TH', VND: 'vi-VN', MYR: 'ms-MY', SGD: 'en-SG',
+  AUD: 'en-AU', CAD: 'en-CA', CHF: 'de-CH', SEK: 'sv-SE', NOK: 'nb-NO',
+  DKK: 'da-DK', PLN: 'pl-PL', CZK: 'cs-CZ', HUF: 'hu-HU', PHP: 'en-PH',
+  AED: 'ar-AE', SAR: 'ar-SA', EGP: 'ar-EG', NGN: 'en-NG', ZAR: 'en-ZA',
+  ARS: 'es-AR', CLP: 'es-CL', COP: 'es-CO', MXN: 'es-MX', PEN: 'es-PE',
+  NZD: 'en-NZ', HKD: 'zh-HK', TWD: 'zh-TW',
+};
+
 export function formatCurrency(amount: number, currency: string = 'IDR'): string {
   const cur = currency.toUpperCase();
-  const locale = cur === 'IDR' ? 'id-ID' : cur === 'USD' ? 'en-US' : cur === 'EUR' ? 'de-DE' : cur === 'GBP' ? 'en-GB' : cur === 'JPY' ? 'ja-JP' : 'en-US';
-  const noDecimals = ['IDR', 'JPY', 'KRW', 'VND'];
+  const locale = CURRENCY_LOCALE[cur] || 'en-US';
+  const isNoDecimal = NO_DECIMAL_CURRENCIES.has(cur);
   return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: cur,
-    minimumFractionDigits: noDecimals.includes(cur) ? 0 : 2,
-    maximumFractionDigits: noDecimals.includes(cur) ? 0 : 2,
+    minimumFractionDigits: isNoDecimal ? 0 : 2,
+    maximumFractionDigits: isNoDecimal ? 0 : 2,
   }).format(amount);
 }
 

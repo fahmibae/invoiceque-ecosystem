@@ -61,7 +61,7 @@ func (c *InvoiceConsumer) ProcessEvent(event InvoiceEvent) {
 			emailStatus)
 
 	case "invoice.paid":
-		subject := "Pembayaran Diterima: " + event.InvoiceNum
+		subject := "Payment Received: " + event.InvoiceNum
 		amountStr := formatCurrency(event.Total)
 		htmlBody := services.TemplateInvoicePaid(event.ClientName, event.InvoiceNum, amountStr)
 
@@ -69,7 +69,7 @@ func (c *InvoiceConsumer) ProcessEvent(event InvoiceEvent) {
 		err := c.emailService.Send(services.EmailPayload{
 			To:       event.ClientEmail,
 			Subject:  subject,
-			Body:     fmt.Sprintf("Pembayaran invoice %s sebesar Rp %s diterima.", event.InvoiceNum, amountStr),
+			Body:     fmt.Sprintf("Payment for invoice %s for Rp %s has been received.", event.InvoiceNum, amountStr),
 			HTMLBody: htmlBody,
 		})
 		if err != nil {
@@ -82,7 +82,7 @@ func (c *InvoiceConsumer) ProcessEvent(event InvoiceEvent) {
 			emailStatus)
 
 	case "invoice.overdue":
-		subject := "Reminder: Invoice " + event.InvoiceNum + " Jatuh Tempo"
+		subject := "Reminder: Invoice " + event.InvoiceNum + " is Overdue"
 		amountStr := formatCurrency(event.Total)
 		htmlBody := services.TemplateInvoiceOverdue(event.ClientName, event.InvoiceNum, amountStr, event.DueDate)
 
@@ -90,7 +90,7 @@ func (c *InvoiceConsumer) ProcessEvent(event InvoiceEvent) {
 		err := c.emailService.Send(services.EmailPayload{
 			To:       event.ClientEmail,
 			Subject:  subject,
-			Body:     fmt.Sprintf("Invoice %s sebesar Rp %s telah jatuh tempo (%s).", event.InvoiceNum, amountStr, event.DueDate),
+			Body:     fmt.Sprintf("Invoice %s for Rp %s is overdue (%s).", event.InvoiceNum, amountStr, event.DueDate),
 			HTMLBody: htmlBody,
 		})
 		if err != nil {
@@ -128,7 +128,7 @@ func (c *InvoiceConsumer) handleInvoiceSent(event InvoiceEvent) {
 
 	err := c.emailService.SendWithAttachment(services.EmailWithAttachmentPayload{
 		To:          event.ClientEmail,
-		Subject:     "Invoice " + event.InvoiceNum + " - Tagihan Anda",
+		Subject:     "Invoice " + event.InvoiceNum + " - Payment Request",
 		HTMLBody:    htmlBody,
 		Attachments: attachments,
 	})
@@ -142,7 +142,7 @@ func (c *InvoiceConsumer) handleInvoiceSent(event InvoiceEvent) {
 	}
 
 	c.saveNotification(event.UserID, "invoice_sent", event.ClientEmail,
-		"Invoice "+event.InvoiceNum+" - Tagihan Anda",
+		"Invoice "+event.InvoiceNum+" - Payment Request",
 		fmt.Sprintf("Invoice %s untuk %s sebesar Rp %s telah dikirim via email", event.InvoiceNum, event.ClientName, formatCurrency(event.Total)),
 		emailStatus)
 }
@@ -187,9 +187,9 @@ func formatItemsHTML(event InvoiceEvent) string {
 	<table width="100%%" cellspacing="0" cellpadding="0" style="margin:20px 0;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;font-size:14px;">
 		<thead>
 			<tr style="background:#f9fafb;color:#374151;text-align:left;">
-				<th style="padding:12px 16px;border-bottom:1px solid #e5e7eb;">Deskripsi</th>
+				<th style="padding:12px 16px;border-bottom:1px solid #e5e7eb;">Description</th>
 				<th style="padding:12px 16px;border-bottom:1px solid #e5e7eb;text-align:center;">Qty</th>
-				<th style="padding:12px 16px;border-bottom:1px solid #e5e7eb;text-align:right;">Harga</th>
+				<th style="padding:12px 16px;border-bottom:1px solid #e5e7eb;text-align:right;">Price</th>
 				<th style="padding:12px 16px;border-bottom:1px solid #e5e7eb;text-align:right;">Total</th>
 			</tr>
 		</thead>
@@ -202,15 +202,15 @@ func formatItemsHTML(event InvoiceEvent) string {
 				<td style="padding:10px 16px;text-align:right;font-weight:600;border-top:1px solid #e5e7eb;">Rp %s</td>
 			</tr>
 			<tr>
-				<td colspan="3" style="padding:10px 16px;text-align:right;color:#6b7280;">Pajak</td>
+				<td colspan="3" style="padding:10px 16px;text-align:right;color:#6b7280;">Tax</td>
 				<td style="padding:10px 16px;text-align:right;font-weight:600;">Rp %s</td>
 			</tr>
 			<tr>
-				<td colspan="3" style="padding:10px 16px;text-align:right;color:#6b7280;">Diskon</td>
+				<td colspan="3" style="padding:10px 16px;text-align:right;color:#6b7280;">Discount</td>
 				<td style="padding:10px 16px;text-align:right;font-weight:600;color:#DC2626;">-Rp %s</td>
 			</tr>
 			<tr style="background:#f9fafb;">
-				<td colspan="3" style="padding:12px 16px;text-align:right;font-weight:700;color:#111827;">Total Tagihan</td>
+				<td colspan="3" style="padding:12px 16px;text-align:right;font-weight:700;color:#111827;">Total Due</td>
 				<td style="padding:12px 16px;text-align:right;font-weight:800;color:#2563EB;">Rp %s</td>
 			</tr>
 		</tfoot>

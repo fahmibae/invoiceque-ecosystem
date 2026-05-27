@@ -6,15 +6,41 @@ const features = [
   {
     icon: (
       <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2" />
+      </svg>
+    ),
+    title: "Manajemen Tugas & Kanban",
+    description:
+      "Atur backlog, prioritas, deadline, status pekerjaan, dan project dalam tampilan kanban atau list yang mudah dipantau.",
+    gradient: "from-red-500/20 to-orange-500/20",
+    iconBg: "bg-red-500/10",
+    iconColor: "text-red-400",
+  },
+  {
+    icon: (
+      <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    title: "Time Tracking & Nilai Kerja",
+    description:
+      "Catat estimasi jam, tarif, currency, dan nilai pekerjaan agar tugas yang selesai bisa langsung siap ditagihkan.",
+    gradient: "from-blue-500/20 to-cyan-500/20",
+    iconBg: "bg-blue-500/10",
+    iconColor: "text-blue-400",
+  },
+  {
+    icon: (
+      <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
     ),
     title: "Invoice Otomatis",
     description:
-      "Buat invoice profesional dalam hitungan detik dengan template siap pakai. Nomor invoice auto-generate, kalkulasi otomatis, dan format PDF yang elegan.",
-    gradient: "from-red-500/20 to-orange-500/20",
-    iconBg: "bg-red-500/10",
-    iconColor: "text-red-400",
+      "Buat invoice profesional dari data klien, proyek, atau tugas selesai. Nomor invoice auto-generate dan kalkulasi otomatis.",
+    gradient: "from-emerald-500/20 to-teal-500/20",
+    iconBg: "bg-emerald-500/10",
+    iconColor: "text-emerald-400",
   },
   {
     icon: (
@@ -24,10 +50,23 @@ const features = [
     ),
     title: "Payment Link Instan",
     description:
-      "Generate payment link yang bisa langsung dikirim ke klien via WhatsApp, email, atau SMS. Integrasi dengan berbagai payment gateway Indonesia.",
-    gradient: "from-blue-500/20 to-cyan-500/20",
-    iconBg: "bg-blue-500/10",
-    iconColor: "text-blue-400",
+      "Generate payment link yang bisa langsung dikirim ke klien via WhatsApp, email, atau SMS dengan status pembayaran real-time.",
+    gradient: "from-purple-500/20 to-pink-500/20",
+    iconBg: "bg-purple-500/10",
+    iconColor: "text-purple-400",
+  },
+  {
+    icon: (
+      <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9" />
+      </svg>
+    ),
+    title: "Payment Chaser Otomatis",
+    description:
+      "Buat reminder pembayaran untuk invoice yang belum lunas agar follow-up klien tetap konsisten tanpa kerja manual berulang.",
+    gradient: "from-amber-500/20 to-yellow-500/20",
+    iconBg: "bg-amber-500/10",
+    iconColor: "text-amber-400",
   },
   {
     icon: (
@@ -37,46 +76,7 @@ const features = [
     ),
     title: "Laporan Real-time",
     description:
-      "Dashboard analitik lengkap dengan grafik pendapatan, status pembayaran, dan laporan keuangan yang bisa di-export kapan saja.",
-    gradient: "from-emerald-500/20 to-teal-500/20",
-    iconBg: "bg-emerald-500/10",
-    iconColor: "text-emerald-400",
-  },
-  {
-    icon: (
-      <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-      </svg>
-    ),
-    title: "Manajemen Klien",
-    description:
-      "Kelola data klien secara terpusat. Riwayat transaksi, profil klien, dan catatan penting semua tersimpan rapi di satu tempat.",
-    gradient: "from-purple-500/20 to-pink-500/20",
-    iconBg: "bg-purple-500/10",
-    iconColor: "text-purple-400",
-  },
-  {
-    icon: (
-      <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-      </svg>
-    ),
-    title: "Multi-device Support",
-    description:
-      "Akses dari mana saja — desktop, tablet, atau smartphone. Interface responsif yang dioptimalkan untuk semua perangkat.",
-    gradient: "from-amber-500/20 to-yellow-500/20",
-    iconBg: "bg-amber-500/10",
-    iconColor: "text-amber-400",
-  },
-  {
-    icon: (
-      <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-      </svg>
-    ),
-    title: "Keamanan Terjamin",
-    description:
-      "Enkripsi end-to-end, autentikasi 2 faktor, dan compliance standar keamanan industri. Data bisnis Anda aman bersama kami.",
+      "Pantau progres tugas, nilai pekerjaan, invoice outstanding, payment link, dan cashflow dari dashboard laporan yang selalu update.",
     gradient: "from-cyan-500/20 to-blue-500/20",
     iconBg: "bg-cyan-500/10",
     iconColor: "text-cyan-400",
@@ -147,8 +147,8 @@ export default function FeaturesSection() {
             <span className="text-gradient-red">dalam Satu Platform</span>
           </h2>
           <p className="text-base md:text-lg text-white/50 leading-relaxed">
-            Dari pembuatan invoice hingga pelacakan pembayaran, InvoiceQu menyediakan
-            semua tools yang Anda butuhkan untuk mengelola keuangan bisnis.
+            Dari pekerjaan harian hingga invoice yang siap dibayar, InvoiceQu menyediakan
+            tools yang Anda butuhkan untuk mengelola workflow bisnis jasa.
           </p>
         </div>
 

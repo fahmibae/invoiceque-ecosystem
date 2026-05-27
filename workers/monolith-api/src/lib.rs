@@ -12,19 +12,25 @@
 
 mod db;
 mod middleware;
-mod utils;
 mod services;
+mod utils;
 
 use worker::*;
 
 #[event(fetch)]
 async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
-    let allowed_origins = env.var("ALLOWED_ORIGINS")
+    let allowed_origins = env
+        .var("ALLOWED_ORIGINS")
         .map(|v| v.to_string())
         .unwrap_or_else(|_| "*".into());
 
     // Extract Origin header BEFORE request is consumed
-    let origin = req.headers().get("Origin").ok().flatten().unwrap_or_default();
+    let origin = req
+        .headers()
+        .get("Origin")
+        .ok()
+        .flatten()
+        .unwrap_or_default();
 
     // Handle CORS preflight for all routes
     if req.method() == Method::Options {
@@ -39,9 +45,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
     let result = route(req, &env, &path, method).await;
 
     match result {
-        Ok(resp) => {
-            middleware::with_cors_origin(resp, &origin, &allowed_origins)
-        }
+        Ok(resp) => middleware::with_cors_origin(resp, &origin, &allowed_origins),
         Err(e) => {
             let error_resp = utils::json_error(&format!("Internal error: {}", e), 500)?;
             middleware::with_cors_origin(error_resp, &origin, &allowed_origins)
@@ -49,16 +53,195 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
     }
 }
 
-async fn route(req: Request, env: &Env, path: &str, method: Method) -> Result<Response> {
+#[event(scheduled)]
+async fn scheduled(event: ScheduledEvent, env: Env, _ctx: ScheduleContext) {
+    console_log!("[CRON] Running scheduled jobs for trigger {}", event.cron());
+
+    match services::subscription::send_due_renewal_reminders(&env).await {
+        Ok(summary) => console_log!(
+            "[CRON] Subscription renewal reminders complete: checked={}, sent={}, skipped={}, failed={}",
+            summary.checked,
+            summary.sent,
+            summary.skipped,
+            summary.failed
+        ),
+        Err(err) => console_log!("[CRON] Subscription renewal reminder job failed: {}", err),
+    }
+
+    match services::subscription::enforce_expired_subscriptions(&env).await {
+        Ok(summary) => console_log!(
+            "[CRON] Expired subscription enforcement complete: checked={}, downgraded={}, skipped={}, failed={}",
+            summary.checked,
+            summary.downgraded,
+            summary.skipped,
+            summary.failed
+        ),
+        Err(err) => console_log!("[CRON] Expired subscription enforcement failed: {}", err),
+    }
+
+    match services::invoice::send_due_invoice_reminders(&env).await {
+        Ok(summary) => console_log!(
+            "[CRON] Invoice due reminders complete: checked={}, sent={}, skipped={}, failed={}",
+            summary.checked,
+            summary.sent,
+            summary.skipped,
+            summary.failed
+        ),
+        Err(err) => console_log!("[CRON] Invoice due reminder job failed: {}", err),
+    }
+
+    match services::payment::send_due_payment_link_reminders(&env).await {
+        Ok(summary) => console_log!(
+            "[CRON] Payment link due reminders complete: checked={}, sent={}, skipped={}, failed={}",
+            summary.checked,
+            summary.sent,
+            summary.skipped,
+            summary.failed
+        ),
+        Err(err) => console_log!("[CRON] Payment link due reminder job failed: {}", err),
+    }
+
+    match services::chaser::process_scheduled_chasers(&env).await {
+        Ok(summary) => console_log!(
+            "[CRON] Payment chasers complete: checked={}, sent={}, skipped={}, failed={}, auto_completed={}",
+            summary.checked,
+            summary.sent,
+            summary.skipped,
+            summary.failed,
+            summary.completed
+        ),
+        Err(err) => console_log!("[CRON] Payment chaser job failed: {}", err),
+    }
+}
+
+async fn route(mut req: Request, env: &Env, path: &str, method: Method) -> Result<Response> {
     let jwt_secret = utils::get_secret(env, "JWT_SECRET");
 
     // ── Health check ──
     if path == "/health" || path == "/api/v1/health" {
-        return utils::json_response(&serde_json::json!({
-            "status": "healthy",
-            "service": "invoicequ-monolith-worker",
-            "version": "1.0.0",
-        }), 200);
+        return utils::json_response(
+            &serde_json::json!({
+                "status": "healthy",
+                "service": "invoicequ-monolith-worker",
+                "version": "1.0.0",
+            }),
+            200,
+        );
+    }
+
+    // ── Temporary DB debug endpoint (remove after fixing) ──
+    if path == "/api/v1/debug/toolkit-db" {
+        let url_raw = utils::get_secret(env, "TASK_DB_URL");
+        let url = url_raw.trim().to_string();
+        if url.is_empty() {
+            return utils::json_response(
+                &serde_json::json!({"error": "TASK_DB_URL is empty"}),
+                500,
+            );
+        }
+
+        let db = match db::NeonClient::from_connection_string(&url) {
+            Ok(db) => db,
+            Err(e) => {
+                return utils::json_response(
+                    &serde_json::json!({"error": format!("DB parse error: {}", e)}),
+                    500,
+                );
+            }
+        };
+
+        // Test SELECT 1
+        if let Err(e) = db.execute("SELECT 1", &[]).await {
+            return utils::json_response(
+                &serde_json::json!({"error": format!("SELECT 1 failed: {}", e)}),
+                500,
+            );
+        }
+
+        // Test ensure_table (base create)
+        if let Err(e) = db.execute(
+            "CREATE TABLE IF NOT EXISTS toolkit_items (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID NOT NULL,
+                toolkit_type VARCHAR(50) NOT NULL DEFAULT 'snippet',
+                title VARCHAR(500) NOT NULL DEFAULT '',
+                content JSONB DEFAULT '{}',
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            )",
+            &[],
+        ).await {
+            return utils::json_response(
+                &serde_json::json!({"error": format!("Table create error: {}", e)}),
+                500,
+            );
+        }
+
+        // Run column migrations
+        let migrations = [
+            "ALTER TABLE toolkit_items ADD COLUMN IF NOT EXISTS project_id UUID",
+            "ALTER TABLE toolkit_items ADD COLUMN IF NOT EXISTS client_id UUID",
+            "ALTER TABLE toolkit_items ADD COLUMN IF NOT EXISTS language VARCHAR(50) DEFAULT ''",
+            "ALTER TABLE toolkit_items ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}'",
+            "ALTER TABLE toolkit_items ADD COLUMN IF NOT EXISTS is_favorited BOOLEAN DEFAULT false",
+            "ALTER TABLE toolkit_items ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0",
+        ];
+        let mut migration_results = Vec::new();
+        for sql in &migrations {
+            match db.execute(sql, &[]).await {
+                Ok(_) => migration_results.push(serde_json::json!({"sql": sql, "ok": true})),
+                Err(e) => migration_results.push(serde_json::json!({"sql": sql, "ok": false, "error": format!("{}", e)})),
+            }
+        }
+
+        // Test COUNT query
+        let count_result: Result<i64, _> = db.query_scalar(
+            "SELECT COUNT(*) FROM toolkit_items",
+            &[],
+        ).await;
+        let count = match &count_result {
+            Ok(c) => *c,
+            Err(_) => -1,
+        };
+
+        // Test raw query to see what Neon returns for the columns
+        let raw_result = db.query(
+            "SELECT id::text, user_id::text, toolkit_type, project_id::text, client_id::text, title, content, language, tags, is_favorited, sort_order, created_at::text, updated_at::text FROM toolkit_items LIMIT 1",
+            &[],
+        ).await;
+
+        let raw_info = match &raw_result {
+            Ok(r) => {
+                let field_info: Vec<serde_json::Value> = r.fields.iter().map(|f| {
+                    serde_json::json!({"name": f.name, "dataTypeID": f.data_type_id})
+                }).collect();
+                let first_row = r.rows.first().cloned();
+                serde_json::json!({"fields": field_info, "first_row": first_row, "row_count": r.rows.len()})
+            }
+            Err(e) => serde_json::json!({"error": format!("Raw query error: {}", e)}),
+        };
+
+        // Test typed deserialization
+        let typed_result: Result<Vec<services::toolkit::ToolkitItem>, _> = db.query_typed(
+            "SELECT id::text, user_id::text, toolkit_type, project_id::text, client_id::text, title, content, language, tags, is_favorited, sort_order, created_at::text, updated_at::text FROM toolkit_items LIMIT 1",
+            &[],
+        ).await;
+        let typed_info = match &typed_result {
+            Ok(items) => serde_json::json!({"ok": true, "count": items.len()}),
+            Err(e) => serde_json::json!({"ok": false, "error": format!("{}", e)}),
+        };
+
+        return utils::json_response(
+            &serde_json::json!({
+                "status": "debug",
+                "db_connected": true,
+                "table_ready": true,
+                "row_count": count,
+                "raw_query": raw_info,
+                "typed_query": typed_info,
+            }),
+            200,
+        );
     }
 
     // ══════════════════════════════════════════════════════════
@@ -66,11 +249,26 @@ async fn route(req: Request, env: &Env, path: &str, method: Method) -> Result<Re
     // ══════════════════════════════════════════════════════════
 
     // ── Auth public routes ──
+    if path == "/api/v1/auth/register-checkout" && method == Method::Post {
+        return services::auth::register_checkout(req, env).await;
+    }
     if path == "/api/v1/auth/register" && method == Method::Post {
         return services::auth::register(req, env).await;
     }
     if path == "/api/v1/auth/login" && method == Method::Post {
         return services::auth::login(req, env).await;
+    }
+    if path == "/api/v1/auth/verify-email" && method == Method::Post {
+        return services::auth::verify_email(req, env).await;
+    }
+    if path == "/api/v1/auth/resend-verification" && method == Method::Post {
+        return services::auth::resend_verification(req, env).await;
+    }
+    if path == "/api/v1/auth/forgot-password" && method == Method::Post {
+        return services::auth::forgot_password(req, env).await;
+    }
+    if path == "/api/v1/auth/reset-password" && method == Method::Post {
+        return services::auth::reset_password(req, env).await;
     }
     if path == "/api/v1/auth/google" && method == Method::Post {
         return services::auth::google_login(req, env).await;
@@ -134,6 +332,30 @@ async fn route(req: Request, env: &Env, path: &str, method: Method) -> Result<Re
     if let Some(uid) = strip_prefix(path, "/api/v1/internal/users/") {
         if method == Method::Get {
             return services::auth::get_user_by_id(&req, env, uid).await;
+        }
+    }
+
+    // ── Public quotation routes ──
+    if let Some(token) = strip_prefix(path, "/api/v1/quote/") {
+        let parts: Vec<&str> = token.split('/').collect();
+        if parts.len() == 1 && method == Method::Get {
+            return services::quotation::get_public(&env, parts[0]).await;
+        }
+        if parts.len() == 2 && parts[1] == "accept" && method == Method::Post {
+            return services::quotation::accept_quotation(&env, parts[0]).await;
+        }
+        if parts.len() == 2 && parts[1] == "reject" && method == Method::Post {
+            return services::quotation::reject_quotation(&env, parts[0]).await;
+        }
+    }
+
+    // ── Public portal route ──
+    if let Some(token) = strip_prefix(path, "/api/v1/portal/") {
+        // Exclude management subpaths handled by protected routes below
+        let is_management =
+            token == "links" || token.starts_with("generate/") || token.starts_with("revoke/");
+        if !is_management && !token.contains('/') && method == Method::Get {
+            return services::portal::get_portal(&env, token).await;
         }
     }
 
@@ -224,7 +446,10 @@ async fn route(req: Request, env: &Env, path: &str, method: Method) -> Result<Re
         if parts.len() == 2 && parts[1] == "pdf" && method == Method::Get {
             // PDF generation is not available in WASM — return a JSON stub
             // Frontend can use client-side PDF libs (jsPDF, html2pdf) instead
-            return utils::json_error("PDF generation not available in Worker mode. Use client-side rendering.", 501);
+            return utils::json_error(
+                "PDF generation not available in Worker mode. Use client-side rendering.",
+                501,
+            );
         }
     }
 
@@ -234,6 +459,97 @@ async fn route(req: Request, env: &Env, path: &str, method: Method) -> Result<Re
     }
     if path == "/api/v1/dashboard/revenue-chart" && method == Method::Get {
         return services::invoice::get_revenue_chart(&req, env, &claims).await;
+    }
+    if path == "/api/v1/dashboard/health-score" && method == Method::Get {
+        return services::health::get_health_score(env, &claims).await;
+    }
+
+    // ── Quotation routes ──
+    if path == "/api/v1/quotations" {
+        return match method {
+            Method::Get => services::quotation::list(&req, env, &claims).await,
+            Method::Post => services::quotation::create(req, env, &claims).await,
+            _ => utils::json_error("Method not allowed", 405),
+        };
+    }
+    if path == "/api/v1/quotations/stats" && method == Method::Get {
+        return services::quotation::stats(env, &claims).await;
+    }
+    if path == "/api/v1/quotations/bulk-delete" && method == Method::Post {
+        return services::quotation::bulk_delete(req, env, &claims).await;
+    }
+    if let Some(rest) = strip_prefix(path, "/api/v1/quotations/") {
+        let parts: Vec<&str> = rest.split('/').collect();
+        let id = parts[0];
+        if parts.len() == 1 {
+            return match method {
+                Method::Get => services::quotation::get(env, &claims, id).await,
+                Method::Put => services::quotation::update(req, env, &claims, id).await,
+                Method::Delete => services::quotation::delete(env, &claims, id).await,
+                _ => utils::json_error("Method not allowed", 405),
+            };
+        }
+        if parts.len() == 2 && parts[1] == "send" && method == Method::Put {
+            return services::quotation::send_quotation(env, &claims, id).await;
+        }
+        if parts.len() == 2 && parts[1] == "convert" && method == Method::Post {
+            return services::quotation::convert_to_invoice(env, &claims, id).await;
+        }
+    }
+
+    // ── Payment Chaser routes ──
+    if path == "/api/v1/chasers" {
+        return match method {
+            Method::Get => services::chaser::list(&req, env, &claims).await,
+            Method::Post => services::chaser::create(req, env, &claims).await,
+            _ => utils::json_error("Method not allowed", 405),
+        };
+    }
+    if path == "/api/v1/chasers/stats" && method == Method::Get {
+        return services::chaser::stats(env, &claims).await;
+    }
+    if path == "/api/v1/chasers/bulk-delete" && method == Method::Post {
+        return services::chaser::bulk_delete(req, env, &claims).await;
+    }
+    if let Some(rest) = strip_prefix(path, "/api/v1/chasers/") {
+        let parts: Vec<&str> = rest.split('/').collect();
+        let id = parts[0];
+        if parts.len() == 1 && method == Method::Delete {
+            return services::chaser::delete(env, &claims, id).await;
+        }
+        if parts.len() == 2 && parts[1] == "toggle" && method == Method::Put {
+            return services::chaser::toggle_status(env, &claims, id).await;
+        }
+        if parts.len() == 2 && parts[1] == "send" && method == Method::Post {
+            return services::chaser::send_reminder(env, &claims, id).await;
+        }
+        if parts.len() == 2 && parts[1] == "logs" && method == Method::Get {
+            return services::chaser::get_logs(env, &claims, id).await;
+        }
+    }
+
+    // ── Portal management routes (protected) ──
+    if path == "/api/v1/portal/links" && method == Method::Get {
+        return services::portal::list_portal_links(env, &claims).await;
+    }
+    if path == "/api/v1/portal/bulk-delete" && method == Method::Post {
+        return services::portal::bulk_delete(req, env, &claims).await;
+    }
+    if let Some(client_id) = strip_prefix(path, "/api/v1/portal/generate/") {
+        if method == Method::Post {
+            return services::portal::generate_portal_link(env, &claims, client_id).await;
+        }
+    }
+    if let Some(client_id) = strip_prefix(path, "/api/v1/portal/revoke/") {
+        if method == Method::Delete {
+            return services::portal::revoke_portal_link(env, &claims, client_id).await;
+        }
+    }
+    if let Some(client_id) = strip_prefix(path, "/api/v1/portal/update/") {
+        if method == Method::Put {
+            let body = req.text().await.unwrap_or_default();
+            return services::portal::update_portal_link(env, &claims, client_id, &body).await;
+        }
     }
 
     // ── Invoice settings routes ──
@@ -272,8 +588,12 @@ async fn route(req: Request, env: &Env, path: &str, method: Method) -> Result<Re
     if path == "/api/v1/payments/xendit/setup" && method == Method::Post {
         return services::payment::xendit_setup(req, env, &claims).await;
     }
-    if path == "/api/v1/payments/xendit/account" && method == Method::Get {
-        return services::payment::xendit_get_account(env, &claims).await;
+    if path == "/api/v1/payments/xendit/account" {
+        return match method {
+            Method::Get => services::payment::xendit_get_account(env, &claims).await,
+            Method::Delete => services::payment::xendit_delete_account(env, &claims).await,
+            _ => utils::json_error("Method not allowed", 405),
+        };
     }
     if let Some(order_id) = strip_prefix(path, "/api/v1/payments/paypal/capture/") {
         if method == Method::Post {
@@ -300,10 +620,22 @@ async fn route(req: Request, env: &Env, path: &str, method: Method) -> Result<Re
     if path == "/api/v1/notifications" && method == Method::Get {
         return services::notification::list_notifications(&req, env, &claims).await;
     }
+    if path == "/api/v1/notifications" && method == Method::Delete {
+        return services::notification::delete_all_notifications(env, &claims).await;
+    }
+    if path == "/api/v1/notifications/read-all" && method == Method::Put {
+        return services::notification::mark_all_as_read(env, &claims).await;
+    }
+    if path == "/api/v1/notifications/delete-batch" && method == Method::Post {
+        return services::notification::delete_batch_notifications(&mut req, env, &claims).await;
+    }
     if let Some(rest) = strip_prefix(path, "/api/v1/notifications/") {
         if rest.ends_with("/read") && method == Method::Put {
             let id = rest.trim_end_matches("/read");
             return services::notification::mark_as_read(env, &claims, id).await;
+        }
+        if !rest.contains('/') && method == Method::Delete {
+            return services::notification::delete_notification(env, &claims, rest).await;
         }
     }
 
@@ -323,6 +655,9 @@ async fn route(req: Request, env: &Env, path: &str, method: Method) -> Result<Re
     if path == "/api/v1/subscriptions/usage/increment" && method == Method::Post {
         return services::subscription::increment_usage(req, env, &claims).await;
     }
+    if path == "/api/v1/subscriptions/upgrade-recommendation" && method == Method::Post {
+        return services::subscription::send_upgrade_recommendation(req, env, &claims).await;
+    }
     if path == "/api/v1/subscriptions/checkout" && method == Method::Post {
         return services::subscription::create_checkout(req, env, &claims).await;
     }
@@ -335,6 +670,132 @@ async fn route(req: Request, env: &Env, path: &str, method: Method) -> Result<Re
     if let Some(rest) = strip_prefix(path, "/api/v1/subscriptions/plans/") {
         if method == Method::Put {
             return services::subscription::update_plan(req, env, &claims, rest).await;
+        }
+    }
+
+    // ── Task routes ──
+    if path == "/api/v1/tasks" {
+        return match method {
+            Method::Get => services::task::list_tasks(&req, env, &claims).await,
+            Method::Post => services::task::create_task(req, env, &claims).await,
+            _ => utils::json_error("Method not allowed", 405),
+        };
+    }
+    if path == "/api/v1/tasks/stats" && method == Method::Get {
+        return services::task::task_stats(env, &claims).await;
+    }
+    if path == "/api/v1/tasks/bulk-delete" && method == Method::Post {
+        return services::task::bulk_delete_tasks(req, env, &claims).await;
+    }
+    if let Some(id) = strip_prefix(path, "/api/v1/tasks/") {
+        if !id.contains('/') {
+            return match method {
+                Method::Get => services::task::get_task(env, &claims, id).await,
+                Method::Put => services::task::update_task(req, env, &claims, id).await,
+                Method::Delete => services::task::delete_task(env, &claims, id).await,
+                _ => utils::json_error("Method not allowed", 405),
+            };
+        }
+    }
+
+    // ── Project routes ──
+    if path == "/api/v1/projects" {
+        return match method {
+            Method::Get => services::task::list_projects(&req, env, &claims).await,
+            Method::Post => services::task::create_project(req, env, &claims).await,
+            _ => utils::json_error("Method not allowed", 405),
+        };
+    }
+    if let Some(id) = strip_prefix(path, "/api/v1/projects/") {
+        if !id.contains('/') {
+            return match method {
+                Method::Get => services::task::get_project(env, &claims, id).await,
+                Method::Put => services::task::update_project(req, env, &claims, id).await,
+                Method::Delete => services::task::delete_project(env, &claims, id).await,
+                _ => utils::json_error("Method not allowed", 405),
+            };
+        }
+    }
+
+    // ── Time Entry routes ──
+    if path == "/api/v1/time-entries" {
+        return match method {
+            Method::Get => services::task::list_time_entries(&req, env, &claims).await,
+            Method::Post => services::task::create_time_entry(req, env, &claims).await,
+            _ => utils::json_error("Method not allowed", 405),
+        };
+    }
+    if path == "/api/v1/time-entries/stats" && method == Method::Get {
+        return services::task::time_entry_stats(env, &claims).await;
+    }
+    if let Some(id) = strip_prefix(path, "/api/v1/time-entries/") {
+        if !id.contains('/') && method == Method::Delete {
+            return services::task::delete_time_entry(env, &claims, id).await;
+        }
+    }
+
+    // ── Expense routes ──
+    if path == "/api/v1/expenses" {
+        return match method {
+            Method::Get => services::expense::list_expenses(&req, env, &claims).await,
+            Method::Post => services::expense::create_expense(req, env, &claims).await,
+            _ => utils::json_error("Method not allowed", 405),
+        };
+    }
+    if path == "/api/v1/expenses/stats" && method == Method::Get {
+        return services::expense::expense_stats(&req, env, &claims).await;
+    }
+    if path == "/api/v1/expenses/categories" && method == Method::Get {
+        return services::expense::expense_categories().await;
+    }
+    if path == "/api/v1/expenses/bulk-delete" && method == Method::Post {
+        return services::expense::bulk_delete_expenses(req, env, &claims).await;
+    }
+    if let Some(id) = strip_prefix(path, "/api/v1/expenses/") {
+        if !id.contains('/') {
+            return match method {
+                Method::Get => services::expense::get_expense(env, &claims, id).await,
+                Method::Put => services::expense::update_expense(req, env, &claims, id).await,
+                Method::Delete => services::expense::delete_expense(env, &claims, id).await,
+                _ => utils::json_error("Method not allowed", 405),
+            };
+        }
+    }
+
+    // ── Toolkit routes ──
+    if path == "/api/v1/toolkit" {
+        let result = match method {
+            Method::Get => services::toolkit::list_items(&req, env, &claims).await,
+            Method::Post => services::toolkit::create_item(req, env, &claims).await,
+            _ => utils::json_error("Method not allowed", 405),
+        };
+        return match result {
+            Ok(r) => Ok(r),
+            Err(e) => utils::json_error(&format!("Toolkit error: {}", e), 500),
+        };
+    }
+    if path == "/api/v1/toolkit/stats" && method == Method::Get {
+        let result = services::toolkit::toolkit_stats(env, &claims).await;
+        return match result {
+            Ok(r) => Ok(r),
+            Err(e) => utils::json_error(&format!("Toolkit stats error: {}", e), 500),
+        };
+    }
+    if path == "/api/v1/toolkit/bulk-delete" && method == Method::Post {
+        return services::toolkit::bulk_delete_items(req, env, &claims).await;
+    }
+    if let Some(id) = strip_prefix(path, "/api/v1/toolkit/") {
+        if !id.contains('/') {
+            let result = match method {
+                Method::Get => services::toolkit::get_item(env, &claims, id).await,
+                Method::Put => services::toolkit::update_item(req, env, &claims, id).await,
+                Method::Delete => services::toolkit::delete_item(env, &claims, id).await,
+                _ => utils::json_error("Method not allowed", 405),
+            };
+            return match result {
+                Ok(r) => Ok(r),
+                Err(e) => utils::json_error(&format!("Toolkit item error: {}", e), 500),
+            };
         }
     }
 

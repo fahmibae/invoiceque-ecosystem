@@ -15,6 +15,8 @@ services:
         value: info
       - key: ALLOWED_ORIGINS
         value: "https://app.invoicequ.my.id,https://invoicequ.my.id,http://localhost:3000"
+      - key: FRONTEND_URL
+        value: "https://app.invoicequ.my.id"
       # ── Secrets (set in Render dashboard) ──
       - key: JWT_SECRET
         sync: false

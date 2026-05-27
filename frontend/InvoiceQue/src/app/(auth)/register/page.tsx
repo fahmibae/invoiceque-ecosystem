@@ -4,11 +4,11 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { ViewIcon, ViewOffSlashIcon } from 'hugeicons-react';
+import { authApi } from '@/lib/api';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
-import { Rocket01Icon, CreditCardIcon, LockIcon, GlobeIcon, GoogleIcon } from 'hugeicons-react';
-import { useGoogleLogin } from '@react-oauth/google';
+import { Rocket01Icon, CreditCardIcon, LockIcon, GlobeIcon, TaskDaily01Icon } from 'hugeicons-react';
+import { useGoogleLogin, type TokenResponse } from '@react-oauth/google';
 
 export default function RegisterPage() {
   const [name, setName] = useState('');
@@ -18,11 +18,14 @@ export default function RegisterPage() {
   const [company, setCompany] = useState('');
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [registeredEmail, setRegisteredEmail] = useState('');
+  const [resending, setResending] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { register, googleLogin } = useAuth();
 
-  const handleGoogleSuccess = async (tokenResponse: any) => {
+  const handleGoogleSuccess = async (tokenResponse: Omit<TokenResponse, 'error' | 'error_description' | 'error_uri'>) => {
     try {
       setLoading(true);
       await googleLogin(tokenResponse.access_token);
@@ -41,6 +44,7 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
 
     if (password !== confirmPassword) {
       setError('Password dan konfirmasi password tidak cocok.');
@@ -49,12 +53,34 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      await register(name, email, password, company || undefined, phone || undefined);
-      router.push('/');
+      const res = await register(name, email, password, company || undefined, phone || undefined);
+      setRegisteredEmail(res.email || email);
+      setSuccess(res.message || 'Pendaftaran berhasil. Silakan cek email untuk verifikasi akun.');
+      setPassword('');
+      setConfirmPassword('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registrasi gagal. Silakan coba lagi.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    const targetEmail = registeredEmail || email;
+    if (!targetEmail) {
+      setError('Masukkan email terlebih dahulu.');
+      return;
+    }
+
+    setError('');
+    setResending(true);
+    try {
+      const res = await authApi.resendVerification(targetEmail);
+      setSuccess(res.message || 'Email verifikasi sudah dikirim ulang.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal mengirim ulang email verifikasi.');
+    } finally {
+      setResending(false);
     }
   };
 
@@ -81,6 +107,7 @@ export default function RegisterPage() {
             <div className="text-sm font-medium opacity-90 py-2 flex items-center gap-2"><CreditCardIcon className="size-5" /> Gratis untuk 10 invoice</div>
             <div className="text-sm font-medium opacity-90 py-2 flex items-center gap-2"><LockIcon className="size-5" /> Keamanan terjamin</div>
             <div className="text-sm font-medium opacity-90 py-2 flex items-center gap-2"><GlobeIcon className="size-5" /> Akses dari mana saja</div>
+            <div className="text-sm font-medium opacity-90 py-2 flex items-center gap-2"><TaskDaily01Icon className="size-5" /> Manajemen Tugas Freelancer Profesional</div>
           </div>
         </div>
         <div className="absolute inset-0 pointer-events-none">
@@ -116,6 +143,24 @@ export default function RegisterPage() {
           {error && (
             <div className="p-3 px-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-500 text-sm mb-4">
               {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-700 dark:text-emerald-400 text-sm mb-4">
+              <div className="font-semibold mb-1">Cek email Anda</div>
+              <p className="leading-relaxed">{success}</p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleResendVerification}
+                  disabled={resending}
+                >
+                  {resending ? 'Mengirim...' : 'Kirim Ulang'}
+                </button>
+                <Link href="/login" className="btn btn-primary btn-sm">Ke Login</Link>
+              </div>
             </div>
           )}
 
@@ -201,7 +246,7 @@ export default function RegisterPage() {
             </div>
 
             <button type="button" onClick={() => loginWithGoogle()} className="btn btn-secondary btn-lg w-full mb-6">
-              <span><GoogleIcon size={18} /></span> Daftar dengan Google
+              <span className="flex items-center justify-center gap-2"><img src="/images/icons8-google.svg" alt="Google" className="w-[32px] h-[32px]" /> Daftar dengan Google</span>
             </button>
           </form>
 

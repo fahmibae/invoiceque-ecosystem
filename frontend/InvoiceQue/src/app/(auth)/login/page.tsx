@@ -1,22 +1,36 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { authApi } from '@/lib/api';
 import { ViewIcon, ViewOffSlashIcon, GoogleIcon, CheckmarkBadge01Icon } from 'hugeicons-react';
-import { useGoogleLogin } from '@react-oauth/google';
+import { useGoogleLogin, type TokenResponse } from '@react-oauth/google';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [canResendVerification, setCanResendVerification] = useState(false);
+  const [resending, setResending] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { login, googleLogin } = useAuth();
 
-  const handleGoogleSuccess = async (tokenResponse: any) => {
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get('verified') === '1') {
+      setSuccess('Email berhasil diverifikasi. Silakan login.');
+    }
+    if (searchParams.get('reset') === '1') {
+      setSuccess('Password berhasil direset. Silakan login dengan password baru.');
+    }
+  }, []);
+
+  const handleGoogleSuccess = async (tokenResponse: Omit<TokenResponse, 'error' | 'error_description' | 'error_uri'>) => {
     try {
       setLoading(true);
       await googleLogin(tokenResponse.access_token);
@@ -35,14 +49,37 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
+    setCanResendVerification(false);
     setLoading(true);
     try {
       await login(email, password);
       router.push('/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login gagal. Silakan coba lagi.');
+      const message = err instanceof Error ? err.message : 'Login gagal. Silakan coba lagi.';
+      setError(message);
+      setCanResendVerification(message.toLowerCase().includes('verifikasi') || message.toLowerCase().includes('verified'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!email) {
+      setError('Masukkan email terlebih dahulu.');
+      return;
+    }
+
+    setResending(true);
+    setError('');
+    try {
+      const res = await authApi.resendVerification(email);
+      setSuccess(res.message || 'Email verifikasi sudah dikirim ulang.');
+      setCanResendVerification(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal mengirim ulang email verifikasi.');
+    } finally {
+      setResending(false);
     }
   };
 
@@ -61,14 +98,14 @@ export default function LoginPage() {
             Kelola Invoice &<br />Payment Link<br />dengan <span className="bg-gradient-to-br from-red-300 to-white bg-clip-text text-transparent">Mudah</span>
           </h1>
           <p className="text-base max-sm:text-sm opacity-85 leading-[1.7] mb-7">
-            Platform SaaS modern untuk membuat invoice profesional,
-            mengirim payment link, dan melacak pembayaran secara real-time.
+            Platform SaaS modern untuk membuat invoice profesional, mengirim payment link, melacak pembayaran secara real-time, dan terdapat manajemen tugas freelancer profesional.
           </p>
           <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-2.5">
             <div className="flex items-center gap-2.5 text-sm font-medium opacity-90 py-2"><CheckmarkBadge01Icon size={18} /> Invoice Otomatis</div>
             <div className="flex items-center gap-2.5 text-sm font-medium opacity-90 py-2"><CheckmarkBadge01Icon size={18} /> Payment Link Instan</div>
             <div className="flex items-center gap-2.5 text-sm font-medium opacity-90 py-2"><CheckmarkBadge01Icon size={18} /> Laporan Real-time</div>
             <div className="flex items-center gap-2.5 text-sm font-medium opacity-90 py-2"><CheckmarkBadge01Icon size={18} /> Multi-device Support</div>
+            <div className="flex items-center gap-2.5 text-sm font-medium opacity-90 py-2"><CheckmarkBadge01Icon size={18} /> Manajemen Tugas Freelancer Profesional</div>
           </div>
         </div>
         <div className="absolute inset-0 pointer-events-none">
@@ -104,6 +141,22 @@ export default function LoginPage() {
           {error && (
             <div className="p-3 px-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-500 text-sm mb-4">
               {error}
+              {canResendVerification && (
+                <button
+                  type="button"
+                  className="block mt-3 text-red-600 font-semibold underline"
+                  onClick={handleResendVerification}
+                  disabled={resending}
+                >
+                  {resending ? 'Mengirim ulang...' : 'Kirim ulang email verifikasi'}
+                </button>
+              )}
+            </div>
+          )}
+
+          {success && (
+            <div className="p-3 px-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-700 dark:text-emerald-400 text-sm mb-4">
+              {success}
             </div>
           )}
 
@@ -122,7 +175,7 @@ export default function LoginPage() {
             <div className="form-group">
               <label className="form-label flex justify-between">
                 <span>Password</span>
-                <a href="#" className="text-[13px] text-red-600 no-underline font-medium hover:underline">Lupa password?</a>
+                <Link href="/forgot-password" className="text-[13px] text-red-600 no-underline font-medium hover:underline">Lupa password?</Link>
               </label>
               <div className="relative">
                 <input
@@ -157,7 +210,7 @@ export default function LoginPage() {
             </div>
 
             <button type="button" onClick={() => loginWithGoogle()} className="btn btn-secondary btn-lg w-full mb-6">
-              <span><GoogleIcon size={18} /></span> Masuk dengan Google
+              <span className="flex items-center justify-center gap-2"><img src="/images/icons8-google.svg" alt="Google" className="w-[32px] h-[32px]" /></span> Masuk dengan Google
             </button>
           </form>
 

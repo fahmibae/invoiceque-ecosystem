@@ -22,6 +22,11 @@ interface PaymentInfo {
   status: string;
 }
 
+const isCompletedStatus = (value?: string) => {
+  const status = value?.toLowerCase();
+  return status === 'completed' || status === 'paid';
+};
+
 export default function PayPalReturnPage() {
   const params = useParams();
   const [status, setStatus] = useState<PaymentStatus>('processing');
@@ -74,16 +79,18 @@ export default function PayPalReturnPage() {
           setT(getPaymentTranslations(detected));
 
           // If already completed (e.g., by webhook), show success immediately
-          if (data.status === 'completed') {
+          if (isCompletedStatus(data.status)) {
             setStatus('success');
             return;
           }
         }
 
         // Step 2: Call the public capture endpoint to capture the PayPal order
+        const orderId = new URL(window.location.href).searchParams.get('token');
         const captureRes = await fetch(`${API_BASE}/pay-capture/${params.id}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orderId ? { order_id: orderId } : {}),
         });
 
         const captureData = await captureRes.json();
@@ -107,6 +114,15 @@ export default function PayPalReturnPage() {
           await pollForCompletion();
         } else {
           // Capture failed — show error
+          const statusRes = await fetch(`${API_BASE}/pay-status/${params.id}`);
+          if (statusRes.ok) {
+            const statusData = await statusRes.json();
+            if (isCompletedStatus(statusData.status)) {
+              setStatus('success');
+              return;
+            }
+          }
+
           setErrorMessage(captureData.error || t.failedToProcess);
           setStatus('error');
         }
@@ -133,7 +149,7 @@ export default function PayPalReturnPage() {
               status: data.status,
             });
 
-            if (data.status === 'completed') {
+            if (isCompletedStatus(data.status)) {
               setStatus('success');
               return;
             }
@@ -162,7 +178,7 @@ export default function PayPalReturnPage() {
     };
 
     captureAndVerify();
-  }, [params.id]);
+  }, [params.id, t.connectionFailed, t.failedToProcess]);
 
   const LanguageSwitcher = () => (
     <div className="relative">

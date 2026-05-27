@@ -5,35 +5,28 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { paymentLinkApi, paypalApi, xenditApi, invoiceApi, type CreatePaymentLinkRequest, type Invoice, invoiceSettingsApi, type InvoiceSettingsData } from '@/lib/api';
 import { GoogleDocIcon, Settings01Icon, Invoice01Icon, AlertCircleIcon, ArrowLeft02Icon, CreditCardIcon, Atm02Icon, Alert02Icon } from 'hugeicons-react';
+import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
+import FeatureLimitLock from '@/components/subscription/FeatureLimitLock';
+import CurrencySelect from '@/components/ui/CurrencySelect';
+import { getCurrencyInfo, getCurrencyProviderWarning, XENDIT_SUPPORTED_CURRENCIES, PAYPAL_SUPPORTED_CURRENCIES } from '@/lib/currencies';
 
-const CURRENCIES = [
-  { code: 'IDR', symbol: 'Rp', name: 'Indonesian Rupiah' },
-  { code: 'USD', symbol: '$', name: 'US Dollar' },
-  { code: 'EUR', symbol: '€', name: 'Euro' },
-  { code: 'GBP', symbol: '£', name: 'British Pound' },
-  { code: 'SGD', symbol: 'S$', name: 'Singapore Dollar' },
-  { code: 'MYR', symbol: 'RM', name: 'Malaysian Ringgit' },
-  { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
-  { code: 'JPY', symbol: '¥', name: 'Japanese Yen' },
-];
-
-function formatCurrency(amount: number, currency: string) {
-  return new Intl.NumberFormat(currency === 'IDR' ? 'id-ID' : 'en-US', {
+function formatPaymentCurrency(amount: number, currencyCode: string) {
+  return new Intl.NumberFormat(currencyCode === 'IDR' ? 'id-ID' : 'en-US', {
     style: 'currency',
-    currency,
-    minimumFractionDigits: currency === 'IDR' || currency === 'JPY' ? 0 : 2,
+    currency: currencyCode,
+    minimumFractionDigits: currencyCode === 'IDR' || currencyCode === 'JPY' ? 0 : 2,
   }).format(amount);
 }
 
 /** Determines label for the invoice's outstanding amount */
 function getInvoiceAmountLabel(inv: Invoice): string {
   if (inv.payment_type === 'dp' && inv.amount_remaining > 0 && inv.amount_paid > 0) {
-    return `Sisa: ${formatCurrency(inv.amount_remaining, 'IDR')}`;
+    return `Sisa: ${formatPaymentCurrency(inv.amount_remaining, 'IDR')}`;
   }
   if (inv.payment_type === 'dp' && inv.amount_paid === 0) {
-    return `DP: ${formatCurrency(inv.dp_amount, 'IDR')}`;
+    return `DP: ${formatPaymentCurrency(inv.dp_amount, 'IDR')}`;
   }
-  return formatCurrency(inv.total, 'IDR');
+  return formatPaymentCurrency(inv.total, 'IDR');
 }
 
 /** Returns the amount to pre-fill when selecting an invoice */
@@ -81,11 +74,13 @@ export default function CreatePaymentPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [loadingInvoices, setLoadingInvoices] = useState(true);
   const [accentColor, setAccentColor] = useState('');
+  const subscription = useSubscriptionUsage();
+  const paymentLinkLocked = subscription.isResourceLocked('payment_links');
 
   const loadSettings = async () => {
     try {
       const s = await invoiceSettingsApi.get();
-      setInitialCompany(s.business_name.substring(0, 2).toUpperCase() || '');
+      setInitialCompany((s.business_name || '').substring(0, 2).toUpperCase());
       setLogoCompany(s.logo_url || '');
       setAccentColor(s.accent_color || 'primary');
     } catch {
@@ -97,9 +92,15 @@ export default function CreatePaymentPage() {
   }, []);
 
   useEffect(() => {
-    // Check available payment gateways
-    xenditApi.getAccount().then(() => setHasXendit(true)).catch(() => { });
-    paypalApi.getAccount().then(() => setHasPaypal(true)).catch(() => { });
+    // Check available payment gateways and auto-set default provider
+    xenditApi.getAccount().then(() => {
+      setHasXendit(true);
+      // Default to xendit for IDR
+      setPaymentProvider(prev => prev === '' ? 'xendit' : prev);
+    }).catch(() => { });
+    paypalApi.getAccount().then(() => {
+      setHasPaypal(true);
+    }).catch(() => { });
 
     // Load invoices that can be linked
     invoiceApi.listLinkable()
@@ -132,12 +133,21 @@ export default function CreatePaymentPage() {
   };
 
   const handleSubmit = async () => {
+    if (paymentLinkLocked) {
+      setError(subscription.limitMessage('payment_links'));
+      return;
+    }
     if (!title.trim()) {
       setError('Judul payment link wajib diisi');
       return;
     }
     if (amount <= 0) {
       setError('Jumlah harus lebih dari 0');
+      return;
+    }
+    const providerWarning = getCurrencyProviderWarning(currency, paymentProvider);
+    if (providerWarning) {
+      setError(providerWarning);
       return;
     }
 
@@ -164,7 +174,18 @@ export default function CreatePaymentPage() {
     }
   };
 
-  const currencyInfo = CURRENCIES.find(c => c.code === currency) || CURRENCIES[0];
+  const currencyInfo = getCurrencyInfo(currency);
+
+  if (!subscription.loading && paymentLinkLocked) {
+    return (
+      <FeatureLimitLock
+        resource="payment_links"
+        usage={subscription.usage}
+        backHref="/payments"
+        backLabel="Kembali ke Payment Links"
+      />
+    );
+  }
 
   return (
     <div className="animate-fade-in">
@@ -234,19 +255,19 @@ export default function CreatePaymentPage() {
                         </span>
                       </div>
                       <div className="text-text-secondary mb-1">Klien: <span className="text-text-primary font-medium">{selectedInvoice.client_name}</span></div>
-                      <div className="text-text-secondary mb-1">Total Invoice: <span className="text-text-primary font-medium">{formatCurrency(selectedInvoice.total, 'IDR')}</span></div>
+                      <div className="text-text-secondary mb-1">Total Invoice: <span className="text-text-primary font-medium">{formatPaymentCurrency(selectedInvoice.total, 'IDR')}</span></div>
                       {isDP && (
                         <>
                           <div className="text-text-secondary mb-1">
-                            DP ({selectedInvoice.dp_percentage}%): <span className="text-text-primary font-medium">{formatCurrency(selectedInvoice.dp_amount, 'IDR')}</span>
+                            DP ({selectedInvoice.dp_percentage}%): <span className="text-text-primary font-medium">{formatPaymentCurrency(selectedInvoice.dp_amount, 'IDR')}</span>
                           </div>
                           {hasPartialPaid && (
                             <>
                               <div className="text-text-secondary mb-1">
-                                Sudah dibayar: <span className="text-emerald-600 font-medium">{formatCurrency(selectedInvoice.amount_paid, 'IDR')}</span>
+                                Sudah dibayar: <span className="text-emerald-600 font-medium">{formatPaymentCurrency(selectedInvoice.amount_paid, 'IDR')}</span>
                               </div>
                               <div className="text-text-secondary">
-                                Sisa tagihan: <span className="text-amber-600 font-bold">{formatCurrency(selectedInvoice.amount_remaining, 'IDR')}</span>
+                                Sisa tagihan: <span className="text-amber-600 font-bold">{formatPaymentCurrency(selectedInvoice.amount_remaining, 'IDR')}</span>
                               </div>
                             </>
                           )}
@@ -284,22 +305,18 @@ export default function CreatePaymentPage() {
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Mata Uang</label>
-                <select
-                  className="form-input"
-                  value={currency}
-                  onChange={(e) => {
-                    setCurrency(e.target.value);
-                    if (e.target.value === 'IDR') {
-                      setPaymentProvider(hasXendit ? 'xendit' : '');
-                    } else {
-                      setPaymentProvider(hasPaypal ? 'paypal' : '');
-                    }
-                  }}
-                >
-                  {CURRENCIES.map(c => (
-                    <option key={c.code} value={c.code}>{c.symbol} {c.code} — {c.name}</option>
-                  ))}
-                </select>
+                <CurrencySelect
+                    value={currency}
+                    allowedCurrencies={paymentProvider === 'xendit' ? XENDIT_SUPPORTED_CURRENCIES : paymentProvider === 'paypal' ? PAYPAL_SUPPORTED_CURRENCIES : undefined}
+                    onChange={(code) => {
+                      setCurrency(code);
+                      if (code === 'IDR') {
+                        setPaymentProvider(hasXendit ? 'xendit' : '');
+                      } else {
+                        setPaymentProvider(hasPaypal ? 'paypal' : '');
+                      }
+                    }}
+                  />
               </div>
               <div className="form-group">
                 <label className="form-label">Jumlah ({currencyInfo.symbol})</label>
@@ -394,6 +411,11 @@ export default function CreatePaymentPage() {
                 <Alert02Icon /> Untuk pembayaran {currency}, Anda perlu menghubungkan PayPal terlebih dahulu di <Link href="/settings" className="underline font-semibold">Pengaturan</Link>.
               </div>
             )}
+            {getCurrencyProviderWarning(currency, paymentProvider) && (
+              <div className="flex gap-2 items-start p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-700 dark:text-red-400 text-[13px] mb-3">
+                <Alert02Icon className="shrink-0 mt-0.5" /> <span>{getCurrencyProviderWarning(currency, paymentProvider)}</span>
+              </div>
+            )}
 
             {/* Settings */}
             <div className="flex justify-between items-center py-3.5 border-b border-border-light last:border-b-0">
@@ -452,12 +474,12 @@ export default function CreatePaymentPage() {
               <p className="text-[13px] text-text-secondary mb-5 leading-[1.6]">{description || 'Deskripsi pembayaran akan muncul di sini...'}</p>
               <div className={`text-[28px] font-black bg-clip-text text-transparent mb-2 ${!accentColor ? 'bg-gradient-to-br from-red-600 to-red-500' : ''}`} style={accentColor ? { backgroundColor: accentColor } : {}}>
                 {amount > 0
-                  ? formatCurrency(amount, currency)
+                  ? formatPaymentCurrency(amount, currency)
                   : `${currencyInfo.symbol} 0`}
               </div>
               {selectedInvoice?.payment_type === 'dp' && selectedInvoice.amount_remaining > 0 && selectedInvoice.amount_paid > 0 && (
                 <div className="text-[12px] text-amber-600 font-medium mb-2">
-                  Pelunasan dari total {formatCurrency(selectedInvoice.total, 'IDR')}
+                  Pelunasan dari total {formatPaymentCurrency(selectedInvoice.total, 'IDR')}
                 </div>
               )}
               {paymentProvider && (

@@ -14,9 +14,21 @@ const sora = Sora({
 });
 
 export const metadata: Metadata = {
-  title: "InvoiceQu - SaaS Invoice & Payment Link Platform",
+  title: "InvoiceQu Application",
   description: "Platform invoice dan payment link modern untuk bisnis Indonesia. Buat, kirim, dan lacak invoice dengan mudah.",
   keywords: "invoice, payment link, SaaS, bisnis, Indonesia",
+  applicationName: "InvoiceQu",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  openGraph: {
+    siteName: "InvoiceQu",
+  },
 };
 
 import { GoogleOAuthProvider } from '@react-oauth/google';

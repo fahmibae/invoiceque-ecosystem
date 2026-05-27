@@ -1,6 +1,11 @@
 pub mod auth;
+pub mod chaser;
 pub mod client;
+pub mod health;
 pub mod invoice;
-pub mod payment;
 pub mod notification;
+pub mod payment;
+pub mod portal;
+pub mod quotation;
 pub mod subscription;
+pub mod task;

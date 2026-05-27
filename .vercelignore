@@ -1,0 +1,12 @@
+/*
+!/frontend
+/frontend/*
+!/frontend/InvoiceQue
+!/frontend/InvoiceQue/**
+
+/frontend/InvoiceQue/.env*
+/frontend/InvoiceQue/.next
+/frontend/InvoiceQue/.vercel
+/frontend/InvoiceQue/.wrangler
+/frontend/InvoiceQue/node_modules
+/frontend/InvoiceQue/tsconfig.tsbuildinfo

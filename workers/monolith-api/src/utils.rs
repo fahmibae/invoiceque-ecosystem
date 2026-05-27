@@ -16,17 +16,18 @@ pub fn json_response<T: serde::Serialize>(data: &T, status: u16) -> Result<Respo
 
 /// Build a JSON error response.
 pub fn json_error(message: &str, status: u16) -> Result<Response> {
-    Response::from_json(&serde_json::json!({"error": message}))
-        .map(|r| r.with_status(status))
+    Response::from_json(&serde_json::json!({"error": message})).map(|r| r.with_status(status))
 }
 
 /// Parse pagination query params from URL.
 pub fn parse_pagination(url: &Url) -> (i32, i32) {
-    let page = url.query_pairs()
+    let page = url
+        .query_pairs()
         .find(|(k, _)| k == "page")
         .and_then(|(_, v)| v.parse::<i32>().ok())
         .unwrap_or(1);
-    let per_page = url.query_pairs()
+    let per_page = url
+        .query_pairs()
         .find(|(k, _)| k == "per_page" || k == "size")
         .and_then(|(_, v)| v.parse::<i32>().ok())
         .unwrap_or(10);

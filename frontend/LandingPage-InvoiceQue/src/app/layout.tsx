@@ -19,11 +19,12 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL("https://invoicequ.my.id"),
   title: {
-    default: "InvoiceQu — Platform Invoice & Payment Link #1 di Indonesia",
+    default: "InvoiceQu",
     template: "%s | InvoiceQu",
   },
   description:
-    "Buat invoice profesional, kirim payment link instan, dan lacak pembayaran real-time. Platform SaaS invoice modern untuk bisnis Indonesia. Mulai gratis sekarang!",
+    "Kelola tugas, proyek, invoice, payment link, dan reminder pembayaran dalam satu workflow. Platform SaaS invoice modern untuk bisnis jasa Indonesia. Mulai gratis sekarang!",
+  applicationName: "InvoiceQu",
   keywords: [
     "invoice online",
     "payment link",
@@ -31,6 +32,11 @@ export const metadata: Metadata = {
     "buat invoice",
     "invoice gratis",
     "payment gateway",
+    "manajemen tugas",
+    "task management",
+    "time tracking",
+    "project billing",
+    "task to invoice",
     "faktur online",
     "kirim invoice",
     "lacak pembayaran",
@@ -59,9 +65,9 @@ export const metadata: Metadata = {
     locale: "id_ID",
     url: "https://invoicequ.my.id",
     siteName: "InvoiceQu",
-    title: "InvoiceQu — Platform Invoice & Payment Link #1 di Indonesia",
+    title: "InvoiceQu",
     description:
-      "Buat invoice profesional, kirim payment link instan, dan lacak pembayaran real-time. Platform SaaS invoice modern untuk bisnis Indonesia.",
+      "Kelola tugas, proyek, invoice, payment link, dan reminder pembayaran dalam satu workflow. Platform SaaS invoice modern untuk bisnis jasa Indonesia.",
     images: [
       {
         url: "/og-image.png",
@@ -73,9 +79,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "InvoiceQu — Platform Invoice & Payment Link #1 di Indonesia",
+    title: "InvoiceQu",
     description:
-      "Buat invoice profesional, kirim payment link instan, dan lacak pembayaran real-time.",
+      "Kelola tugas, invoice, payment link, dan pembayaran dalam satu workflow.",
     images: ["/og-image.png"],
   },
   alternates: {
@@ -87,14 +93,38 @@ export const metadata: Metadata = {
   },
 };
 
-const jsonLd = {
+// WebSite schema — sinyal utama agar Google menampilkan "InvoiceQu" sebagai nama situs di hasil pencarian
+const webSiteJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "InvoiceQu",
+  alternateName: ["InvoiceQu Indonesia", "invoicequ"],
+  url: "https://invoicequ.my.id",
+  potentialAction: {
+    "@type": "SearchAction",
+    target: "https://invoicequ.my.id/?q={search_term_string}",
+    "query-input": "required name=search_term_string",
+  },
+};
+
+// Organization schema — memperkuat brand identity di Google
+const organizationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "InvoiceQu",
+  url: "https://invoicequ.my.id",
+  logo: "https://invoicequ.my.id/logo.png",
+  sameAs: [],
+};
+
+const softwareJsonLd = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   name: "InvoiceQu",
   applicationCategory: "BusinessApplication",
   operatingSystem: "Web",
   description:
-    "Platform SaaS modern untuk membuat invoice profesional, mengirim payment link, dan melacak pembayaran secara real-time.",
+    "Platform SaaS modern untuk mengelola tugas, membuat invoice profesional, mengirim payment link, dan melacak pembayaran secara real-time.",
   url: "https://invoicequ.my.id",
   offers: {
     "@type": "Offer",
@@ -119,7 +149,15 @@ export default function RootLayout({
       <head>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(webSiteJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }}
         />
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

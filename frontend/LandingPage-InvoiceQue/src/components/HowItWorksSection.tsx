@@ -5,9 +5,9 @@ import { useEffect, useRef, useState } from "react";
 const steps = [
   {
     number: "01",
-    title: "Daftar Akun Gratis",
+    title: "Buat Proyek & Tugas",
     description:
-      "Buat akun InvoiceQu dalam 30 detik. Tidak perlu kartu kredit — langsung mulai dengan paket gratis.",
+      "Masukkan project, klien, deadline, prioritas, dan detail pekerjaan yang perlu diselesaikan.",
     icon: (
       <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
@@ -16,9 +16,9 @@ const steps = [
   },
   {
     number: "02",
-    title: "Buat Invoice Pertama",
+    title: "Kerjakan & Track Waktu",
     description:
-      "Pilih template, masukkan data klien dan item — invoice profesional siap dalam hitungan detik.",
+      "Pantau progres di kanban atau list, catat estimasi jam, dan lihat nilai pekerjaan berjalan.",
     icon: (
       <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -27,9 +27,9 @@ const steps = [
   },
   {
     number: "03",
-    title: "Kirim ke Klien",
+    title: "Generate Invoice",
     description:
-      "Bagikan invoice atau payment link via WhatsApp, email, atau salin link. Klien bisa bayar langsung dari link.",
+      "Saat tugas selesai, ubah data pekerjaan menjadi invoice profesional tanpa input ulang dari awal.",
     icon: (
       <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -38,9 +38,9 @@ const steps = [
   },
   {
     number: "04",
-    title: "Terima Pembayaran",
+    title: "Kirim Link & Terima Bayar",
     description:
-      "Klien membayar melalui payment link. Anda mendapat notifikasi real-time dan laporan otomatis update.",
+      "Bagikan invoice atau payment link, terima notifikasi pembayaran, lalu follow-up otomatis jika belum lunas.",
     icon: (
       <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -132,12 +132,12 @@ export default function HowItWorksSection() {
             CARA KERJA
           </div>
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight mb-5">
-            Mulai dalam{" "}
-            <span className="text-gradient-red">4 Langkah Mudah</span>
+            Dari Pekerjaan ke{" "}
+            <span className="text-gradient-red">Pembayaran</span>
           </h2>
           <p className="text-base md:text-lg text-white/50 leading-relaxed">
-            Tidak perlu setup rumit. Daftar, buat invoice, kirim, dan terima pembayaran —
-            semua bisa dilakukan dari browser Anda.
+            InvoiceQu membantu bisnis jasa menjaga alur dari task harian, invoice,
+            payment link, sampai reminder pembayaran tetap tersambung.
           </p>
         </div>
 

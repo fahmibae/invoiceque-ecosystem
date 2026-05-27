@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import Link from 'next/link';
-import { subscriptionApi, invoiceApi, clientApi, paymentLinkApi, type UsageData } from '@/lib/api';
-import { Chart01Icon, GoogleDocIcon, UserGroup02Icon, Payment01Icon, ArrowRight02Icon } from 'hugeicons-react';
+import { Chart01Icon, GoogleDocIcon, UserGroup02Icon, Payment01Icon, ArrowRight02Icon, LockedIcon } from 'hugeicons-react';
+import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
 
 function UsageBar({ label, icon, used, limit }: { label: string; icon: React.ReactNode; used: number; limit: number; }) {
   const isUnlimited = limit === -1;
@@ -29,52 +29,7 @@ function UsageBar({ label, icon, used, limit }: { label: string; icon: React.Rea
 }
 
 export default function UsageIndicator() {
-  const [usage, setUsage] = useState<UsageData | null>(null);
-
-  useEffect(() => {
-    async function fetchUsage() {
-      try {
-        // Fetch limits from subscription service and real counts from each service in parallel
-        const [subscriptionUsage, invoicesRes, clientsRes, paymentsRes] = await Promise.all([
-          subscriptionApi.getUsage().catch(() => null),
-          invoiceApi.list(undefined, 0, 1).catch(() => null),
-          clientApi.list(undefined, 1, 1).catch(() => null),
-          paymentLinkApi.list(1, 1).catch(() => null),
-        ]);
-
-        // Use real counts from API responses (total field), fall back to subscription counters
-        const invoicesUsed = invoicesRes?.total ?? subscriptionUsage?.invoices_used ?? 0;
-        const clientsUsed = clientsRes?.total ?? subscriptionUsage?.clients_used ?? 0;
-        const paymentLinksUsed = paymentsRes?.total ?? subscriptionUsage?.payment_links_used ?? 0;
-
-        // Use limits from subscription service, or defaults for Free plan
-        const invoicesLimit = subscriptionUsage?.invoices_limit ?? 5;
-        const clientsLimit = subscriptionUsage?.clients_limit ?? 10;
-        const paymentLinksLimit = subscriptionUsage?.payment_links_limit ?? 5;
-
-        setUsage({
-          invoices_used: invoicesUsed,
-          invoices_limit: invoicesLimit,
-          clients_used: clientsUsed,
-          clients_limit: clientsLimit,
-          payment_links_used: paymentLinksUsed,
-          payment_links_limit: paymentLinksLimit,
-          can_create_invoice: invoicesLimit === -1 || invoicesUsed < invoicesLimit,
-          can_create_client: clientsLimit === -1 || clientsUsed < clientsLimit,
-          can_create_payment: paymentLinksLimit === -1 || paymentLinksUsed < paymentLinksLimit,
-        });
-      } catch {
-        // Fallback: show zeros with default free plan limits
-        setUsage({
-          invoices_used: 0, invoices_limit: 5,
-          clients_used: 0, clients_limit: 10,
-          payment_links_used: 0, payment_links_limit: 5,
-          can_create_invoice: true, can_create_client: true, can_create_payment: true,
-        });
-      }
-    }
-    fetchUsage();
-  }, []);
+  const { usage } = useSubscriptionUsage();
 
   if (!usage) return null;
 
@@ -106,7 +61,7 @@ export default function UsageIndicator() {
           
           <div className="relative z-10 flex flex-col items-center text-center">
             <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center mb-3 shadow-inner ring-1 ring-white/30 group-hover:-translate-y-1 transition-transform duration-300">
-              <span className="text-2xl drop-shadow-md">🚀</span>
+              <LockedIcon width={24} height={24} />
             </div>
             <h4 className="text-base font-extrabold mb-2 tracking-wide text-white drop-shadow-md">
               Limit Penggunaan Tercapai
@@ -114,7 +69,7 @@ export default function UsageIndicator() {
             <p className="text-[13px] text-white/95 mb-5 leading-relaxed max-w-[250px] drop-shadow-sm font-medium">
               Kapasitas plan Anda sudah penuh. Tingkatkan plan Anda untuk menikmati fitur premium dan akses tanpa batas!
             </p>
-            <Link href="/subscription" className="w-full flex items-center gap-2 relative overflow-hidden group/btn bg-white text-red-600 text-[13px] font-extrabold py-3 px-4 rounded-lg shadow-[0_4px_15px_rgba(255,255,255,0.25)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.4)] transition-all duration-300 hover:-translate-y-0.5 flex items-center justify-center gap-2">
+            <Link href="/subscription" className="w-full relative overflow-hidden group/btn bg-white text-red-600 text-[13px] font-extrabold py-3 px-4 rounded-lg shadow-[0_4px_15px_rgba(255,255,255,0.25)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.4)] transition-all duration-300 hover:-translate-y-0.5 flex items-center justify-center gap-2">
               <span className="relative z-10 flex items-center gap-1.5">
                 Upgrade Plan Sekarang 
                 <span className="group-hover/btn:translate-x-1 transition-transform duration-300"><ArrowRight02Icon/></span>

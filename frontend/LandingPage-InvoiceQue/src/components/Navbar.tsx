@@ -56,7 +56,7 @@ export default function Navbar() {
               <span className="text-2xl font-bold tracking-tight">
                 Invoice<span className="text-red-500">Qu</span>
               </span>
-              <span className="text-xs font-medium text-gray-400 tracking-tight">Smart Invoice Together</span>
+              <span className="text-md font-medium text-gray-400 tracking-tight">SaaS Platform</span>
             </div>
           </Link>
 

@@ -38,7 +38,7 @@ function formatRupiah(n: number) {
 // ── Shared input class ──
 const inputCls = "w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/25 focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/30 transition-all";
 
-type Step = "form" | "processing" | "redirecting";
+type Step = "form" | "verifying" | "processing" | "redirecting";
 
 // ═══════════════════════════════════════════
 //  MAIN CONTENT
@@ -50,8 +50,6 @@ function CheckoutContent() {
 
   // Resolve enterprise from token
   const enterprise = planKey === "enterprise" && token ? decodeToken(token) : null;
-
-  // Check enterprise expiry
   const isExpired = enterprise ? Date.now() > enterprise.exp : false;
 
   // Build plan info
@@ -73,6 +71,7 @@ function CheckoutContent() {
   const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
   const [showPw, setShowPw] = useState(false);
+  const [verifyChecking, setVerifyChecking] = useState(false);
 
   // ── Invalid states ──
   if (!plan) {
@@ -99,7 +98,8 @@ function CheckoutContent() {
     );
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // ── Step 1: Register ──
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (password !== confirmPassword) { setError("Password dan konfirmasi password tidak cocok."); return; }
@@ -107,35 +107,102 @@ function CheckoutContent() {
 
     setStep("processing");
     try {
-      // Register
       const regRes = await fetch(`${API_BASE}/auth/register`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password, company: company || undefined, phone: phone || undefined }),
       });
+      const regData = await regRes.json().catch(() => ({ error: "Registrasi gagal" }));
+
       if (!regRes.ok) {
-        const err = await regRes.json().catch(() => ({ error: "Registrasi gagal" }));
-        throw new Error(err.error || err.message || "Registrasi gagal");
+        // 409 = email already registered & verified → let them login directly
+        if (regRes.status === 409) {
+          await proceedWithLogin();
+          return;
+        }
+        throw new Error(regData.error || regData.message || "Registrasi gagal");
       }
-      const { token: authToken } = await regRes.json();
 
-      // Checkout
-      const checkoutRes = await fetch(`${API_BASE}/subscriptions/checkout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({ plan_id: plan.id }),
-      });
-      if (!checkoutRes.ok) {
-        const err = await checkoutRes.json().catch(() => ({ error: "Checkout gagal" }));
-        throw new Error(err.error || err.message || "Checkout gagal");
+      // Registration successful — email verification required
+      if (regData.requires_verification) {
+        setStep("verifying");
+        return;
       }
-      const { checkout_url } = await checkoutRes.json();
-      if (!checkout_url) throw new Error("Tidak ada URL pembayaran");
 
-      setStep("redirecting");
-      window.location.href = checkout_url;
+      // If register somehow returns a token (shouldn't normally), use it
+      if (regData.token) {
+        await proceedWithCheckout(regData.token);
+        return;
+      }
+
+      setStep("verifying");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Terjadi kesalahan.");
       setStep("form");
+    }
+  };
+
+  // ── Step 2: After verification, login and checkout ──
+  const handleVerifiedContinue = async () => {
+    setError("");
+    setVerifyChecking(true);
+    try {
+      await proceedWithLogin();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Terjadi kesalahan.");
+    } finally {
+      setVerifyChecking(false);
+    }
+  };
+
+  // ── Login helper ──
+  const proceedWithLogin = async () => {
+    const loginRes = await fetch(`${API_BASE}/auth/login`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const loginData = await loginRes.json().catch(() => ({ error: "Login gagal" }));
+
+    if (!loginRes.ok) {
+      if (loginRes.status === 403) {
+        throw new Error("Email belum diverifikasi. Silakan cek inbox Anda dan klik link verifikasi terlebih dahulu.");
+      }
+      throw new Error(loginData.error || loginData.message || "Login gagal");
+    }
+
+    if (!loginData.token) throw new Error("Login berhasil tapi tidak ada token");
+    await proceedWithCheckout(loginData.token);
+  };
+
+  // ── Checkout helper ──
+  const proceedWithCheckout = async (authToken: string) => {
+    setStep("processing");
+    const checkoutRes = await fetch(`${API_BASE}/subscriptions/checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+      body: JSON.stringify({ plan_id: plan.id }),
+    });
+    if (!checkoutRes.ok) {
+      const err = await checkoutRes.json().catch(() => ({ error: "Checkout gagal" }));
+      throw new Error(err.error || err.message || "Checkout gagal");
+    }
+    const { checkout_url } = await checkoutRes.json();
+    if (!checkout_url) throw new Error("Tidak ada URL pembayaran");
+
+    setStep("redirecting");
+    window.location.href = checkout_url;
+  };
+
+  // ── Resend verification email ──
+  const handleResendVerification = async () => {
+    setError("");
+    try {
+      await fetch(`${API_BASE}/auth/resend-verification`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      setError("✅ Email verifikasi sudah dikirim ulang. Cek inbox Anda.");
+    } catch {
+      setError("Gagal mengirim ulang email verifikasi.");
     }
   };
 
@@ -190,23 +257,34 @@ function CheckoutContent() {
             </div>
           </div>
 
-          {/* ── Right: Form ── */}
+          {/* ── Right: Form / Steps ── */}
           <div className="lg:col-span-3 order-1 lg:order-2">
-            <div className="mb-8">
-              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2">
-                Daftar <span className="text-gradient-red">Paket {plan.displayName}</span>
-              </h1>
-              <p className="text-white/50">Buat akun dan langsung lanjutkan ke pembayaran.</p>
+
+            {/* Step indicator */}
+            <div className="flex items-center gap-3 mb-8">
+              {["Daftar", "Verifikasi", "Bayar"].map((label, i) => {
+                const stepIndex = step === "form" ? 0 : step === "verifying" ? 1 : 2;
+                const isActive = i <= stepIndex;
+                return (
+                  <div key={label} className="flex items-center gap-2">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${isActive ? "bg-red-500 text-white" : "bg-white/10 text-white/30"}`}>{i + 1}</div>
+                    <span className={`text-sm font-medium ${isActive ? "text-white" : "text-white/30"}`}>{label}</span>
+                    {i < 2 && <div className={`w-8 h-px ${isActive ? "bg-red-500/50" : "bg-white/10"}`} />}
+                  </div>
+                );
+              })}
             </div>
 
+            {/* ── Processing spinner ── */}
             {step === "processing" && (
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-12 text-center">
                 <div className="w-14 h-14 border-4 border-red-200/20 border-t-red-500 rounded-full animate-spin mx-auto mb-5" />
-                <h3 className="text-xl font-bold mb-2">Memproses Pendaftaran...</h3>
-                <p className="text-white/40 text-sm">Membuat akun dan menyiapkan halaman pembayaran</p>
+                <h3 className="text-xl font-bold mb-2">Memproses...</h3>
+                <p className="text-white/40 text-sm">Menyiapkan akun dan halaman pembayaran</p>
               </div>
             )}
 
+            {/* ── Redirecting spinner ── */}
             {step === "redirecting" && (
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-12 text-center">
                 <div className="w-14 h-14 border-4 border-emerald-200/20 border-t-emerald-500 rounded-full animate-spin mx-auto mb-5" />
@@ -215,74 +293,138 @@ function CheckoutContent() {
               </div>
             )}
 
+            {/* ── Step: Verify Email ── */}
+            {step === "verifying" && (
+              <div className="space-y-6">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center">
+                  <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-5">
+                    <svg className="w-8 h-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold mb-2">Verifikasi Email Anda</h3>
+                  <p className="text-white/50 text-sm mb-2">
+                    Kami sudah mengirim link verifikasi ke:
+                  </p>
+                  <p className="text-red-400 font-semibold mb-6">{email}</p>
+                  <p className="text-white/40 text-sm mb-6">
+                    Buka inbox email Anda, klik link verifikasi, lalu kembali ke sini dan klik tombol di bawah.
+                  </p>
+
+                  {error && (
+                    <div className={`p-3 rounded-xl text-sm mb-4 ${error.startsWith("✅") ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400" : "bg-red-500/10 border border-red-500/20 text-red-400"}`}>
+                      {error}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleVerifiedContinue}
+                    disabled={verifyChecking}
+                    className="w-full py-4 rounded-xl font-bold text-base bg-gradient-to-r from-red-600 to-red-500 text-white hover:shadow-lg hover:shadow-red-500/25 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer border-none disabled:opacity-50 disabled:cursor-not-allowed mb-3"
+                  >
+                    {verifyChecking ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Memeriksa...
+                      </span>
+                    ) : "Saya Sudah Verifikasi → Lanjut Bayar"}
+                  </button>
+
+                  <button
+                    onClick={handleResendVerification}
+                    className="text-sm text-white/40 hover:text-white/60 transition-colors cursor-pointer bg-transparent border-none"
+                  >
+                    Tidak menerima email? <span className="text-red-400/70 hover:text-red-400">Kirim ulang</span>
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => { setStep("form"); setError(""); }}
+                  className="text-sm text-white/40 hover:text-white/60 transition-colors cursor-pointer bg-transparent border-none w-full text-center"
+                >
+                  ← Kembali ke form pendaftaran
+                </button>
+              </div>
+            )}
+
+            {/* ── Step: Registration Form ── */}
             {step === "form" && (
-              <form onSubmit={handleSubmit} className="space-y-5">
-                {error && <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-white/80">Nama Lengkap <span className="text-red-400">*</span></label>
-                    <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="Nama Anda" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-white/80">Email <span className="text-red-400">*</span></label>
-                    <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} placeholder="email@company.com" />
-                  </div>
+              <>
+                <div className="mb-8">
+                  <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2">
+                    Daftar <span className="text-gradient-red">Paket {plan.displayName}</span>
+                  </h1>
+                  <p className="text-white/50">Buat akun, verifikasi email, lalu lanjutkan ke pembayaran.</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-white/80">Perusahaan <span className="text-white/30">(opsional)</span></label>
-                    <input type="text" value={company} onChange={(e) => setCompany(e.target.value)} className={inputCls} placeholder="Nama perusahaan" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-white/80">No. Telepon <span className="text-white/30">(opsional)</span></label>
-                    <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} placeholder="+62 812 3456 7890" />
-                  </div>
-                </div>
+                <form onSubmit={handleRegister} className="space-y-5">
+                  {error && <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-white/80">Password <span className="text-red-400">*</span></label>
-                    <div className="relative">
-                      <input type={showPw ? "text" : "password"} required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} className={`${inputCls} pr-12`} placeholder="Minimal 6 karakter" />
-                      <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 text-sm">{showPw ? "🙈" : "👁️"}</button>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-white/80">Nama Lengkap <span className="text-red-400">*</span></label>
+                      <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="Nama Anda" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-white/80">Email <span className="text-red-400">*</span></label>
+                      <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} placeholder="email@company.com" />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-white/80">Konfirmasi Password <span className="text-red-400">*</span></label>
-                    <input type="password" required minLength={6} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={inputCls} placeholder="Ulangi password" />
-                  </div>
-                </div>
 
-                {/* Order Summary */}
-                <div className="rounded-xl bg-white/[0.03] border border-white/10 p-5 mt-2">
-                  <div className="flex justify-between items-center text-sm mb-2">
-                    <span className="text-white/50">Paket {plan.displayName}</span>
-                    <span className="font-semibold">{plan.priceLabel}</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-white/80">Perusahaan <span className="text-white/30">(opsional)</span></label>
+                      <input type="text" value={company} onChange={(e) => setCompany(e.target.value)} className={inputCls} placeholder="Nama perusahaan" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-white/80">No. Telepon <span className="text-white/30">(opsional)</span></label>
+                      <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} placeholder="+62 812 3456 7890" />
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center text-sm mb-3 pb-3 border-b border-white/10">
-                    <span className="text-white/50">Periode</span>
-                    <span className="text-white/70">Bulanan</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold">Total</span>
-                    <span className={`text-lg font-extrabold ${plan.accentColor}`}>{plan.priceLabel}</span>
-                  </div>
-                </div>
 
-                <button type="submit" className="w-full py-4 rounded-xl font-bold text-base bg-gradient-to-r from-red-600 to-red-500 text-white hover:shadow-lg hover:shadow-red-500/25 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer border-none">
-                  Daftar & Bayar Sekarang
-                </button>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-white/80">Password <span className="text-red-400">*</span></label>
+                      <div className="relative">
+                        <input type={showPw ? "text" : "password"} required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} className={`${inputCls} pr-12`} placeholder="Minimal 6 karakter" />
+                        <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 text-sm">{showPw ? "🙈" : "👁️"}</button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-white/80">Konfirmasi Password <span className="text-red-400">*</span></label>
+                      <input type="password" required minLength={6} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={inputCls} placeholder="Ulangi password" />
+                    </div>
+                  </div>
 
-                <p className="text-xs text-center text-white/30">
-                  Dengan mendaftar, Anda menyetujui <Link href="/syarat-ketentuan" className="text-red-400/70 hover:text-red-400">Syarat & Ketentuan</Link> serta <Link href="/privasi" className="text-red-400/70 hover:text-red-400">Kebijakan Privasi</Link> kami.
-                </p>
-                <div className="text-center text-sm text-white/40 pt-2">
-                  Sudah punya akun?{" "}
-                  <a href="https://app.invoicequ.my.id/login" className="text-red-400 hover:text-red-300 font-medium">Masuk & upgrade dari dashboard</a>
-                </div>
-              </form>
+                  {/* Order Summary */}
+                  <div className="rounded-xl bg-white/[0.03] border border-white/10 p-5 mt-2">
+                    <div className="flex justify-between items-center text-sm mb-2">
+                      <span className="text-white/50">Paket {plan.displayName}</span>
+                      <span className="font-semibold">{plan.priceLabel}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm mb-3 pb-3 border-b border-white/10">
+                      <span className="text-white/50">Periode</span>
+                      <span className="text-white/70">Bulanan</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold">Total</span>
+                      <span className={`text-lg font-extrabold ${plan.accentColor}`}>{plan.priceLabel}</span>
+                    </div>
+                  </div>
+
+                  <button type="submit" className="w-full py-4 rounded-xl font-bold text-base bg-gradient-to-r from-red-600 to-red-500 text-white hover:shadow-lg hover:shadow-red-500/25 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer border-none">
+                    Daftar & Verifikasi Email
+                  </button>
+
+                  <p className="text-xs text-center text-white/30">
+                    Dengan mendaftar, Anda menyetujui <Link href="/syarat-ketentuan" className="text-red-400/70 hover:text-red-400">Syarat & Ketentuan</Link> serta <Link href="/privasi" className="text-red-400/70 hover:text-red-400">Kebijakan Privasi</Link> kami.
+                  </p>
+                  <div className="text-center text-sm text-white/40 pt-2">
+                    Sudah punya akun?{" "}
+                    <a href="https://app.invoicequ.my.id/login" className="text-red-400 hover:text-red-300 font-medium">Masuk & upgrade dari dashboard</a>
+                  </div>
+                </form>
+              </>
             )}
           </div>
         </div>

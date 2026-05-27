@@ -6,6 +6,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { paymentLinkApi, type UpdatePaymentLinkRequest } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { GoogleDocIcon, Settings01Icon, ArrowLeft02Icon, CheckmarkBadge01Icon, PauseCircleIcon } from 'hugeicons-react';
+import CurrencySelect from '@/components/ui/CurrencySelect';
+import { ALL_SUPPORTED_CURRENCIES } from '@/lib/currencies';
 
 export default function EditPaymentPage() {
   const params = useParams();
@@ -101,6 +103,10 @@ export default function EditPaymentPage() {
               <textarea className="form-input form-textarea" placeholder="Deskripsi pembayaran..." value={description} onChange={(e) => setDescription(e.target.value)} />
             </div>
             <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Mata Uang</label>
+                <CurrencySelect value={currency} onChange={setCurrency} allowedCurrencies={ALL_SUPPORTED_CURRENCIES} />
+              </div>
               <div className="form-group">
                 <label className="form-label">Jumlah ({currency})</label>
                 <input type="number" className="form-input" min="0" value={amount} onChange={(e) => setAmount(parseInt(e.target.value) || 0)} />

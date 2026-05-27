@@ -14,17 +14,17 @@ export default function CTASection() {
         {/* Badge */}
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass text-sm mb-8">
           <span className="text-2xl">🚀</span>
-          <span className="text-white/80">Siap untuk memulai?</span>
+          <span className="text-white/80">Siap merapikan workflow?</span>
         </div>
 
         <h2 className="text-3xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6 leading-tight">
-          Kelola Invoice Anda<br />
-          <span className="text-gradient-red">Lebih Cerdas Mulai Hari Ini</span>
+          Ubah Pekerjaan Harian<br />
+          <span className="text-gradient-red">Jadi Invoice Siap Dibayar</span>
         </h2>
 
         <p className="text-base md:text-lg text-white/50 max-w-2xl mx-auto mb-10 leading-relaxed">
-          Bergabung dengan ribuan bisnis Indonesia yang telah beralih ke InvoiceQu.
-          Daftar gratis, tanpa kartu kredit, tanpa komitmen.
+          Kelola tugas, proyek, invoice, payment link, dan reminder pembayaran
+          dari satu tempat. Daftar gratis, tanpa kartu kredit, tanpa komitmen.
         </p>
 
         {/* CTA Buttons */}
@@ -57,7 +57,7 @@ export default function CTASection() {
             <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
-            Gratis selamanya
+            Task to invoice
           </div>
           <div className="flex items-center gap-2">
             <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">

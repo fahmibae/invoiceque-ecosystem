@@ -46,14 +46,14 @@ func (c *PaymentConsumer) ProcessEvent(event PaymentEvent) {
 func (c *PaymentConsumer) handlePaymentCompleted(event PaymentEvent) {
 	amountStr := formatCurrency(event.Amount)
 
-	clientSubject := "Pembayaran Berhasil: " + event.PaymentTitle
+	clientSubject := "Payment Successful: " + event.PaymentTitle
 	clientHTML := services.TemplatePaymentCompletedClient(event.ClientName, event.PaymentTitle, amountStr)
 
 	emailStatus := "sent"
 	err := c.emailService.Send(services.EmailPayload{
 		To:       event.ClientEmail,
 		Subject:  clientSubject,
-		Body:     fmt.Sprintf("Pembayaran Anda untuk \"%s\" sebesar Rp %s berhasil.", event.PaymentTitle, amountStr),
+		Body:     fmt.Sprintf("Your payment for \"%s\" for Rp %s was successful.", event.PaymentTitle, amountStr),
 		HTMLBody: clientHTML,
 	})
 	if err != nil {
@@ -96,14 +96,14 @@ func (c *PaymentConsumer) handlePaymentCompleted(event PaymentEvent) {
 func (c *PaymentConsumer) handlePaymentFailed(event PaymentEvent) {
 	amountStr := formatCurrency(event.Amount)
 
-	subject := "Pembayaran Gagal: " + event.PaymentTitle
+	subject := "Payment Failed: " + event.PaymentTitle
 	failedHTML := services.TemplatePaymentFailed(event.ClientName, event.PaymentTitle, amountStr)
 
 	emailStatus := "sent"
 	err := c.emailService.Send(services.EmailPayload{
 		To:       event.ClientEmail,
 		Subject:  subject,
-		Body:     fmt.Sprintf("Pembayaran \"%s\" sebesar Rp %s gagal.", event.PaymentTitle, amountStr),
+		Body:     fmt.Sprintf("Payment for \"%s\" for Rp %s failed.", event.PaymentTitle, amountStr),
 		HTMLBody: failedHTML,
 	})
 	if err != nil {

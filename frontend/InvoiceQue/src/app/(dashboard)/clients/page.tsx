@@ -8,11 +8,12 @@ import {
   Search01Icon, Mail01Icon, SmartPhone01Icon, Location01Icon,
   UserGroupIcon, FilterIcon, Cancel01Icon, SortingUpIcon,
   Invoice01Icon, MoneyBag02Icon, ArrowLeft01Icon, ArrowRight01Icon,
-  UserIcon, Delete02Icon
+  Delete02Icon, LockedIcon, Tick02Icon
 } from 'hugeicons-react';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import ClickableAmount from '@/components/ui/ClickableAmount';
 import Portal from '@/components/ui/Portal';
+import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
 
 const PER_PAGE = 12;
 
@@ -24,6 +25,8 @@ export default function ClientsPage() {
   const [page, setPage] = useState(1);
   const [allInvoices, setAllInvoices] = useState<Invoice[]>([]);
   const [exchangeRates, setExchangeRates] = useState<Record<string, number> | null>(null);
+  const subscription = useSubscriptionUsage();
+  const clientLocked = subscription.isResourceLocked('clients');
 
   // Filter state
   const [showFilter, setShowFilter] = useState(false);
@@ -144,8 +147,9 @@ export default function ClientsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
 
-  useEffect(() => { setSelected(new Set()); }, [search, filterCity, filterMinInvoices, filterMinSpent, filterMaxSpent, sortBy]);
+  useEffect(() => { setSelected(new Set()); setSelectionMode(false); }, [search, filterCity, filterMinInvoices, filterMinSpent, filterMaxSpent, sortBy]);
 
   const activeFilterCount = [filterCity, filterMinInvoices, filterMinSpent, filterMaxSpent, sortBy !== 'newest' ? 'x' : ''].filter(Boolean).length;
 
@@ -307,24 +311,26 @@ export default function ClientsPage() {
       )}
 
       {/* Header */}
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1 className="page-title">Klien</h1>
-          <p className="page-subtitle">Kelola data klien dan lihat riwayat transaksi</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Klien</h1>
+          <p className="text-sm text-text-secondary mt-0.5">Kelola data klien dan lihat riwayat transaksi</p>
         </div>
-        <div className="flex gap-2">
-          {selected.size > 0 && (
-            <button
-              className="btn btn-secondary border-red-500 text-red-500 hover:bg-red-50"
-              onClick={confirmBulkDelete}
-              disabled={bulkDeleting}
-            >
-              <Delete02Icon color='red' /> Hapus {selected.size} Klien
+        <div className="flex gap-2 flex-wrap">
+          {!selectionMode && currentData.length > 0 && (
+            <button onClick={() => setSelectionMode(true)} className="btn btn-secondary flex items-center gap-1.5 text-xs sm:text-sm py-2 px-3">
+              <Tick02Icon width={15} height={15} /> Pilih
             </button>
           )}
-          <Link href="/clients/create" className="btn btn-primary">
-            <span>＋</span> Tambah Klien
-          </Link>
+          {clientLocked ? (
+            <button className="btn btn-primary opacity-60 cursor-not-allowed text-xs sm:text-sm" disabled title={subscription.limitMessage('clients')}>
+              <LockedIcon width={16} height={16} /> Tambah Klien
+            </button>
+          ) : (
+            <Link href="/clients/create" className="btn btn-primary text-xs sm:text-sm">
+              <span>＋</span> Tambah Klien
+            </Link>
+          )}
         </div>
       </div>
 
@@ -388,25 +394,40 @@ export default function ClientsPage() {
         </button>
       </div>
 
-      {/* Results count & Select All */}
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-text-tertiary">{filtered.length} klien ditemukan</span>
-          {currentData.length > 0 && (
-            <div className="flex items-center gap-2 pl-3 border-l border-border-color">
-              <input 
-                type="checkbox" 
-                checked={selected.size === currentData.length && currentData.length > 0} 
-                onChange={toggleSelectAll} 
-                className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
-                id="selectAllClients"
-              />
-              <label htmlFor="selectAllClients" className="text-xs font-semibold text-text-secondary cursor-pointer">
-                Pilih Semua
-              </label>
-            </div>
+      {/* Selection toolbar */}
+      {selectionMode && (
+        <div className="flex items-center gap-2 sm:gap-3 mb-4 py-2.5 px-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl animate-fade-in">
+          <button
+            onClick={toggleSelectAll}
+            className={`w-7 h-7 shrink-0 flex items-center justify-center rounded-lg border-2 transition-all duration-150 cursor-pointer ${
+              selected.size === currentData.length && currentData.length > 0
+                ? 'bg-red-600 border-red-600 text-white'
+                : 'border-gray-300 dark:border-gray-600 hover:border-red-400'
+            }`}
+          >
+            {selected.size === currentData.length && currentData.length > 0 && <Tick02Icon width={14} height={14} />}
+          </button>
+          <span className="text-sm font-medium text-text-primary whitespace-nowrap">
+            {selected.size > 0 ? `${selected.size} dipilih` : 'Pilih klien'}
+          </span>
+          <div className="flex-1" />
+          {selected.size > 0 && (
+            <button onClick={confirmBulkDelete} disabled={bulkDeleting} className="flex items-center gap-1.5 text-xs sm:text-sm py-1.5 px-3 bg-red-600 text-white hover:bg-red-700 rounded-lg font-medium transition-colors cursor-pointer">
+              <Delete02Icon width={14} height={14} />
+              <span className="hidden sm:inline">Hapus ({selected.size})</span>
+              <span className="sm:hidden">{selected.size}</span>
+            </button>
           )}
+          <button onClick={() => { setSelectionMode(false); setSelected(new Set()); }} className="flex items-center gap-1 text-xs sm:text-sm py-1.5 px-3 bg-bg-card border border-border-light text-text-secondary hover:bg-bg-hover rounded-lg font-medium transition-colors cursor-pointer">
+            <Cancel01Icon width={14} height={14} />
+            <span className="hidden sm:inline">Batal</span>
+          </button>
         </div>
+      )}
+
+      {/* Results count */}
+      <div className="flex justify-between items-center mb-4">
+        <span className="text-xs text-text-tertiary">{filtered.length} klien ditemukan</span>
         {activeFilterCount > 0 && (
           <button className="text-xs text-red-500 hover:underline" onClick={() => { setSortBy('newest'); setFilterCity(''); setFilterMinInvoices(''); setFilterMinSpent(''); setFilterMaxSpent(''); }}>
             Hapus semua filter
@@ -416,66 +437,88 @@ export default function ClientsPage() {
 
       {/* Client Cards */}
       {currentData.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(360px,1fr))] gap-5">
-          {currentData.map((client) => (
-            <div key={client.id} className={`card relative overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-lg before:absolute before:top-0 before:inset-x-0 before:h-[3px] before:bg-gradient-to-br before:from-red-600 before:to-red-500 ${selected.has(client.id) ? 'ring-2 ring-red-500 bg-red-50/10' : 'before:opacity-0 before:transition-opacity before:duration-150 hover:before:opacity-100'}`}>
-              <div className="absolute top-4 right-4 z-10">
-                <input 
-                  type="checkbox" 
-                  checked={selected.has(client.id)} 
-                  onChange={() => toggleSelect(client.id)}
-                  className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
-                />
+        <div className="grid grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-5">
+          {currentData.map((client) => {
+            const isSelected = selected.has(client.id);
+            return (
+              <div
+                key={client.id}
+                onClick={() => selectionMode && toggleSelect(client.id)}
+                className={`card relative overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-lg
+                  ${isSelected ? 'ring-2 ring-red-500 bg-red-50/10 border-l-[4px] border-l-red-500' : 'before:absolute before:top-0 before:inset-x-0 before:h-[3px] before:bg-gradient-to-br before:from-red-600 before:to-red-500 before:opacity-0 before:transition-opacity before:duration-150 hover:before:opacity-100'}
+                  ${selectionMode ? 'cursor-pointer active:scale-[0.98]' : ''}
+                `}
+              >
+                {/* Selection indicator */}
+                {selectionMode && (
+                  <div className="absolute top-4 right-4 z-10">
+                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-150 ${
+                      isSelected ? 'bg-red-600 border-red-600 text-white' : 'border-gray-300 dark:border-gray-600'
+                    }`}>
+                      {isSelected && <Tick02Icon width={12} height={12} />}
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center gap-3.5 mb-4 pr-6">
+                  <div className="w-[50px] h-[50px] bg-gradient-to-br from-red-600 to-red-500 rounded-full flex items-center justify-center font-bold text-base text-white shrink-0">
+                    {client.name.split(' ').map((n) => n[0]).join('').substring(0,2)}
+                  </div>
+                  <div className="overflow-hidden">
+                    <h3 className="text-base font-bold mb-0.5">{client.name}</h3>
+                    <p className="text-[13px] text-text-secondary">{client.company}</p>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2 mb-4 p-3.5 bg-bg-secondary rounded-md">
+                  <div className="flex items-center gap-2.5 text-[13px] text-text-secondary">
+                    <span className="text-sm shrink-0"><Mail01Icon width={16} height={16} /></span>
+                    <span className="overflow-hidden text-ellipsis whitespace-nowrap">{client.email}</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-[13px] text-text-secondary">
+                    <span className="text-sm shrink-0"><SmartPhone01Icon width={16} height={16} /></span>
+                    <span className="overflow-hidden text-ellipsis whitespace-nowrap">{client.phone}</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-[13px] text-text-secondary">
+                    <span className="text-sm shrink-0"><Location01Icon width={16} height={16} /></span>
+                    <span className="overflow-hidden text-ellipsis whitespace-nowrap">{client.address}, {client.city}</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="flex flex-col gap-0.5 py-2.5 px-3 bg-bg-secondary rounded-sm text-center">
+                    <span className="text-[15px] font-bold overflow-hidden text-ellipsis whitespace-nowrap">{clientStats[client.id]?.totalInvoices || 0}</span>
+                    <span className="text-[11px] text-text-tertiary font-medium">Invoice</span>
+                  </div>
+                  <div className="flex flex-col gap-0.5 py-2.5 px-3 bg-bg-secondary rounded-sm text-center">
+                    <span className="text-[15px] font-bold overflow-hidden text-ellipsis whitespace-nowrap">{formatCurrency(clientStats[client.id]?.totalSpent || 0)}</span>
+                    <span className="text-[11px] text-text-tertiary font-medium">Total Transaksi</span>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center pt-3 border-t border-border-light">
+                  <span className="text-[11px] text-text-tertiary">Bergabung: {new Date(client.created_at).toLocaleDateString('id-ID')}</span>
+                  {!selectionMode && (
+                    <div className="flex gap-2">
+                      <button className="btn btn-ghost btn-sm text-danger hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(client.id)}>Hapus</button>
+                      <Link href={`/clients/${client.id}`} className="btn btn-ghost btn-sm">Detail →</Link>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-3.5 mb-4 pr-6">
-                <div className="w-[50px] h-[50px] bg-gradient-to-br from-red-600 to-red-500 rounded-full flex items-center justify-center font-bold text-base text-white shrink-0">
-                  {client.name.split(' ').map((n) => n[0]).join('').substring(0,2)}
-                </div>
-                <div className="overflow-hidden">
-                  <h3 className="text-base font-bold mb-0.5">{client.name}</h3>
-                  <p className="text-[13px] text-text-secondary">{client.company}</p>
-                </div>
-              </div>
-              <div className="flex flex-col gap-2 mb-4 p-3.5 bg-bg-secondary rounded-md">
-                <div className="flex items-center gap-2.5 text-[13px] text-text-secondary">
-                  <span className="text-sm shrink-0"><Mail01Icon width={16} height={16} /></span>
-                  <span className="overflow-hidden text-ellipsis whitespace-nowrap">{client.email}</span>
-                </div>
-                <div className="flex items-center gap-2.5 text-[13px] text-text-secondary">
-                  <span className="text-sm shrink-0"><SmartPhone01Icon width={16} height={16} /></span>
-                  <span className="overflow-hidden text-ellipsis whitespace-nowrap">{client.phone}</span>
-                </div>
-                <div className="flex items-center gap-2.5 text-[13px] text-text-secondary">
-                  <span className="text-sm shrink-0"><Location01Icon width={16} height={16} /></span>
-                  <span className="overflow-hidden text-ellipsis whitespace-nowrap">{client.address}, {client.city}</span>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="flex flex-col gap-0.5 py-2.5 px-3 bg-bg-secondary rounded-sm text-center">
-                  <span className="text-[15px] font-bold overflow-hidden text-ellipsis whitespace-nowrap">{clientStats[client.id]?.totalInvoices || 0}</span>
-                  <span className="text-[11px] text-text-tertiary font-medium">Invoice</span>
-                </div>
-                <div className="flex flex-col gap-0.5 py-2.5 px-3 bg-bg-secondary rounded-sm text-center">
-                  <span className="text-[15px] font-bold overflow-hidden text-ellipsis whitespace-nowrap">{formatCurrency(clientStats[client.id]?.totalSpent || 0)}</span>
-                  <span className="text-[11px] text-text-tertiary font-medium">Total Transaksi</span>
-                </div>
-              </div>
-              <div className="flex justify-between items-center pt-3 border-t border-border-light">
-                <span className="text-[11px] text-text-tertiary">Bergabung: {new Date(client.created_at).toLocaleDateString('id-ID')}</span>
-                <div className="flex gap-2">
-                  <button className="btn btn-ghost btn-sm text-danger hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(client.id)}>Hapus</button>
-                  <Link href={`/clients/${client.id}`} className="btn btn-ghost btn-sm">Detail →</Link>
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="card text-center py-16 px-5">
           <div className="text-5xl mb-4 opacity-50 flex justify-center"><UserGroupIcon width={48} height={48} /></div>
           <h3 className="text-lg font-semibold mb-2">{search || activeFilterCount > 0 ? 'Tidak ada klien yang cocok' : 'Belum ada klien'}</h3>
           <p className="text-sm text-text-secondary mb-6">{search || activeFilterCount > 0 ? 'Coba ubah pencarian atau filter Anda' : 'Tambah klien pertama Anda untuk mulai membuat invoice'}</p>
-          {!(search || activeFilterCount > 0) && <Link href="/clients/create" className="btn btn-primary">Tambah Klien</Link>}
+          {!(search || activeFilterCount > 0) && (
+            clientLocked ? (
+              <button className="btn btn-primary opacity-60 cursor-not-allowed" disabled title={subscription.limitMessage('clients')}>
+                <LockedIcon width={16} height={16} /> Tambah Klien
+              </button>
+            ) : (
+              <Link href="/clients/create" className="btn btn-primary">Tambah Klien</Link>
+            )
+          )}
         </div>
       )}
 

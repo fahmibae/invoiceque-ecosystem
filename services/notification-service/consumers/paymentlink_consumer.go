@@ -48,10 +48,10 @@ func (c *PaymentLinkConsumer) ProcessEvent(event PaymentLinkEvent) {
 
 	clientName := event.ClientName
 	if clientName == "" {
-		clientName = "Pelanggan"
+		clientName = "Customer"
 	}
 
-	subject := "Tagihan Pembayaran: " + event.Title
+	subject := "Payment Request: " + event.Title
 	amountStr := formatCurrency(event.Amount)
 	htmlBody := services.TemplatePaymentLinkCreated(clientName, event.Title, event.Description, amountStr, event.PaymentURL)
 
@@ -59,7 +59,7 @@ func (c *PaymentLinkConsumer) ProcessEvent(event PaymentLinkEvent) {
 	err := c.emailService.Send(services.EmailPayload{
 		To:       event.ClientEmail,
 		Subject:  subject,
-		Body:     fmt.Sprintf("Anda menerima tagihan pembayaran %s sebesar Rp %s. Bayar di: %s", event.Title, amountStr, event.PaymentURL),
+		Body:     fmt.Sprintf("You have received a payment request for %s for Rp %s. Pay here: %s", event.Title, amountStr, event.PaymentURL),
 		HTMLBody: htmlBody,
 	})
 	if err != nil {

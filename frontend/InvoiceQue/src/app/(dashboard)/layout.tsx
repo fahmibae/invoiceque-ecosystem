@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useAuth } from '@/context/AuthContext';
+import { TimeTrackingProvider } from '@/context/TimeTrackingContext';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -30,5 +31,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  return <DashboardLayout>{children}</DashboardLayout>;
+  return (
+    <TimeTrackingProvider>
+      <DashboardLayout>{children}</DashboardLayout>
+    </TimeTrackingProvider>
+  );
 }

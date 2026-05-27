@@ -2,11 +2,15 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { clientApi, invoiceApi, paymentLinkApi, xenditApi, paypalApi, type Client, type PaymentLink, invoiceSettingsApi, type InvoiceSettingsData } from '@/lib/api';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { clientApi, invoiceApi, paymentLinkApi, xenditApi, paypalApi, type Client, type PaymentLink, invoiceSettingsApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
-import { GoogleDocIcon, User02Icon, ArrowLeft02Icon, PackageIcon, MoneyBag02Icon, Payment02Icon, Link04Icon, CreditCardIcon, Atm02Icon, Copy01Icon, Tick02Icon, Cancel01Icon } from 'hugeicons-react';
+import { GoogleDocIcon, User02Icon, ArrowLeft02Icon, PackageIcon, MoneyBag02Icon, Payment02Icon, Link04Icon, CreditCardIcon, Atm02Icon, Copy01Icon, Tick02Icon } from 'hugeicons-react';
 import Portal from '@/components/ui/Portal';
+import CurrencySelect from '@/components/ui/CurrencySelect';
+import { ALL_SUPPORTED_CURRENCIES } from '@/lib/currencies';
+import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
+import FeatureLimitLock from '@/components/subscription/FeatureLimitLock';
 
 interface LineItem {
   id: number;
@@ -17,6 +21,7 @@ interface LineItem {
 
 export default function CreateInvoicePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState('');
   const [items, setItems] = useState<LineItem[]>([
@@ -47,11 +52,14 @@ export default function CreateInvoicePage() {
   const [createdPaymentLink, setCreatedPaymentLink] = useState<PaymentLink | null>(null);
   const [copied, setCopied] = useState(false);
   const [savingStep, setSavingStep] = useState('');
+  const subscription = useSubscriptionUsage();
+  const invoiceLocked = subscription.isResourceLocked('invoices');
+  const paymentLinkLocked = subscription.isResourceLocked('payment_links');
 
   const loadSettings = async () => {
     try {
       const s = await invoiceSettingsApi.get();
-      setCompanyInitial(s.business_name.substring(0, 2).toUpperCase() || '');
+      setCompanyInitial((s.business_name || '').substring(0, 2).toUpperCase());
       setLogoCompany(s.logo_url || '');
       setAccentColor(s.accent_color || '');
     } catch {
@@ -78,6 +86,64 @@ export default function CreateInvoicePage() {
     fetchClients();
   }, []);
 
+  // Auto-fill from task (when coming from "Generate Invoice" button)
+  useEffect(() => {
+    if (searchParams.get('from_task') !== 'true') return;
+    const desc = searchParams.get('item_desc') || '';
+    const qty = Number(searchParams.get('item_qty')) || 1;
+    const price = Number(searchParams.get('item_price')) || 0;
+    const clientId = searchParams.get('client_id') || '';
+    const taskTitle = searchParams.get('task_title') || '';
+    const taskProject = searchParams.get('task_project') || '';
+
+    if (desc) {
+      setItems([{ id: 1, description: desc, quantity: qty, price }]);
+    }
+    if (clientId) {
+      setSelectedClient(clientId);
+    }
+    if (taskTitle || taskProject) {
+      setNotes(`Dibuat dari tugas: ${taskTitle}${taskProject ? ` (Proyek: ${taskProject})` : ''}`);
+    }
+    // Set due date to 14 days from now
+    const due = new Date();
+    due.setDate(due.getDate() + 14);
+    setDueDate(due.toISOString().split('T')[0]);
+  }, [searchParams]);
+
+  // Auto-fill from completed project
+  useEffect(() => {
+    if (searchParams.get('from_project') !== 'true') return;
+
+    const projectName = searchParams.get('project_name') || '';
+    const desc = searchParams.get('item_desc') || (projectName ? `Proyek ${projectName}` : '');
+    const qty = Number(searchParams.get('item_qty')) || 1;
+    const price = Number(searchParams.get('item_price')) || 0;
+    const clientId = searchParams.get('client_id') || '';
+    const projectCurrency = searchParams.get('currency') || '';
+    const projectDueDate = searchParams.get('due_date') || '';
+
+    if (desc) {
+      setItems([{ id: 1, description: desc, quantity: qty, price }]);
+    }
+    if (clientId) {
+      setSelectedClient(clientId);
+    }
+    if (projectCurrency) {
+      setCurrency(projectCurrency);
+    }
+    if (projectName) {
+      setNotes(`Dibuat dari proyek: ${projectName}`);
+    }
+    if (projectDueDate) {
+      setDueDate(projectDueDate);
+    } else {
+      const due = new Date();
+      due.setDate(due.getDate() + 14);
+      setDueDate(due.toISOString().split('T')[0]);
+    }
+  }, [searchParams]);
+
   const addItem = () => {
     setItems([...items, { id: Date.now(), description: '', quantity: 1, price: 0 }]);
   };
@@ -103,6 +169,14 @@ export default function CreateInvoicePage() {
   const client = clients.find((c) => c.id === selectedClient);
 
   const handleSubmit = async (status: string) => {
+    if (invoiceLocked) {
+      setError(subscription.limitMessage('invoices'));
+      return;
+    }
+    if (autoPaymentLink && status === 'sent' && paymentLinkLocked) {
+      setError(subscription.limitMessage('payment_links'));
+      return;
+    }
     if (!selectedClient) {
       setError('Pilih klien terlebih dahulu');
       return;
@@ -125,6 +199,9 @@ export default function CreateInvoicePage() {
     setError('');
     setSaving(true);
     try {
+      const shouldSendWithPaymentLink = autoPaymentLink && status === 'sent';
+      const initialStatus = shouldSendWithPaymentLink ? 'draft' : status;
+
       setSavingStep('Menyimpan invoice...');
       const createdInvoice = await invoiceApi.create({
         client_id: selectedClient,
@@ -139,14 +216,14 @@ export default function CreateInvoicePage() {
         discount: discount,
         due_date: dueDate || undefined,
         notes: notes || undefined,
-        status,
+        status: initialStatus,
         payment_type: paymentType,
         dp_percentage: paymentType === 'dp' ? dpPercentage : undefined,
         currency,
       });
 
       // Auto-create payment link if toggle is on
-      if (autoPaymentLink && status === 'sent') {
+      if (shouldSendWithPaymentLink) {
         setSavingStep('Membuat payment link...');
         const invoiceAmount = paymentType === 'dp' ? createdInvoice.dp_amount : createdInvoice.total;
         const titlePrefix = paymentType === 'dp' ? 'Down Payment' : 'Pembayaran';
@@ -161,6 +238,8 @@ export default function CreateInvoicePage() {
           client_name: client?.name || undefined,
           client_email: client?.email || undefined,
         });
+        setSavingStep('Mengirim invoice...');
+        await invoiceApi.send(createdInvoice.id);
         setCreatedPaymentLink(paymentLink);
         setShowSuccessModal(true);
       } else {
@@ -173,6 +252,17 @@ export default function CreateInvoicePage() {
       setSavingStep('');
     }
   };
+
+  if (!subscription.loading && invoiceLocked) {
+    return (
+      <FeatureLimitLock
+        resource="invoices"
+        usage={subscription.usage}
+        backHref="/invoices"
+        backLabel="Kembali ke Invoice"
+      />
+    );
+  }
 
   const handleCopyLink = () => {
     if (createdPaymentLink?.url) {
@@ -317,33 +407,7 @@ export default function CreateInvoicePage() {
             {/* Currency */}
             <div className="form-group">
               <label className="form-label">Mata Uang</label>
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                {[
-                  { code: 'IDR', flag: '🇮🇩', name: 'Rupiah' },
-                  { code: 'USD', flag: '🇺🇸', name: 'US Dollar' },
-                  { code: 'EUR', flag: '🇪🇺', name: 'Euro' },
-                  { code: 'GBP', flag: '🇬🇧', name: 'Pound' },
-                  { code: 'SGD', flag: '🇸🇬', name: 'S$ Dollar' },
-                  { code: 'MYR', flag: '🇲🇾', name: 'Ringgit' },
-                  { code: 'JPY', flag: '🇯🇵', name: 'Yen' },
-                  { code: 'AUD', flag: '🇦🇺', name: 'AUD' },
-                ].map((c) => (
-                  <button
-                    key={c.code}
-                    type="button"
-                    onClick={() => setCurrency(c.code)}
-                    className={`flex flex-col items-center gap-0.5 py-2.5 px-2 rounded-xl border text-center transition-all duration-150 ${currency === c.code
-                      ? 'border-red-500 bg-red-50 dark:bg-red-900/20 shadow-sm'
-                      : 'border-border-color bg-bg-secondary hover:border-red-300'
-                      }`}
-                  >
-                    <span className="text-xl leading-none">{c.flag}</span>
-                    <span className={`text-[11px] font-bold leading-none mt-1 ${currency === c.code ? 'text-red-600' : 'text-text-tertiary'
-                      }`}>{c.code}</span>
-                    <span className="text-[9px] text-text-tertiary leading-none">{c.name}</span>
-                  </button>
-                ))}
-              </div>
+              <CurrencySelect value={currency} onChange={setCurrency} allowedCurrencies={ALL_SUPPORTED_CURRENCIES} />
             </div>
             <div className="form-group">
               <label className="form-label">Jatuh Tempo</label>
@@ -430,12 +494,24 @@ export default function CreateInvoicePage() {
                 <input
                   type="checkbox"
                   checked={autoPaymentLink}
-                  onChange={(e) => setAutoPaymentLink(e.target.checked)}
+                  onChange={(e) => {
+                    if (paymentLinkLocked) {
+                      setError(subscription.limitMessage('payment_links'));
+                      return;
+                    }
+                    setAutoPaymentLink(e.target.checked);
+                  }}
                   className="peer opacity-0 w-0 h-0"
+                  disabled={paymentLinkLocked}
                 />
                 <span className="absolute cursor-pointer inset-0 bg-border-color transition-all duration-150 rounded-full peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-emerald-600 before:absolute before:content-[''] before:h-5 before:w-5 before:left-[3px] before:bottom-[3px] before:bg-white before:transition-all before:duration-150 before:rounded-full peer-checked:before:translate-x-[22px]"></span>
               </label>
             </div>
+            {paymentLinkLocked && (
+              <div className="mt-4 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2.5 text-[13px] text-red-600">
+                Limit payment link sudah tercapai. Upgrade plan untuk memakai Auto Buat Payment Link.
+              </div>
+            )}
 
             {autoPaymentLink && (
               <div className="mt-4 pt-4 border-t border-border-light animate-fade-in">
@@ -607,7 +683,6 @@ export default function CreateInvoicePage() {
               >
                 {saving ? savingStep || 'Menyimpan...' : (
                   <>
-                    {autoPaymentLink && <Link04Icon className="w-4 h-4" />}
                     {autoPaymentLink ? 'Simpan, Kirim & Buat Payment Link' : 'Simpan & Kirim'}
                   </>
                 )}

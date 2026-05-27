@@ -4,10 +4,12 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { paymentLinkApi, type PaymentLink } from '@/lib/api';
 import { formatCurrency, getStatusColor, convertToIDR, fetchExchangeRates } from '@/lib/utils';
-import { Search01Icon, Copy01Icon, Payment01Icon, Edit02Icon, FilterIcon, Cancel01Icon, SortingUpIcon, PaypalIcon, Delete02Icon, FileLinkIcon, Link04Icon, MouseLeftClick02Icon, MoneyBag02Icon } from 'hugeicons-react';
+import { Search01Icon, Copy01Icon, Payment01Icon, Edit02Icon, FilterIcon, Cancel01Icon, SortingUpIcon, PaypalIcon, Delete02Icon, FileLinkIcon, Link04Icon, MouseLeftClick02Icon, MoneyBag02Icon, LockedIcon, WhatsappIcon, Tick02Icon } from 'hugeicons-react';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import ClickableAmount from '@/components/ui/ClickableAmount';
 import Portal from '@/components/ui/Portal';
+import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
+import { createPaymentWhatsAppUrl } from '@/lib/payment-share';
 
 export default function PaymentsPage() {
   const [paymentLinks, setPaymentLinks] = useState<PaymentLink[]>([]);
@@ -39,11 +41,14 @@ export default function PaymentsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
 
   // Single delete modal state
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const subscription = useSubscriptionUsage();
+  const paymentLinkLocked = subscription.isResourceLocked('payment_links');
 
   useEffect(() => {
     async function fetchPaymentLinks() {
@@ -61,7 +66,7 @@ export default function PaymentsPage() {
   }, []);
 
   useEffect(() => {
-    setSelected(new Set());
+    setSelected(new Set()); setSelectionMode(false);
   }, [search, filterStatus, filterMinAmount, filterMaxAmount, filterDateFrom, filterDateTo, filterSort]);
 
   const activeFilterCount = [filterStatus, filterMinAmount, filterMaxAmount, filterDateFrom, filterDateTo, filterSort !== 'newest' ? filterSort : ''].filter(Boolean).length;
@@ -309,22 +314,26 @@ export default function PaymentsPage() {
           </div>
         </Portal>
       )}
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1 className="page-title">Payment Links</h1>
-          <p className="page-subtitle">Buat dan kelola link pembayaran Anda</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Payment Links</h1>
+          <p className="text-sm text-text-secondary mt-0.5">Buat dan kelola link pembayaran Anda</p>
         </div>
-        <div className="flex gap-2">
-          {selected.size > 0 && (
-            <button
-              className="btn btn-secondary border-red-500 text-red-500 hover:bg-red-50"
-              onClick={confirmBulkDelete}
-              disabled={bulkDeleting}
-            >
-              <Delete02Icon color='red' /> Hapus {selected.size} Link
+        <div className="flex gap-2 flex-wrap">
+          {!selectionMode && currentData.length > 0 && (
+            <button onClick={() => setSelectionMode(true)} className="btn btn-secondary flex items-center gap-1.5 text-xs sm:text-sm py-2 px-3">
+              <Tick02Icon width={15} height={15} /> Pilih
             </button>
           )}
-
+          {paymentLinkLocked ? (
+            <button className="btn btn-primary opacity-60 cursor-not-allowed text-xs sm:text-sm" disabled title={subscription.limitMessage('payment_links')}>
+              <LockedIcon width={16} height={16} /> Buat Payment Link
+            </button>
+          ) : (
+            <Link href="/payments/create" className="btn btn-primary text-xs sm:text-sm">
+              <span>＋</span> Buat Payment Link
+            </Link>
+          )}
         </div>
       </div>
 
@@ -384,83 +393,125 @@ export default function PaymentsPage() {
         </button>
       </div>
 
-      {currentData.length > 0 && (
-        <div className="mb-4 flex items-center gap-3">
-          <input
-            type="checkbox"
-            checked={selected.size === currentData.length && currentData.length > 0}
-            onChange={toggleSelectAll}
-            className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
-            id="selectAll"
-          />
-          <label htmlFor="selectAll" className="text-sm text-text-secondary cursor-pointer">Pilih Semua ({currentData.length})</label>
+      {/* Selection toolbar */}
+      {selectionMode && (
+        <div className="flex items-center gap-2 sm:gap-3 mb-4 py-2.5 px-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl animate-fade-in">
+          <button
+            onClick={toggleSelectAll}
+            className={`w-7 h-7 shrink-0 flex items-center justify-center rounded-lg border-2 transition-all duration-150 cursor-pointer ${
+              selected.size === currentData.length && currentData.length > 0
+                ? 'bg-red-600 border-red-600 text-white'
+                : 'border-gray-300 dark:border-gray-600 hover:border-red-400'
+            }`}
+          >
+            {selected.size === currentData.length && currentData.length > 0 && <Tick02Icon width={14} height={14} />}
+          </button>
+          <span className="text-sm font-medium text-text-primary whitespace-nowrap">
+            {selected.size > 0 ? `${selected.size} dipilih` : 'Pilih payment link'}
+          </span>
+          <div className="flex-1" />
+          {selected.size > 0 && (
+            <button onClick={confirmBulkDelete} disabled={bulkDeleting} className="flex items-center gap-1.5 text-xs sm:text-sm py-1.5 px-3 bg-red-600 text-white hover:bg-red-700 rounded-lg font-medium transition-colors cursor-pointer">
+              <Delete02Icon width={14} height={14} />
+              <span className="hidden sm:inline">Hapus ({selected.size})</span>
+              <span className="sm:hidden">{selected.size}</span>
+            </button>
+          )}
+          <button onClick={() => { setSelectionMode(false); setSelected(new Set()); }} className="flex items-center gap-1 text-xs sm:text-sm py-1.5 px-3 bg-bg-card border border-border-light text-text-secondary hover:bg-bg-hover rounded-lg font-medium transition-colors cursor-pointer">
+            <Cancel01Icon width={14} height={14} />
+            <span className="hidden sm:inline">Batal</span>
+          </button>
         </div>
       )}
 
-      {/* Payment Link Cards */}
       <div className="grid grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-5">
-        {currentData.map((pl) => (
-          <div key={pl.id} className={`card relative overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-lg before:absolute before:top-0 before:inset-x-0 before:h-[3px] before:bg-gradient-to-br before:from-red-600 before:to-red-500 ${selected.has(pl.id) ? 'ring-2 ring-red-500 bg-red-50/10' : ''}`}>
-            <div className="absolute top-4 right-4 z-10">
-              <input
-                type="checkbox"
-                checked={selected.has(pl.id)}
-                onChange={() => toggleSelect(pl.id)}
-                className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
-              />
-            </div>
-            <div className="flex justify-between items-center mb-3.5 mt-1 pr-6">
-              <div className="w-[42px] h-[42px] bg-red-50 dark:bg-red-900/10 rounded-md flex items-center justify-center text-xl">
-                <Payment01Icon className="text-red-600" />
-              </div>
-              <div className="flex items-center gap-2">
-                {pl.payment_provider && pl.payment_provider !== 'manual' && (
-                  <span className={`inline-flex items-center gap-1 py-0.5 px-2 rounded-full text-[10px] font-bold ${pl.payment_provider === 'paypal' ? 'bg-blue-500/10 text-blue-600' : 'bg-emerald-500/10 text-emerald-600'
-                    }`}>
-                    {pl.payment_provider === 'paypal' ? <PaypalIcon width={14} height={14}> PayPal</PaypalIcon> : <Payment01Icon width={14} height={14}> Xendit</Payment01Icon>}
+        {currentData.map((pl) => {
+          const isSelected = selected.has(pl.id);
+          return (
+            <div
+              key={pl.id}
+              onClick={() => selectionMode && toggleSelect(pl.id)}
+              className={`card relative overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-lg before:absolute before:top-0 before:inset-x-0 before:h-[3px] before:bg-gradient-to-br before:from-red-600 before:to-red-500
+                ${isSelected ? 'ring-2 ring-red-500 bg-red-50/10 border-l-[4px] border-l-red-500' : ''}
+                ${selectionMode ? 'cursor-pointer active:scale-[0.98]' : ''}
+              `}
+            >
+              {/* Selection indicator */}
+              {selectionMode && (
+                <div className="absolute top-4 right-4 z-10">
+                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-150 ${
+                    isSelected ? 'bg-red-600 border-red-600 text-white' : 'border-gray-300 dark:border-gray-600'
+                  }`}>
+                    {isSelected && <Tick02Icon width={12} height={12} />}
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-between items-center mb-3.5 mt-1 pr-6">
+                <div className="w-[42px] h-[42px] bg-red-50 dark:bg-red-900/10 rounded-md flex items-center justify-center text-xl">
+                  <Payment01Icon className="text-red-600" />
+                </div>
+                <div className="flex items-center gap-2">
+                  {pl.payment_provider && pl.payment_provider !== 'manual' && (
+                    <span className={`inline-flex items-center gap-1 py-0.5 px-2 rounded-full text-[10px] font-bold ${pl.payment_provider === 'paypal' ? 'bg-blue-500/10 text-blue-600' : 'bg-emerald-500/10 text-emerald-600'
+                      }`}>
+                      {pl.payment_provider === 'paypal' ? <PaypalIcon width={14} height={14}> PayPal</PaypalIcon> : <Payment01Icon width={14} height={14}> Xendit</Payment01Icon>}
+                    </span>
+                  )}
+                  <span className={`badge ${getStatusColor(pl.status)}`}>
+                    {pl.status.charAt(0).toUpperCase() + pl.status.slice(1)}
                   </span>
+                </div>
+              </div>
+              <Link href={`/payments/${pl.id}`} className="text-[17px] font-bold mb-1.5 block hover:text-red-600 transition-colors no-underline text-text-primary">{pl.title}</Link>
+              <p className="text-[13px] text-text-secondary mb-3 leading-relaxed line-clamp-2" title={pl.description}>{pl.description}</p>
+              <div className="text-[22px] font-extrabold bg-gradient-to-br from-red-600 to-red-500 bg-clip-text text-transparent mb-4">
+                {new Intl.NumberFormat(pl.currency === 'IDR' ? 'id-ID' : 'en-US', { style: 'currency', currency: pl.currency || 'IDR', minimumFractionDigits: pl.currency === 'IDR' || pl.currency === 'JPY' ? 0 : 2 }).format(pl.amount)}
+              </div>
+              <div className="grid grid-cols-3 gap-2 mb-4 p-3 bg-bg-secondary rounded-md">
+                <div className="flex flex-col items-center gap-0.5">
+                  <span className="text-base font-bold">{pl.clicks}</span>
+                  <span className="text-[11px] text-text-tertiary font-medium">Klik</span>
+                </div>
+                <div className="flex flex-col items-center gap-0.5">
+                  <span className="text-base font-bold">{pl.payments}</span>
+                  <span className="text-[11px] text-text-tertiary font-medium">Pembayaran</span>
+                </div>
+                <div className="flex flex-col items-center gap-0.5">
+                  <span className="text-base font-bold">
+                    {pl.clicks > 0 ? Math.round((pl.payments / pl.clicks) * 100) : 0}%
+                  </span>
+                  <span className="text-[11px] text-text-tertiary font-medium">Konversi</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-bg-secondary border border-border-light rounded-md mb-3">
+                <span className="flex-1 text-xs text-text-secondary overflow-hidden text-ellipsis whitespace-nowrap font-mono">{pl.url}</span>
+                <button className="w-[30px] h-[30px] flex items-center justify-center rounded-sm bg-bg-card border border-border-color cursor-pointer text-sm transition-all duration-150 hover:bg-red-50 hover:border-red-300" title="Salin link" onClick={(e) => { e.stopPropagation(); handleCopy(pl.url); }}>
+                  <Copy01Icon width={16} height={16} className="text-text-secondary" />
+                </button>
+                <a
+                  href={createPaymentWhatsAppUrl(pl)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-[30px] h-[30px] flex items-center justify-center rounded-sm bg-bg-card border border-border-color cursor-pointer text-sm transition-all duration-150 hover:bg-emerald-50 hover:border-emerald-300"
+                  title="Bagikan via WhatsApp"
+                  aria-label={`Bagikan ${pl.title} via WhatsApp`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <WhatsappIcon width={16} height={16} className="text-emerald-600" />
+                </a>
+              </div>
+              <div className="flex justify-between mt-1 items-center">
+                <span className="text-[11px] text-text-tertiary">Dibuat: {new Date(pl.created_at).toLocaleDateString('id-ID')}</span>
+                {!selectionMode && (
+                  <div className="flex gap-1.5">
+                    <Link href={`/payments/${pl.id}/edit`} className="btn btn-ghost btn-sm text-text-secondary hover:text-red-600 hover:bg-red-50"><Edit02Icon width={14} height={14} /> Edit</Link>
+                    <button className="btn btn-ghost btn-sm text-danger hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(pl.id)}>Hapus</button>
+                  </div>
                 )}
-                <span className={`badge ${getStatusColor(pl.status)}`}>
-                  {pl.status.charAt(0).toUpperCase() + pl.status.slice(1)}
-                </span>
               </div>
             </div>
-            <Link href={`/payments/${pl.id}`} className="text-[17px] font-bold mb-1.5 block hover:text-red-600 transition-colors no-underline text-text-primary">{pl.title}</Link>
-            <p className="text-[13px] text-text-secondary mb-3 leading-relaxed line-clamp-2" title={pl.description}>{pl.description}</p>
-            <div className="text-[22px] font-extrabold bg-gradient-to-br from-red-600 to-red-500 bg-clip-text text-transparent mb-4">
-              {new Intl.NumberFormat(pl.currency === 'IDR' ? 'id-ID' : 'en-US', { style: 'currency', currency: pl.currency || 'IDR', minimumFractionDigits: pl.currency === 'IDR' || pl.currency === 'JPY' ? 0 : 2 }).format(pl.amount)}
-            </div>
-            <div className="grid grid-cols-3 gap-2 mb-4 p-3 bg-bg-secondary rounded-md">
-              <div className="flex flex-col items-center gap-0.5">
-                <span className="text-base font-bold">{pl.clicks}</span>
-                <span className="text-[11px] text-text-tertiary font-medium">Klik</span>
-              </div>
-              <div className="flex flex-col items-center gap-0.5">
-                <span className="text-base font-bold">{pl.payments}</span>
-                <span className="text-[11px] text-text-tertiary font-medium">Pembayaran</span>
-              </div>
-              <div className="flex flex-col items-center gap-0.5">
-                <span className="text-base font-bold">
-                  {pl.clicks > 0 ? Math.round((pl.payments / pl.clicks) * 100) : 0}%
-                </span>
-                <span className="text-[11px] text-text-tertiary font-medium">Konversi</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-2.5 bg-bg-secondary border border-border-light rounded-md mb-3">
-              <span className="flex-1 text-xs text-text-secondary overflow-hidden text-ellipsis whitespace-nowrap font-mono">{pl.url}</span>
-              <button className="w-[30px] h-[30px] flex items-center justify-center rounded-sm bg-bg-card border border-border-color cursor-pointer text-sm transition-all duration-150 hover:bg-red-50 hover:border-red-300" title="Salin link" onClick={() => handleCopy(pl.url)}>
-                <Copy01Icon width={16} height={16} className="text-text-secondary" />
-              </button>
-            </div>
-            <div className="flex justify-between mt-1 items-center">
-              <span className="text-[11px] text-text-tertiary">Dibuat: {new Date(pl.created_at).toLocaleDateString('id-ID')}</span>
-              <div className="flex gap-1.5">
-                <Link href={`/payments/${pl.id}/edit`} className="btn btn-ghost btn-sm text-text-secondary hover:text-red-600 hover:bg-red-50"><Edit02Icon width={14} height={14} /> Edit</Link>
-                <button className="btn btn-ghost btn-sm text-danger hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(pl.id)}>Hapus</button>
-              </div>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Pagination */}
@@ -496,7 +547,13 @@ export default function PaymentsPage() {
           <div className="text-5xl mb-4 opacity-50 flex justify-center"><Payment01Icon width={48} height={48} /></div>
           <h3 className="text-lg font-semibold mb-2">Belum ada payment link</h3>
           <p className="text-sm text-text-secondary mb-6">Buat payment link pertama Anda</p>
-          <Link href="/payments/create" className="btn btn-primary">Buat Payment Link</Link>
+          {paymentLinkLocked ? (
+            <button className="btn btn-primary opacity-60 cursor-not-allowed" disabled title={subscription.limitMessage('payment_links')}>
+              <LockedIcon width={16} height={16} /> Buat Payment Link
+            </button>
+          ) : (
+            <Link href="/payments/create" className="btn btn-primary">Buat Payment Link</Link>
+          )}
         </div>
       )}
     </div>
