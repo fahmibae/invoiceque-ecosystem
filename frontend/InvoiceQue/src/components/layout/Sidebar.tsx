@@ -93,6 +93,8 @@ const navEntries: NavEntry[] = [
           { href: '/toolkit/expenses', label: 'Expense Tracker' },
           { href: '/toolkit/contracts', label: 'Contracts' },
           { href: '/toolkit/notes', label: 'Quick Notes' },
+          { href: '/toolkit/rate-cards', label: 'Rate Cards' },
+          { href: '/toolkit/intake-forms', label: 'Intake Forms' },
           { href: '/toolkit/snippets', label: 'Code Snippets' },
           { href: '/toolkit/checklists', label: 'Checklists' },
         ],
