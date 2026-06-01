@@ -1,7 +1,7 @@
-import * as XLSX from 'xlsx';
-import { saveAs } from 'file-saver';
-import type { Invoice, Client, PaymentLink } from './api';
-import { formatCurrency, convertToIDR } from './utils';
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+import type { Invoice, Client, PaymentLink } from "./api";
+import { formatCurrency, convertToIDR } from "./utils";
 
 // ── Types ─────────────────────────────────────────────
 
@@ -24,13 +24,19 @@ export interface ReportData {
     dpCount: number;
   };
   topClients: { name: string; revenue: number; count: number }[];
-  agingBuckets: { current: number; '1-30': number; '31-60': number; '61-90': number; '90+': number };
+  agingBuckets: {
+    current: number;
+    "1-30": number;
+    "31-60": number;
+    "61-90": number;
+    "90+": number;
+  };
   monthlyRevenue: { month: string; revenue: number }[];
 }
 
 // ── Excel Export ──────────────────────────────────────
 
-function fmtCur(amount: number, currency = 'IDR') {
+function fmtCur(amount: number, currency = "IDR") {
   return formatCurrency(amount, currency);
 }
 
@@ -41,114 +47,164 @@ export function exportReportToExcel(data: ReportData) {
 
   // ── Sheet 1: Ringkasan / Summary ──
   const summaryRows = [
-    ['LAPORAN KEUANGAN INVOICEQU'],
+    ["LAPORAN KEUANGAN INVOICEQU"],
     [`Periode: ${data.period}`],
-    [`Tanggal Export: ${now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`],
+    [
+      `Tanggal Export: ${now.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}`,
+    ],
     [],
-    ['RINGKASAN KPI'],
-    ['Metrik', 'Nilai'],
-    ['Total Pendapatan', fmtCur(data.kpis.totalRevenue)],
-    ['Belum Dibayar', fmtCur(data.kpis.totalPending)],
-    ['Jatuh Tempo', fmtCur(data.kpis.totalOverdue)],
-    ['Rata-rata Invoice', fmtCur(data.kpis.avgInvoice)],
-    ['Tingkat Koleksi', `${data.kpis.collectionRate}%`],
+    ["RINGKASAN KPI"],
+    ["Metrik", "Nilai"],
+    ["Total Pendapatan", fmtCur(data.kpis.totalRevenue)],
+    ["Belum Dibayar", fmtCur(data.kpis.totalPending)],
+    ["Jatuh Tempo", fmtCur(data.kpis.totalOverdue)],
+    ["Rata-rata Invoice", fmtCur(data.kpis.avgInvoice)],
+    ["Tingkat Koleksi", `${data.kpis.collectionRate}%`],
     [],
-    ['DISTRIBUSI STATUS'],
-    ['Status', 'Jumlah'],
-    ['Lunas', data.kpis.paidCount],
-    ['Terkirim', data.kpis.sentCount],
-    ['Jatuh Tempo', data.kpis.overdueCount],
-    ['Draft', data.kpis.draftCount],
-    ['DP (Partially Paid)', data.kpis.dpCount],
+    ["DISTRIBUSI STATUS"],
+    ["Status", "Jumlah"],
+    ["Lunas", data.kpis.paidCount],
+    ["Terkirim", data.kpis.sentCount],
+    ["Jatuh Tempo", data.kpis.overdueCount],
+    ["Draft", data.kpis.draftCount],
+    ["DP (Partially Paid)", data.kpis.dpCount],
     [],
-    ['AGING PIUTANG'],
-    ['Kategori', 'Jumlah (IDR)'],
-    ['Belum Jatuh Tempo', fmtCur(data.agingBuckets.current)],
-    ['1-30 Hari Lewat', fmtCur(data.agingBuckets['1-30'])],
-    ['31-60 Hari Lewat', fmtCur(data.agingBuckets['31-60'])],
-    ['61-90 Hari Lewat', fmtCur(data.agingBuckets['61-90'])],
-    ['> 90 Hari Lewat', fmtCur(data.agingBuckets['90+'])],
+    ["AGING PIUTANG"],
+    ["Kategori", "Jumlah (IDR)"],
+    ["Belum Jatuh Tempo", fmtCur(data.agingBuckets.current)],
+    ["1-30 Hari Lewat", fmtCur(data.agingBuckets["1-30"])],
+    ["31-60 Hari Lewat", fmtCur(data.agingBuckets["31-60"])],
+    ["61-90 Hari Lewat", fmtCur(data.agingBuckets["61-90"])],
+    ["> 90 Hari Lewat", fmtCur(data.agingBuckets["90+"])],
   ];
   const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
-  wsSummary['!cols'] = [{ wch: 28 }, { wch: 28 }];
-  XLSX.utils.book_append_sheet(wb, wsSummary, 'Ringkasan');
+  wsSummary["!cols"] = [{ wch: 28 }, { wch: 28 }];
+  XLSX.utils.book_append_sheet(wb, wsSummary, "Ringkasan");
 
   // ── Sheet 2: Tren Pendapatan ──
   const revenueRows = [
-    ['TREN PENDAPATAN BULANAN'],
+    ["TREN PENDAPATAN BULANAN"],
     [],
-    ['Bulan', 'Pendapatan (IDR)'],
-    ...data.monthlyRevenue.map(r => [r.month, fmtCur(r.revenue)]),
+    ["Bulan", "Pendapatan (IDR)"],
+    ...data.monthlyRevenue.map((r) => [r.month, fmtCur(r.revenue)]),
   ];
   const wsRevenue = XLSX.utils.aoa_to_sheet(revenueRows);
-  wsRevenue['!cols'] = [{ wch: 18 }, { wch: 28 }];
-  XLSX.utils.book_append_sheet(wb, wsRevenue, 'Tren Pendapatan');
+  wsRevenue["!cols"] = [{ wch: 18 }, { wch: 28 }];
+  XLSX.utils.book_append_sheet(wb, wsRevenue, "Tren Pendapatan");
 
   // ── Sheet 3: Top Klien ──
   const clientRows = [
-    ['KLIEN TERATAS'],
+    ["KLIEN TERATAS"],
     [],
-    ['Peringkat', 'Nama Klien', 'Jumlah Invoice', 'Total Pendapatan (IDR)'],
-    ...data.topClients.map((c, i) => [i + 1, c.name, c.count, fmtCur(c.revenue)]),
+    ["Peringkat", "Nama Klien", "Jumlah Invoice", "Total Pendapatan (IDR)"],
+    ...data.topClients.map((c, i) => [
+      i + 1,
+      c.name,
+      c.count,
+      fmtCur(c.revenue),
+    ]),
   ];
   const wsClients = XLSX.utils.aoa_to_sheet(clientRows);
-  wsClients['!cols'] = [{ wch: 10 }, { wch: 30 }, { wch: 18 }, { wch: 28 }];
-  XLSX.utils.book_append_sheet(wb, wsClients, 'Klien Teratas');
+  wsClients["!cols"] = [{ wch: 10 }, { wch: 30 }, { wch: 18 }, { wch: 28 }];
+  XLSX.utils.book_append_sheet(wb, wsClients, "Klien Teratas");
 
   // ── Sheet 4: Detail Invoice ──
-  const invoiceHeaders = ['No.', 'Nomor Invoice', 'Klien', 'Status', 'Mata Uang', 'Total', 'Total (IDR)', 'Dibayar', 'Sisa', 'Jatuh Tempo', 'Dibuat'];
+  const invoiceHeaders = [
+    "No.",
+    "Nomor Invoice",
+    "Klien",
+    "Status",
+    "Mata Uang",
+    "Total",
+    "Total (IDR)",
+    "Dibayar",
+    "Sisa",
+    "Jatuh Tempo",
+    "Dibuat",
+  ];
   const invoiceRows = data.invoices.map((inv, i) => [
     i + 1,
-    inv.number || inv.invoice_number || '',
+    inv.number || inv.invoice_number || "",
     inv.client_name,
     inv.status,
-    inv.currency || 'IDR',
+    inv.currency || "IDR",
     inv.total,
-    convertToIDR(inv.total, inv.currency, data.rates || undefined, inv.exchange_rate_idr),
+    convertToIDR(
+      inv.total,
+      inv.currency,
+      data.rates || undefined,
+      inv.exchange_rate_idr,
+    ),
     inv.amount_paid || 0,
     inv.amount_remaining || 0,
-    inv.due_date ? new Date(inv.due_date).toLocaleDateString('id-ID') : '',
-    inv.created_at ? new Date(inv.created_at).toLocaleDateString('id-ID') : '',
+    inv.due_date ? new Date(inv.due_date).toLocaleDateString("id-ID") : "",
+    inv.created_at ? new Date(inv.created_at).toLocaleDateString("id-ID") : "",
   ]);
   const wsInvoices = XLSX.utils.aoa_to_sheet([
-    ['DETAIL SEMUA INVOICE'],
+    ["DETAIL SEMUA INVOICE"],
     [],
     invoiceHeaders,
     ...invoiceRows,
   ]);
-  wsInvoices['!cols'] = [
-    { wch: 5 }, { wch: 18 }, { wch: 25 }, { wch: 15 }, { wch: 12 },
-    { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 14 }, { wch: 14 },
+  wsInvoices["!cols"] = [
+    { wch: 5 },
+    { wch: 18 },
+    { wch: 25 },
+    { wch: 15 },
+    { wch: 12 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 14 },
+    { wch: 14 },
   ];
-  XLSX.utils.book_append_sheet(wb, wsInvoices, 'Detail Invoice');
+  XLSX.utils.book_append_sheet(wb, wsInvoices, "Detail Invoice");
 
   // ── Sheet 5: Payment Links ──
-  const plHeaders = ['No.', 'Judul', 'Jumlah', 'Mata Uang', 'Status', 'Klik', 'Pembayaran', 'Dibuat'];
+  const plHeaders = [
+    "No.",
+    "Judul",
+    "Jumlah",
+    "Mata Uang",
+    "Status",
+    "Klik",
+    "Pembayaran",
+    "Dibuat",
+  ];
   const plRows = data.paymentLinks.map((pl, i) => [
     i + 1,
     pl.title,
     pl.amount,
-    pl.currency || 'IDR',
+    pl.currency || "IDR",
     pl.status,
     pl.clicks || 0,
     pl.payments || 0,
-    pl.created_at ? new Date(pl.created_at).toLocaleDateString('id-ID') : '',
+    pl.created_at ? new Date(pl.created_at).toLocaleDateString("id-ID") : "",
   ]);
   const wsPL = XLSX.utils.aoa_to_sheet([
-    ['DETAIL PAYMENT LINKS'],
+    ["DETAIL PAYMENT LINKS"],
     [],
     plHeaders,
     ...plRows,
   ]);
-  wsPL['!cols'] = [
-    { wch: 5 }, { wch: 30 }, { wch: 18 }, { wch: 12 }, { wch: 12 },
-    { wch: 8 }, { wch: 14 }, { wch: 14 },
+  wsPL["!cols"] = [
+    { wch: 5 },
+    { wch: 30 },
+    { wch: 18 },
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 8 },
+    { wch: 14 },
+    { wch: 14 },
   ];
-  XLSX.utils.book_append_sheet(wb, wsPL, 'Payment Links');
+  XLSX.utils.book_append_sheet(wb, wsPL, "Payment Links");
 
   // ── Write & Save ──
-  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-  const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([wbout], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
   saveAs(blob, `Laporan_InvoiceQu_${dateStr}.xlsx`);
 }
 
@@ -156,14 +212,18 @@ export function exportReportToExcel(data: ReportData) {
 
 export function printReportPDF(data: ReportData) {
   const now = new Date();
-  const dateStr = now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  const dateStr = now.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 
   const statusMap: Record<string, string> = {
-    paid: 'Lunas',
-    sent: 'Terkirim',
-    overdue: 'Jatuh Tempo',
-    draft: 'Draft',
-    partially_paid: 'DP',
+    paid: "Lunas",
+    sent: "Terkirim",
+    overdue: "Jatuh Tempo",
+    draft: "Draft",
+    partially_paid: "DP",
   };
 
   const html = `
@@ -321,17 +381,25 @@ export function printReportPDF(data: ReportData) {
       <div class="section-title">Distribusi Status Invoice</div>
       <div class="status-grid">
         ${[
-          { label: 'Lunas', count: data.kpis.paidCount, color: '#10b981' },
-          { label: 'Terkirim', count: data.kpis.sentCount, color: '#3b82f6' },
-          { label: 'Jatuh Tempo', count: data.kpis.overdueCount, color: '#ef4444' },
-          { label: 'Draft', count: data.kpis.draftCount, color: '#6b7280' },
-          { label: 'DP', count: data.kpis.dpCount, color: '#f59e0b' },
-        ].map(s => `
+          { label: "Lunas", count: data.kpis.paidCount, color: "#10b981" },
+          { label: "Terkirim", count: data.kpis.sentCount, color: "#3b82f6" },
+          {
+            label: "Jatuh Tempo",
+            count: data.kpis.overdueCount,
+            color: "#ef4444",
+          },
+          { label: "Draft", count: data.kpis.draftCount, color: "#6b7280" },
+          { label: "DP", count: data.kpis.dpCount, color: "#f59e0b" },
+        ]
+          .map(
+            (s) => `
           <div class="status-card">
             <div class="count" style="color:${s.color}">${s.count}</div>
             <div class="label"><span class="dot" style="background:${s.color}"></span>${s.label}</div>
           </div>
-        `).join('')}
+        `,
+          )
+          .join("")}
       </div>
       <div style="text-align:right; margin-top:8px; font-size:10px; color:#6b7280;">
         Tingkat Koleksi: <strong style="color:#1a1a2e">${data.kpis.collectionRate}%</strong>
@@ -342,39 +410,52 @@ export function printReportPDF(data: ReportData) {
       <!-- Monthly Revenue -->
       <div class="section">
         <div class="section-title">Tren Pendapatan Bulanan</div>
-        ${data.monthlyRevenue.length === 0
-          ? '<div style="text-align:center;color:#9ca3af;padding:20px 0;">Belum ada data</div>'
-          : (() => {
-              const maxRev = Math.max(...data.monthlyRevenue.map(r => r.revenue), 1);
-              return `<div class="bar-chart">
-                ${data.monthlyRevenue.map(r => `
+        ${
+          data.monthlyRevenue.length === 0
+            ? '<div style="text-align:center;color:#9ca3af;padding:20px 0;">Belum ada data</div>'
+            : (() => {
+                const maxRev = Math.max(
+                  ...data.monthlyRevenue.map((r) => r.revenue),
+                  1,
+                );
+                return `<div class="bar-chart">
+                ${data.monthlyRevenue
+                  .map(
+                    (r) => `
                   <div class="bar-col">
                     <div class="bar-value">${fmtCur(r.revenue)}</div>
                     <div class="bar" style="height:${Math.max((r.revenue / maxRev) * 80, 3)}px"></div>
                     <div class="bar-label">${r.month}</div>
                   </div>
-                `).join('')}
+                `,
+                  )
+                  .join("")}
               </div>`;
-            })()
+              })()
         }
       </div>
 
       <!-- Top Clients -->
       <div class="section">
         <div class="section-title">Klien Teratas</div>
-        ${data.topClients.length === 0
-          ? '<div style="text-align:center;color:#9ca3af;padding:20px 0;">Belum ada data</div>'
-          : `<table>
+        ${
+          data.topClients.length === 0
+            ? '<div style="text-align:center;color:#9ca3af;padding:20px 0;">Belum ada data</div>'
+            : `<table>
               <thead><tr><th>#</th><th>Klien</th><th class="text-center">Inv</th><th class="text-right">Pendapatan</th></tr></thead>
               <tbody>
-                ${data.topClients.map((c, i) => `
+                ${data.topClients
+                  .map(
+                    (c, i) => `
                   <tr>
                     <td class="font-bold">${i + 1}</td>
                     <td class="font-semibold">${c.name}</td>
                     <td class="text-center">${c.count}</td>
                     <td class="text-right font-semibold">${fmtCur(c.revenue)}</td>
                   </tr>
-                `).join('')}
+                `,
+                  )
+                  .join("")}
               </tbody>
             </table>`
         }
@@ -385,14 +466,42 @@ export function printReportPDF(data: ReportData) {
     <div class="section">
       <div class="section-title">Aging Piutang</div>
       ${[
-        { label: 'Belum Jatuh Tempo', value: data.agingBuckets.current, color: '#10b981' },
-        { label: '1-30 Hari Lewat', value: data.agingBuckets['1-30'], color: '#f59e0b' },
-        { label: '31-60 Hari Lewat', value: data.agingBuckets['31-60'], color: '#f97316' },
-        { label: '61-90 Hari Lewat', value: data.agingBuckets['61-90'], color: '#ef4444' },
-        { label: '> 90 Hari Lewat', value: data.agingBuckets['90+'], color: '#991b1b' },
-      ].map(b => {
-        const maxAging = Math.max(data.agingBuckets.current, data.agingBuckets['1-30'], data.agingBuckets['31-60'], data.agingBuckets['61-90'], data.agingBuckets['90+'], 1);
-        return `
+        {
+          label: "Belum Jatuh Tempo",
+          value: data.agingBuckets.current,
+          color: "#10b981",
+        },
+        {
+          label: "1-30 Hari Lewat",
+          value: data.agingBuckets["1-30"],
+          color: "#f59e0b",
+        },
+        {
+          label: "31-60 Hari Lewat",
+          value: data.agingBuckets["31-60"],
+          color: "#f97316",
+        },
+        {
+          label: "61-90 Hari Lewat",
+          value: data.agingBuckets["61-90"],
+          color: "#ef4444",
+        },
+        {
+          label: "> 90 Hari Lewat",
+          value: data.agingBuckets["90+"],
+          color: "#991b1b",
+        },
+      ]
+        .map((b) => {
+          const maxAging = Math.max(
+            data.agingBuckets.current,
+            data.agingBuckets["1-30"],
+            data.agingBuckets["31-60"],
+            data.agingBuckets["61-90"],
+            data.agingBuckets["90+"],
+            1,
+          );
+          return `
           <div class="aging-row">
             <div class="aging-label" style="color:${b.color}">${b.label}</div>
             <div class="aging-bar-bg">
@@ -401,7 +510,8 @@ export function printReportPDF(data: ReportData) {
             <div class="aging-value">${fmtCur(b.value)}</div>
           </div>
         `;
-      }).join('')}
+        })
+        .join("")}
     </div>
 
     <!-- Invoice Detail Table -->
@@ -421,21 +531,32 @@ export function printReportPDF(data: ReportData) {
           </tr>
         </thead>
         <tbody>
-          ${data.invoices.map((inv, i) => {
-            const badgeClass = inv.status === 'paid' ? 'badge-paid' : inv.status === 'sent' ? 'badge-sent' : inv.status === 'overdue' ? 'badge-overdue' : inv.status === 'partially_paid' ? 'badge-dp' : 'badge-draft';
-            return `
+          ${data.invoices
+            .map((inv, i) => {
+              const badgeClass =
+                inv.status === "paid"
+                  ? "badge-paid"
+                  : inv.status === "sent"
+                    ? "badge-sent"
+                    : inv.status === "overdue"
+                      ? "badge-overdue"
+                      : inv.status === "partially_paid"
+                        ? "badge-dp"
+                        : "badge-draft";
+              return `
               <tr>
                 <td>${i + 1}</td>
-                <td class="font-semibold">${inv.number || inv.invoice_number || '-'}</td>
+                <td class="font-semibold">${inv.number || inv.invoice_number || "-"}</td>
                 <td>${inv.client_name}</td>
                 <td class="text-center"><span class="badge ${badgeClass}">${statusMap[inv.status] || inv.status}</span></td>
                 <td class="text-right font-semibold">${fmtCur(convertToIDR(inv.total, inv.currency, data.rates || undefined, inv.exchange_rate_idr))}</td>
                 <td class="text-right">${fmtCur(convertToIDR(inv.amount_paid || 0, inv.currency, data.rates || undefined, inv.exchange_rate_idr))}</td>
                 <td class="text-right">${fmtCur(convertToIDR(inv.amount_remaining || 0, inv.currency, data.rates || undefined, inv.exchange_rate_idr))}</td>
-                <td>${inv.due_date ? new Date(inv.due_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}</td>
+                <td>${inv.due_date ? new Date(inv.due_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "-"}</td>
               </tr>
             `;
-          }).join('')}
+            })
+            .join("")}
         </tbody>
       </table>
     </div>
@@ -450,7 +571,7 @@ export function printReportPDF(data: ReportData) {
 </body>
 </html>`;
 
-  const printWindow = window.open('', '_blank');
+  const printWindow = window.open("", "_blank");
   if (printWindow) {
     printWindow.document.write(html);
     printWindow.document.close();

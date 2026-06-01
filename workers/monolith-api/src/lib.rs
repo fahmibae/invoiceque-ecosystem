@@ -129,120 +129,7 @@ async fn route(mut req: Request, env: &Env, path: &str, method: Method) -> Resul
         );
     }
 
-    // ── Temporary DB debug endpoint (remove after fixing) ──
-    if path == "/api/v1/debug/toolkit-db" {
-        let url_raw = utils::get_secret(env, "TASK_DB_URL");
-        let url = url_raw.trim().to_string();
-        if url.is_empty() {
-            return utils::json_response(
-                &serde_json::json!({"error": "TASK_DB_URL is empty"}),
-                500,
-            );
-        }
-
-        let db = match db::NeonClient::from_connection_string(&url) {
-            Ok(db) => db,
-            Err(e) => {
-                return utils::json_response(
-                    &serde_json::json!({"error": format!("DB parse error: {}", e)}),
-                    500,
-                );
-            }
-        };
-
-        // Test SELECT 1
-        if let Err(e) = db.execute("SELECT 1", &[]).await {
-            return utils::json_response(
-                &serde_json::json!({"error": format!("SELECT 1 failed: {}", e)}),
-                500,
-            );
-        }
-
-        // Test ensure_table (base create)
-        if let Err(e) = db.execute(
-            "CREATE TABLE IF NOT EXISTS toolkit_items (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                user_id UUID NOT NULL,
-                toolkit_type VARCHAR(50) NOT NULL DEFAULT 'snippet',
-                title VARCHAR(500) NOT NULL DEFAULT '',
-                content JSONB DEFAULT '{}',
-                created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW()
-            )",
-            &[],
-        ).await {
-            return utils::json_response(
-                &serde_json::json!({"error": format!("Table create error: {}", e)}),
-                500,
-            );
-        }
-
-        // Run column migrations
-        let migrations = [
-            "ALTER TABLE toolkit_items ADD COLUMN IF NOT EXISTS project_id UUID",
-            "ALTER TABLE toolkit_items ADD COLUMN IF NOT EXISTS client_id UUID",
-            "ALTER TABLE toolkit_items ADD COLUMN IF NOT EXISTS language VARCHAR(50) DEFAULT ''",
-            "ALTER TABLE toolkit_items ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}'",
-            "ALTER TABLE toolkit_items ADD COLUMN IF NOT EXISTS is_favorited BOOLEAN DEFAULT false",
-            "ALTER TABLE toolkit_items ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0",
-        ];
-        let mut migration_results = Vec::new();
-        for sql in &migrations {
-            match db.execute(sql, &[]).await {
-                Ok(_) => migration_results.push(serde_json::json!({"sql": sql, "ok": true})),
-                Err(e) => migration_results.push(serde_json::json!({"sql": sql, "ok": false, "error": format!("{}", e)})),
-            }
-        }
-
-        // Test COUNT query
-        let count_result: Result<i64, _> = db.query_scalar(
-            "SELECT COUNT(*) FROM toolkit_items",
-            &[],
-        ).await;
-        let count = match &count_result {
-            Ok(c) => *c,
-            Err(_) => -1,
-        };
-
-        // Test raw query to see what Neon returns for the columns
-        let raw_result = db.query(
-            "SELECT id::text, user_id::text, toolkit_type, project_id::text, client_id::text, title, content, language, tags, is_favorited, sort_order, created_at::text, updated_at::text FROM toolkit_items LIMIT 1",
-            &[],
-        ).await;
-
-        let raw_info = match &raw_result {
-            Ok(r) => {
-                let field_info: Vec<serde_json::Value> = r.fields.iter().map(|f| {
-                    serde_json::json!({"name": f.name, "dataTypeID": f.data_type_id})
-                }).collect();
-                let first_row = r.rows.first().cloned();
-                serde_json::json!({"fields": field_info, "first_row": first_row, "row_count": r.rows.len()})
-            }
-            Err(e) => serde_json::json!({"error": format!("Raw query error: {}", e)}),
-        };
-
-        // Test typed deserialization
-        let typed_result: Result<Vec<services::toolkit::ToolkitItem>, _> = db.query_typed(
-            "SELECT id::text, user_id::text, toolkit_type, project_id::text, client_id::text, title, content, language, tags, is_favorited, sort_order, created_at::text, updated_at::text FROM toolkit_items LIMIT 1",
-            &[],
-        ).await;
-        let typed_info = match &typed_result {
-            Ok(items) => serde_json::json!({"ok": true, "count": items.len()}),
-            Err(e) => serde_json::json!({"ok": false, "error": format!("{}", e)}),
-        };
-
-        return utils::json_response(
-            &serde_json::json!({
-                "status": "debug",
-                "db_connected": true,
-                "table_ready": true,
-                "row_count": count,
-                "raw_query": raw_info,
-                "typed_query": typed_info,
-            }),
-            200,
-        );
-    }
+    // Debug endpoints removed for production security
 
     // ══════════════════════════════════════════════════════════
     //  PUBLIC ROUTES (no JWT required)
@@ -360,13 +247,47 @@ async fn route(mut req: Request, env: &Env, path: &str, method: Method) -> Resul
     }
 
     // ══════════════════════════════════════════════════════════
-    //  PROTECTED ROUTES (JWT required)
+    //  PROTECTED ROUTES (JWT or API Key required)
     // ══════════════════════════════════════════════════════════
 
-    let claims = match middleware::extract_auth(&req, &jwt_secret) {
+    let auth_ctx = match middleware::extract_auth_dual(&req, &env, &jwt_secret).await {
         Ok(c) => c,
         Err(resp) => return Ok(resp),
     };
+
+    // Derive JwtClaims for backward compatibility with existing service handlers
+    let claims = middleware::JwtClaims {
+        user_id: auth_ctx.user_id.clone(),
+        email: auth_ctx.email.clone(),
+        role: auth_ctx.role.clone(),
+    };
+
+    // ── API Key management routes (JWT-only, not accessible via API keys) ──
+    if path == "/api/v1/api-keys" || path == "/api/v1/api-keys/" {
+        if auth_ctx.auth_type != middleware::AuthType::Jwt {
+            return utils::json_error("API key management requires JWT authentication", 403);
+        }
+        return match method {
+            Method::Get => services::api_key::list_api_keys(&req, &env, &claims).await,
+            Method::Post => services::api_key::create_api_key(req, &env, &claims).await,
+            _ => utils::json_error("Method not allowed", 405),
+        };
+    }
+    if path == "/api/v1/api-keys/scopes" && method == Method::Get {
+        return services::api_key::list_scopes().await;
+    }
+    if let Some(id) = strip_prefix(path, "/api/v1/api-keys/") {
+        if !id.contains('/') {
+            if auth_ctx.auth_type != middleware::AuthType::Jwt {
+                return utils::json_error("API key management requires JWT authentication", 403);
+            }
+            return match method {
+                Method::Put => services::api_key::update_api_key(req, &env, &claims, id).await,
+                Method::Delete => services::api_key::revoke_api_key(&env, &claims, id).await,
+                _ => utils::json_error("Method not allowed", 405),
+            };
+        }
+    }
 
     // ── Auth protected routes ──
     if path == "/api/v1/auth/profile" {
@@ -693,6 +614,31 @@ async fn route(mut req: Request, env: &Env, path: &str, method: Method) -> Resul
                 Method::Get => services::task::get_task(env, &claims, id).await,
                 Method::Put => services::task::update_task(req, env, &claims, id).await,
                 Method::Delete => services::task::delete_task(env, &claims, id).await,
+                _ => utils::json_error("Method not allowed", 405),
+            };
+        }
+    }
+
+    // ── Meeting routes ──
+    if path == "/api/v1/meetings" {
+        return match method {
+            Method::Get => services::meeting::list_meetings(&req, env, &claims).await,
+            Method::Post => services::meeting::create_meeting(req, env, &claims).await,
+            _ => utils::json_error("Method not allowed", 405),
+        };
+    }
+    if path == "/api/v1/meetings/stats" && method == Method::Get {
+        return services::meeting::meeting_stats(env, &claims).await;
+    }
+    if path == "/api/v1/meetings/bulk-delete" && method == Method::Post {
+        return services::meeting::bulk_delete_meetings(req, env, &claims).await;
+    }
+    if let Some(id) = strip_prefix(path, "/api/v1/meetings/") {
+        if !id.contains('/') {
+            return match method {
+                Method::Get => services::meeting::get_meeting(env, &claims, id).await,
+                Method::Put => services::meeting::update_meeting(req, env, &claims, id).await,
+                Method::Delete => services::meeting::delete_meeting(env, &claims, id).await,
                 _ => utils::json_error("Method not allowed", 405),
             };
         }

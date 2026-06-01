@@ -162,7 +162,7 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
-      <body className="min-h-screen bg-[#09090b] text-white font-[family-name:var(--font-inter)] overflow-x-hidden" suppressHydrationWarning>
+      <body className="min-h-screen bg-[#09090b] text-white font-[family-name:var(--font-sora)] overflow-x-hidden" suppressHydrationWarning>
         <IdleDetector />
         <AntiInspect />
         {children}

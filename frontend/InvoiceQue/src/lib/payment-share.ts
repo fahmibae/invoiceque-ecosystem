@@ -1,4 +1,4 @@
-import { formatCurrency } from './utils';
+import { formatCurrency } from "./utils";
 
 type ShareablePaymentLink = {
   title: string;
@@ -10,14 +10,16 @@ type ShareablePaymentLink = {
 
 export function createPaymentWhatsAppUrl(link: ShareablePaymentLink) {
   const message = [
-    'Halo, berikut link pembayaran:',
-    '',
+    "Halo, berikut link pembayaran:",
+    "",
     `*${link.title}*`,
     `Nominal: ${formatCurrency(link.amount, link.currency)}`,
-    link.description ? `Keterangan: ${link.description}` : '',
-    '',
+    link.description ? `Keterangan: ${link.description}` : "",
+    "",
     link.url,
-  ].filter(Boolean).join('\n');
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   return `https://wa.me/?text=${encodeURIComponent(message)}`;
 }

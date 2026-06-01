@@ -337,3 +337,66 @@ html {
     line-height: 1.15 !important;
   }
 }
+
+/* ===== Safari Compatibility ===== */
+
+/*
+ * Tailwind v4 generates oklch() / color-mix() colors that Safari < 16.2
+ * cannot render. The browserslist in package.json tells Lightning CSS to
+ * generate rgb fallbacks. The rules below add extra safety for custom
+ * classes and animation performance on WebKit.
+ */
+
+/* Hardware-accelerated animations for Safari */
+.animate-fade-in-up,
+.animate-fade-in-down,
+.animate-fade-in,
+.animate-slide-in-left,
+.animate-slide-in-right,
+.animate-float,
+.animate-float-slow {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+/* Section divider with explicit rgba fallback for Safari */
+.section-divider,
+.border-divider {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.08),
+    transparent
+  );
+}
+
+/* Glass fallback: guarantee -webkit-backdrop-filter on all glass variants */
+.glass {
+  -webkit-backdrop-filter: blur(20px);
+}
+.glass-card {
+  -webkit-backdrop-filter: blur(24px);
+}
+
+/* Ensure text gradients degrade gracefully */
+@supports not (-webkit-background-clip: text) {
+  .text-gradient-red {
+    color: #dc2626;
+    background: none !important;
+  }
+  .text-gradient-light {
+    color: #fca5a5;
+    background: none !important;
+  }
+}
+
+/* Safari flexbox gap polyfill for very old versions (< 14.1) */
+@supports not (gap: 1px) {
+  .flex {
+    --safari-gap: 8px;
+  }
+  .flex > * + * {
+    margin-left: var(--safari-gap);
+  }
+}

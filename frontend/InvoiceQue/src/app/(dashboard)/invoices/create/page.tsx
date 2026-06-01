@@ -1,16 +1,38 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { clientApi, invoiceApi, paymentLinkApi, xenditApi, paypalApi, type Client, type PaymentLink, invoiceSettingsApi } from '@/lib/api';
-import { formatCurrency } from '@/lib/utils';
-import { GoogleDocIcon, User02Icon, ArrowLeft02Icon, PackageIcon, MoneyBag02Icon, Payment02Icon, Link04Icon, CreditCardIcon, Atm02Icon, Copy01Icon, Tick02Icon } from 'hugeicons-react';
-import Portal from '@/components/ui/Portal';
-import CurrencySelect from '@/components/ui/CurrencySelect';
-import { ALL_SUPPORTED_CURRENCIES } from '@/lib/currencies';
-import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
-import FeatureLimitLock from '@/components/subscription/FeatureLimitLock';
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  clientApi,
+  invoiceApi,
+  paymentLinkApi,
+  xenditApi,
+  paypalApi,
+  type Client,
+  type PaymentLink,
+  invoiceSettingsApi,
+} from "@/lib/api";
+import { formatCurrency } from "@/lib/utils";
+import {
+  GoogleDocIcon,
+  User02Icon,
+  ArrowLeft02Icon,
+  PackageIcon,
+  MoneyBag02Icon,
+  Payment02Icon,
+  Link04Icon,
+  CreditCardIcon,
+  Atm02Icon,
+  Copy01Icon,
+  Tick02Icon,
+} from "hugeicons-react";
+import Portal from "@/components/ui/Portal";
+import CurrencySelect from "@/components/ui/CurrencySelect";
+import { ALL_SUPPORTED_CURRENCIES } from "@/lib/currencies";
+import { useSubscriptionUsage } from "@/hooks/useSubscriptionUsage";
+import FeatureLimitLock from "@/components/subscription/FeatureLimitLock";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface LineItem {
   id: number;
@@ -22,46 +44,48 @@ interface LineItem {
 export default function CreateInvoicePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t, intlLocale } = useLanguage();
   const [clients, setClients] = useState<Client[]>([]);
-  const [selectedClient, setSelectedClient] = useState('');
+  const [selectedClient, setSelectedClient] = useState("");
   const [items, setItems] = useState<LineItem[]>([
-    { id: 1, description: '', quantity: 1, price: 0 },
+    { id: 1, description: "", quantity: 1, price: 0 },
   ]);
   const [tax, setTax] = useState(10);
   const [discount, setDiscount] = useState(0);
-  const [notes, setNotes] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [paymentType, setPaymentType] = useState<'full' | 'dp'>('full');
+  const [notes, setNotes] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [paymentType, setPaymentType] = useState<"full" | "dp">("full");
   const [dpPercentage, setDpPercentage] = useState(50);
-  const [currency, setCurrency] = useState('IDR');
+  const [currency, setCurrency] = useState("IDR");
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [companyInitial, setCompanyInitial] = useState('');
-  const [logoCompany, setLogoCompany] = useState('');
-  const [accentColor, setAccentColor] = useState('');
+  const [error, setError] = useState("");
+  const [companyInitial, setCompanyInitial] = useState("");
+  const [logoCompany, setLogoCompany] = useState("");
+  const [accentColor, setAccentColor] = useState("");
   const hasLogo = !!logoCompany;
   const hasInitial = !!companyInitial;
   const hasAccent = !!accentColor;
 
   // Auto Payment Link states
   const [autoPaymentLink, setAutoPaymentLink] = useState(false);
-  const [paymentProvider, setPaymentProvider] = useState('');
+  const [paymentProvider, setPaymentProvider] = useState("");
   const [hasXendit, setHasXendit] = useState(false);
   const [hasPaypal, setHasPaypal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [createdPaymentLink, setCreatedPaymentLink] = useState<PaymentLink | null>(null);
+  const [createdPaymentLink, setCreatedPaymentLink] =
+    useState<PaymentLink | null>(null);
   const [copied, setCopied] = useState(false);
-  const [savingStep, setSavingStep] = useState('');
+  const [savingStep, setSavingStep] = useState("");
   const subscription = useSubscriptionUsage();
-  const invoiceLocked = subscription.isResourceLocked('invoices');
-  const paymentLinkLocked = subscription.isResourceLocked('payment_links');
+  const invoiceLocked = subscription.isResourceLocked("invoices");
+  const paymentLinkLocked = subscription.isResourceLocked("payment_links");
 
   const loadSettings = async () => {
     try {
       const s = await invoiceSettingsApi.get();
-      setCompanyInitial((s.business_name || '').substring(0, 2).toUpperCase());
-      setLogoCompany(s.logo_url || '');
-      setAccentColor(s.accent_color || '');
+      setCompanyInitial((s.business_name || "").substring(0, 2).toUpperCase());
+      setLogoCompany(s.logo_url || "");
+      setAccentColor(s.accent_color || "");
     } catch {
       // Use defaults if API not available
     }
@@ -69,10 +93,15 @@ export default function CreateInvoicePage() {
   useEffect(() => {
     loadSettings();
     // Check available payment gateways
-    xenditApi.getAccount().then(() => setHasXendit(true)).catch(() => { });
-    paypalApi.getAccount().then(() => setHasPaypal(true)).catch(() => { });
+    xenditApi
+      .getAccount()
+      .then(() => setHasXendit(true))
+      .catch(() => {});
+    paypalApi
+      .getAccount()
+      .then(() => setHasPaypal(true))
+      .catch(() => {});
   }, []);
-
 
   useEffect(() => {
     async function fetchClients() {
@@ -88,13 +117,13 @@ export default function CreateInvoicePage() {
 
   // Auto-fill from task (when coming from "Generate Invoice" button)
   useEffect(() => {
-    if (searchParams.get('from_task') !== 'true') return;
-    const desc = searchParams.get('item_desc') || '';
-    const qty = Number(searchParams.get('item_qty')) || 1;
-    const price = Number(searchParams.get('item_price')) || 0;
-    const clientId = searchParams.get('client_id') || '';
-    const taskTitle = searchParams.get('task_title') || '';
-    const taskProject = searchParams.get('task_project') || '';
+    if (searchParams.get("from_task") !== "true") return;
+    const desc = searchParams.get("item_desc") || "";
+    const qty = Number(searchParams.get("item_qty")) || 1;
+    const price = Number(searchParams.get("item_price")) || 0;
+    const clientId = searchParams.get("client_id") || "";
+    const taskTitle = searchParams.get("task_title") || "";
+    const taskProject = searchParams.get("task_project") || "";
 
     if (desc) {
       setItems([{ id: 1, description: desc, quantity: qty, price }]);
@@ -103,25 +132,34 @@ export default function CreateInvoicePage() {
       setSelectedClient(clientId);
     }
     if (taskTitle || taskProject) {
-      setNotes(`Dibuat dari tugas: ${taskTitle}${taskProject ? ` (Proyek: ${taskProject})` : ''}`);
+      setNotes(
+        t("invoiceForm.createdFromTask", {
+          task: taskTitle,
+          project: taskProject
+            ? t("invoiceForm.projectSuffix", { project: taskProject })
+            : "",
+        }),
+      );
     }
     // Set due date to 14 days from now
     const due = new Date();
     due.setDate(due.getDate() + 14);
-    setDueDate(due.toISOString().split('T')[0]);
-  }, [searchParams]);
+    setDueDate(due.toISOString().split("T")[0]);
+  }, [searchParams, t]);
 
   // Auto-fill from completed project
   useEffect(() => {
-    if (searchParams.get('from_project') !== 'true') return;
+    if (searchParams.get("from_project") !== "true") return;
 
-    const projectName = searchParams.get('project_name') || '';
-    const desc = searchParams.get('item_desc') || (projectName ? `Proyek ${projectName}` : '');
-    const qty = Number(searchParams.get('item_qty')) || 1;
-    const price = Number(searchParams.get('item_price')) || 0;
-    const clientId = searchParams.get('client_id') || '';
-    const projectCurrency = searchParams.get('currency') || '';
-    const projectDueDate = searchParams.get('due_date') || '';
+    const projectName = searchParams.get("project_name") || "";
+    const desc =
+      searchParams.get("item_desc") ||
+      (projectName ? `Proyek ${projectName}` : "");
+    const qty = Number(searchParams.get("item_qty")) || 1;
+    const price = Number(searchParams.get("item_price")) || 0;
+    const clientId = searchParams.get("client_id") || "";
+    const projectCurrency = searchParams.get("currency") || "";
+    const projectDueDate = searchParams.get("due_date") || "";
 
     if (desc) {
       setItems([{ id: 1, description: desc, quantity: qty, price }]);
@@ -133,19 +171,22 @@ export default function CreateInvoicePage() {
       setCurrency(projectCurrency);
     }
     if (projectName) {
-      setNotes(`Dibuat dari proyek: ${projectName}`);
+      setNotes(t("invoiceForm.createdFromProject", { project: projectName }));
     }
     if (projectDueDate) {
       setDueDate(projectDueDate);
     } else {
       const due = new Date();
       due.setDate(due.getDate() + 14);
-      setDueDate(due.toISOString().split('T')[0]);
+      setDueDate(due.toISOString().split("T")[0]);
     }
-  }, [searchParams]);
+  }, [searchParams, t]);
 
   const addItem = () => {
-    setItems([...items, { id: Date.now(), description: '', quantity: 1, price: 0 }]);
+    setItems([
+      ...items,
+      { id: Date.now(), description: "", quantity: 1, price: 0 },
+    ]);
   };
 
   const removeItem = (id: number) => {
@@ -154,81 +195,101 @@ export default function CreateInvoicePage() {
     }
   };
 
-  const updateItem = (id: number, field: keyof LineItem, value: string | number) => {
-    setItems(items.map((item) =>
-      item.id === id ? { ...item, [field]: value } : item
-    ));
+  const updateItem = (
+    id: number,
+    field: keyof LineItem,
+    value: string | number,
+  ) => {
+    setItems(
+      items.map((item) =>
+        item.id === id ? { ...item, [field]: value } : item,
+      ),
+    );
   };
 
-  const subtotal = items.reduce((sum, item) => sum + item.quantity * item.price, 0);
+  const subtotal = items.reduce(
+    (sum, item) => sum + item.quantity * item.price,
+    0,
+  );
   const taxAmount = (subtotal * tax) / 100;
   const total = subtotal + taxAmount - discount;
-  const dpAmount = paymentType === 'dp' ? Math.round(total * dpPercentage / 100) : 0;
-  const remainingAmount = paymentType === 'dp' ? total - dpAmount : 0;
+  const dpAmount =
+    paymentType === "dp" ? Math.round((total * dpPercentage) / 100) : 0;
+  const remainingAmount = paymentType === "dp" ? total - dpAmount : 0;
 
   const client = clients.find((c) => c.id === selectedClient);
 
   const handleSubmit = async (status: string) => {
     if (invoiceLocked) {
-      setError(subscription.limitMessage('invoices'));
+      setError(subscription.limitMessage("invoices"));
       return;
     }
-    if (autoPaymentLink && status === 'sent' && paymentLinkLocked) {
-      setError(subscription.limitMessage('payment_links'));
+    if (autoPaymentLink && status === "sent" && paymentLinkLocked) {
+      setError(subscription.limitMessage("payment_links"));
       return;
     }
     if (!selectedClient) {
-      setError('Pilih klien terlebih dahulu');
+      setError(t("invoiceForm.selectClientError"));
       return;
     }
     if (!dueDate) {
-      setError('Tanggal jatuh tempo wajib diisi');
+      setError(t("invoiceForm.dueDateRequired"));
       return;
     }
     const validItems = items.filter((i) => i.description.trim());
     if (validItems.length === 0) {
-      setError('Tambahkan minimal 1 item dengan deskripsi');
+      setError(t("invoiceForm.minItemError"));
       return;
     }
-    const invalidItem = validItems.find((i) => !i.description.trim() || i.quantity <= 0 || i.price <= 0);
+    const invalidItem = validItems.find(
+      (i) => !i.description.trim() || i.quantity <= 0 || i.price <= 0,
+    );
     if (invalidItem) {
-      setError('Setiap item harus memiliki deskripsi, jumlah > 0, dan harga > 0');
+      setError(
+        t("invoiceForm.invalidItemError"),
+      );
       return;
     }
 
-    setError('');
+    setError("");
     setSaving(true);
     try {
-      const shouldSendWithPaymentLink = autoPaymentLink && status === 'sent';
-      const initialStatus = shouldSendWithPaymentLink ? 'draft' : status;
+      const shouldSendWithPaymentLink = autoPaymentLink && status === "sent";
+      const initialStatus = shouldSendWithPaymentLink ? "draft" : status;
 
-      setSavingStep('Menyimpan invoice...');
+      setSavingStep(t("invoiceForm.savingInvoice"));
       const createdInvoice = await invoiceApi.create({
         client_id: selectedClient,
-        client_name: client?.name || '',
+        client_name: client?.name || "",
         client_email: client?.email,
-        items: items.filter((i) => i.description).map((i) => ({
-          description: i.description,
-          quantity: i.quantity,
-          price: i.price,
-        })),
+        items: items
+          .filter((i) => i.description)
+          .map((i) => ({
+            description: i.description,
+            quantity: i.quantity,
+            price: i.price,
+          })),
         tax: taxAmount,
         discount: discount,
         due_date: dueDate || undefined,
         notes: notes || undefined,
         status: initialStatus,
         payment_type: paymentType,
-        dp_percentage: paymentType === 'dp' ? dpPercentage : undefined,
+        dp_percentage: paymentType === "dp" ? dpPercentage : undefined,
         currency,
       });
 
       // Auto-create payment link if toggle is on
       if (shouldSendWithPaymentLink) {
-        setSavingStep('Membuat payment link...');
-        const invoiceAmount = paymentType === 'dp' ? createdInvoice.dp_amount : createdInvoice.total;
-        const titlePrefix = paymentType === 'dp' ? 'Down Payment' : 'Pembayaran';
+        setSavingStep(t("invoiceForm.creatingPaymentLink"));
+        const invoiceAmount =
+          paymentType === "dp"
+            ? createdInvoice.dp_amount
+            : createdInvoice.total;
+        const titlePrefix =
+          paymentType === "dp" ? "Down Payment" : t("payments.payments");
         const paymentLink = await paymentLinkApi.create({
-          title: `${titlePrefix} Invoice ${createdInvoice.number} — ${createdInvoice.client_name}`,
+          title: `${titlePrefix} Invoice ${createdInvoice.number} - ${createdInvoice.client_name}`,
           description: `Payment link untuk invoice ${createdInvoice.number}`,
           amount: invoiceAmount,
           currency,
@@ -238,18 +299,18 @@ export default function CreateInvoicePage() {
           client_name: client?.name || undefined,
           client_email: client?.email || undefined,
         });
-        setSavingStep('Mengirim invoice...');
+        setSavingStep(t("invoiceForm.sendingInvoice"));
         await invoiceApi.send(createdInvoice.id);
         setCreatedPaymentLink(paymentLink);
         setShowSuccessModal(true);
       } else {
-        router.push('/invoices');
+        router.push("/invoices");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menyimpan invoice');
+      setError(err instanceof Error ? err.message : t("invoiceForm.saveError"));
     } finally {
       setSaving(false);
-      setSavingStep('');
+      setSavingStep("");
     }
   };
 
@@ -259,7 +320,7 @@ export default function CreateInvoicePage() {
         resource="invoices"
         usage={subscription.usage}
         backHref="/invoices"
-        backLabel="Kembali ke Invoice"
+        backLabel={t("invoiceForm.backToInvoices")}
       />
     );
   }
@@ -277,15 +338,16 @@ export default function CreateInvoicePage() {
       <div className="page-header">
         <div className="page-header-left flex items-center gap-2">
           <div className="flex items-center gap-2">
-            <Link href="/invoices" className="btn btn-icon btn-transparent border-none hover:bg-transparent hover:-translate-x-1 transition">
+            <Link
+              href="/invoices"
+              className="btn btn-icon btn-transparent border-none hover:bg-transparent hover:-translate-x-1 transition"
+            >
               <ArrowLeft02Icon />
             </Link>
-            <h1 className="page-title">Buat Invoice Baru</h1>
+            <h1 className="page-title">{t("invoiceForm.createTitle")}</h1>
           </div>
-          <p className="page-subtitle">Isi detail invoice dan kirim ke klien</p>
+          <p className="page-subtitle">{t("invoiceForm.createSubtitle")}</p>
         </div>
-
-
       </div>
 
       {error && (
@@ -299,29 +361,41 @@ export default function CreateInvoicePage() {
         <div className="flex flex-col gap-5">
           {/* Client Selection */}
           <div className="card">
-            <h3 className="flex items-center gap-2 text-base font-bold mb-4 pb-3 border-b border-border-light"><User02Icon /> Informasi Klien</h3>
+            <h3 className="flex items-center gap-2 text-base font-bold mb-4 pb-3 border-b border-border-light">
+              <User02Icon /> {t("clients.infoTitle")}
+            </h3>
             <div className="form-group">
-              <label className="form-label">Pilih Klien</label>
+              <label className="form-label">{t("invoiceForm.chooseClient")}</label>
               <select
                 className="form-input form-select"
                 value={selectedClient}
                 onChange={(e) => setSelectedClient(e.target.value)}
               >
-                <option value="">-- Pilih Klien --</option>
+                <option value="">{t("invoiceForm.chooseClientPlaceholder")}</option>
                 {clients.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name} - {c.company}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.name} - {c.company}
+                  </option>
                 ))}
               </select>
             </div>
             {client && (
               <div className="flex items-center gap-3.5 p-3.5 bg-bg-secondary rounded-md mt-2">
                 <div className="w-[42px] h-[42px] bg-gradient-to-br from-red-600 to-red-500 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0">
-                  {client.name.split(' ').map((n) => n[0]).join('').substring(0, 2)}
+                  {client.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .substring(0, 2)}
                 </div>
                 <div>
                   <div className="font-semibold">{client.name}</div>
-                  <div className="text-[13px] text-text-secondary">{client.company}</div>
-                  <div className="text-xs text-text-tertiary">{client.email}</div>
+                  <div className="text-[13px] text-text-secondary">
+                    {client.company}
+                  </div>
+                  <div className="text-xs text-text-tertiary">
+                    {client.email}
+                  </div>
                 </div>
               </div>
             )}
@@ -329,63 +403,96 @@ export default function CreateInvoicePage() {
 
           {/* Line Items */}
           <div className="card">
-            <h3 className="flex items-center gap-2 text-base font-bold mb-4 pb-3 border-b border-border-light"><PackageIcon /> Item & Layanan</h3>
+            <h3 className="flex items-center gap-2 text-base font-bold mb-4 pb-3 border-b border-border-light">
+              <PackageIcon /> {t("invoiceForm.itemServices")}
+            </h3>
             {items.map((item, index) => (
-              <div key={item.id} className="border border-border-light rounded-md p-4 mb-3 bg-bg-secondary transition-all duration-150 hover:border-red-200">
+              <div
+                key={item.id}
+                className="border border-border-light rounded-md p-4 mb-3 bg-bg-secondary transition-all duration-150 hover:border-red-200"
+              >
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-bold text-red-600 bg-red-50 dark:bg-red-900/50 px-2.5 py-0.5 rounded-full">#{index + 1}</span>
+                  <span className="text-xs font-bold text-red-600 bg-red-50 dark:bg-red-900/50 px-2.5 py-0.5 rounded-full">
+                    #{index + 1}
+                  </span>
                   {items.length > 1 && (
-                    <button className="w-7 h-7 flex items-center justify-center rounded-full bg-danger-bg text-danger text-xs cursor-pointer transition-all duration-150 border-none hover:bg-danger hover:text-white" onClick={() => removeItem(item.id)}>✕</button>
+                    <button
+                      className="w-7 h-7 flex items-center justify-center rounded-full bg-danger-bg text-danger text-xs cursor-pointer transition-all duration-150 border-none hover:bg-danger hover:text-white"
+                      onClick={() => removeItem(item.id)}
+                    >
+                      ✕
+                    </button>
                   )}
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Deskripsi</label>
+                  <label className="form-label">{t("common.description")}</label>
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="Contoh: Web Development"
+                    placeholder={t("invoiceForm.exampleItem")}
                     value={item.description}
-                    onChange={(e) => updateItem(item.id, 'description', e.target.value)}
+                    onChange={(e) =>
+                      updateItem(item.id, "description", e.target.value)
+                    }
                   />
                 </div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label className="form-label">Jumlah</label>
+                    <label className="form-label">{t("invoiceForm.quantity")}</label>
                     <input
                       type="number"
                       className="form-input"
                       min="1"
                       value={item.quantity}
-                      onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 0)}
+                      onChange={(e) =>
+                        updateItem(
+                          item.id,
+                          "quantity",
+                          parseInt(e.target.value) || 0,
+                        )
+                      }
                     />
                   </div>
                   <div className="form-group">
-                    <div className="form-label">Harga ({currency})</div>
+                    <div className="form-label">
+                      {t("invoiceDetail.price")} ({currency})
+                    </div>
                     <input
                       type="number"
                       className="form-input"
                       min="0"
                       value={item.price}
-                      onChange={(e) => updateItem(item.id, 'price', parseInt(e.target.value) || 0)}
+                      onChange={(e) =>
+                        updateItem(
+                          item.id,
+                          "price",
+                          parseInt(e.target.value) || 0,
+                        )
+                      }
                     />
                   </div>
                 </div>
                 <div className="text-right text-sm text-text-secondary pt-2 border-t border-dashed border-border-color mt-2">
-                  Subtotal: <strong className="text-text-primary">{formatCurrency(item.quantity * item.price, currency)}</strong>
+                  Subtotal:{" "}
+                  <strong className="text-text-primary">
+                    {formatCurrency(item.quantity * item.price, currency)}
+                  </strong>
                 </div>
               </div>
             ))}
             <button className="btn btn-secondary w-full mt-1" onClick={addItem}>
-              ＋ Tambah Item
+              ＋ {t("invoiceForm.addItem")}
             </button>
           </div>
 
           {/* Additional Info */}
           <div className="card">
-            <h3 className="flex items-center gap-2 text-base font-bold mb-4 pb-3 border-b border-border-light"><GoogleDocIcon /> Detail Tambahan</h3>
+            <h3 className="flex items-center gap-2 text-base font-bold mb-4 pb-3 border-b border-border-light">
+              <GoogleDocIcon /> {t("invoiceForm.additionalDetails")}
+            </h3>
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label">Pajak (%)</label>
+                <label className="form-label">{t("invoiceForm.taxPercent")}</label>
                 <input
                   type="number"
                   className="form-input"
@@ -394,7 +501,9 @@ export default function CreateInvoicePage() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Diskon (Rp)</label>
+                <label className="form-label">
+                  {t("invoiceForm.discountAmount")}
+                </label>
                 <input
                   type="number"
                   className="form-input"
@@ -406,11 +515,15 @@ export default function CreateInvoicePage() {
 
             {/* Currency */}
             <div className="form-group">
-              <label className="form-label">Mata Uang</label>
-              <CurrencySelect value={currency} onChange={setCurrency} allowedCurrencies={ALL_SUPPORTED_CURRENCIES} />
+              <label className="form-label">{t("common.currency")}</label>
+              <CurrencySelect
+                value={currency}
+                onChange={setCurrency}
+                allowedCurrencies={ALL_SUPPORTED_CURRENCIES}
+              />
             </div>
             <div className="form-group">
-              <label className="form-label">Jatuh Tempo</label>
+              <label className="form-label">{t("invoiceForm.dueDate")}</label>
               <input
                 type="date"
                 className="form-input"
@@ -419,10 +532,10 @@ export default function CreateInvoicePage() {
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Catatan</label>
+              <label className="form-label">{t("clients.notes")}</label>
               <textarea
                 className="form-input form-textarea"
-                placeholder="Catatan tambahan untuk klien..."
+                placeholder={t("invoiceForm.notesPlaceholder")}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />
@@ -430,28 +543,32 @@ export default function CreateInvoicePage() {
 
             {/* Payment Type */}
             <div className="form-group mt-4">
-              <label className="flex items-center gap-2 form-label"><Payment02Icon /> Tipe Pembayaran</label>
+              <label className="flex items-center gap-2 form-label">
+                <Payment02Icon /> {t("invoiceForm.paymentType")}
+              </label>
               <div className="flex gap-2 flex-col">
                 <button
                   type="button"
-                  className={`btn flex-1 w-auto ${paymentType === 'full' ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => setPaymentType('full')}
+                  className={`btn flex-1 w-auto ${paymentType === "full" ? "btn-primary" : "btn-secondary"}`}
+                  onClick={() => setPaymentType("full")}
                 >
-                  <MoneyBag02Icon /> Full Payment
+                  <MoneyBag02Icon /> {t("invoiceDetail.fullPayment")}
                 </button>
                 <button
                   type="button"
-                  className={`btn flex-1 w-auto ${paymentType === 'dp' ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => setPaymentType('dp')}
+                  className={`btn flex-1 w-auto ${paymentType === "dp" ? "btn-primary" : "btn-secondary"}`}
+                  onClick={() => setPaymentType("dp")}
                 >
                   <GoogleDocIcon /> Down Payment
                 </button>
               </div>
             </div>
 
-            {paymentType === 'dp' && (
+            {paymentType === "dp" && (
               <div className="mt-3 p-4 bg-amber-500/10 rounded-lg border border-amber-500/20">
-                <label className="form-label text-amber-600">Persentase DP</label>
+                <label className="form-label text-amber-600">
+                  {t("invoiceForm.dpPercentage")}
+                </label>
                 <div className="flex items-center gap-3">
                   <input
                     type="range"
@@ -462,16 +579,24 @@ export default function CreateInvoicePage() {
                     onChange={(e) => setDpPercentage(parseInt(e.target.value))}
                     className="flex-1"
                   />
-                  <span className="font-bold text-lg text-amber-600 min-w-[50px] text-right">{dpPercentage}%</span>
+                  <span className="font-bold text-lg text-amber-600 min-w-[50px] text-right">
+                    {dpPercentage}%
+                  </span>
                 </div>
                 <div className="flex justify-between mt-2.5 text-[13px]">
                   <div>
                     <span className="text-text-tertiary">DP: </span>
-                    <strong className="text-amber-600">{formatCurrency(dpAmount, currency)}</strong>
+                    <strong className="text-amber-600">
+                      {formatCurrency(dpAmount, currency)}
+                    </strong>
                   </div>
                   <div>
-                    <span className="text-text-tertiary">Sisa: </span>
-                    <strong className="text-text-primary">{formatCurrency(remainingAmount, currency)}</strong>
+                    <span className="text-text-tertiary">
+                      {t("invoices.outstanding.remainingShort")}:{" "}
+                    </span>
+                    <strong className="text-text-primary">
+                      {formatCurrency(remainingAmount, currency)}
+                    </strong>
                   </div>
                 </div>
               </div>
@@ -486,8 +611,12 @@ export default function CreateInvoicePage() {
                   <Link04Icon />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold">Auto Buat Payment Link</h3>
-                  <p className="text-[13px] text-text-secondary">Otomatis buat link pembayaran saat invoice dikirim</p>
+                  <h3 className="text-base font-bold">
+                    {t("invoiceForm.autoPaymentLink")}
+                  </h3>
+                  <p className="text-[13px] text-text-secondary">
+                    {t("invoiceForm.autoPaymentLinkSubtitle")}
+                  </p>
                 </div>
               </div>
               <label className="relative inline-block w-12 h-[26px] shrink-0">
@@ -496,7 +625,7 @@ export default function CreateInvoicePage() {
                   checked={autoPaymentLink}
                   onChange={(e) => {
                     if (paymentLinkLocked) {
-                      setError(subscription.limitMessage('payment_links'));
+                      setError(subscription.limitMessage("payment_links"));
                       return;
                     }
                     setAutoPaymentLink(e.target.checked);
@@ -509,61 +638,85 @@ export default function CreateInvoicePage() {
             </div>
             {paymentLinkLocked && (
               <div className="mt-4 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2.5 text-[13px] text-red-600">
-                Limit payment link sudah tercapai. Upgrade plan untuk memakai Auto Buat Payment Link.
+                {t("invoiceForm.paymentLinkLimit")}
               </div>
             )}
 
             {autoPaymentLink && (
               <div className="mt-4 pt-4 border-t border-border-light animate-fade-in">
-                <label className="form-label">Metode Pembayaran</label>
+                <label className="form-label">
+                  {t("invoiceForm.paymentMethod")}
+                </label>
                 <div className="grid grid-cols-3 gap-2">
                   {/* Xendit */}
                   <button
                     type="button"
-                    onClick={() => hasXendit && setPaymentProvider('xendit')}
-                    className={`flex flex-col items-center gap-1.5 py-3 px-2 border-2 rounded-lg transition-all duration-150 ${paymentProvider === 'xendit'
-                      ? '!border-red-500 bg-red-50 dark:bg-red-900/20'
-                      : 'border-border-color hover:border-red-300'
-                      } ${!hasXendit ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+                    onClick={() => hasXendit && setPaymentProvider("xendit")}
+                    className={`flex flex-col items-center gap-1.5 py-3 px-2 border-2 rounded-lg transition-all duration-150 ${
+                      paymentProvider === "xendit"
+                        ? "!border-red-500 bg-red-50 dark:bg-red-900/20"
+                        : "border-border-color hover:border-red-300"
+                    } ${!hasXendit ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
                   >
                     <CreditCardIcon className="w-5 h-5" />
                     <span className="text-[12px] font-semibold">Xendit</span>
                     <span className="text-[10px] text-text-tertiary">IDR</span>
-                    {!hasXendit && <span className="text-[9px] text-amber-600">Belum aktif</span>}
+                    {!hasXendit && (
+                      <span className="text-[9px] text-amber-600">
+                        {t("invoiceForm.notActive")}
+                      </span>
+                    )}
                   </button>
 
                   {/* PayPal */}
                   <button
                     type="button"
-                    onClick={() => hasPaypal && setPaymentProvider('paypal')}
-                    className={`flex flex-col items-center gap-1.5 py-3 px-2 border-2 rounded-lg transition-all duration-150 ${paymentProvider === 'paypal'
-                      ? '!border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                      : 'border-border-color hover:border-blue-300'
-                      } ${!hasPaypal ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+                    onClick={() => hasPaypal && setPaymentProvider("paypal")}
+                    className={`flex flex-col items-center gap-1.5 py-3 px-2 border-2 rounded-lg transition-all duration-150 ${
+                      paymentProvider === "paypal"
+                        ? "!border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                        : "border-border-color hover:border-blue-300"
+                    } ${!hasPaypal ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
                   >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#003087"><path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 0 0-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 0 0 .554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.816-5.09a.932.932 0 0 1 .923-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.777-4.471z" /></svg>
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="#003087"
+                    >
+                      <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 0 0-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 0 0 .554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.816-5.09a.932.932 0 0 1 .923-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.777-4.471z" />
+                    </svg>
                     <span className="text-[12px] font-semibold">PayPal</span>
-                    <span className="text-[10px] text-text-tertiary">Multi</span>
-                    {!hasPaypal && <span className="text-[9px] text-amber-600">Belum aktif</span>}
+                    <span className="text-[10px] text-text-tertiary">
+                      Multi
+                    </span>
+                    {!hasPaypal && (
+                      <span className="text-[9px] text-amber-600">
+                        {t("invoiceForm.notActive")}
+                      </span>
+                    )}
                   </button>
 
                   {/* Manual */}
                   <button
                     type="button"
-                    onClick={() => setPaymentProvider('')}
-                    className={`flex flex-col items-center gap-1.5 py-3 px-2 border-2 rounded-lg cursor-pointer transition-all duration-150 ${paymentProvider === ''
-                      ? '!border-text-secondary bg-bg-secondary'
-                      : 'border-border-color hover:border-gray-400'
-                      }`}
+                    onClick={() => setPaymentProvider("")}
+                    className={`flex flex-col items-center gap-1.5 py-3 px-2 border-2 rounded-lg cursor-pointer transition-all duration-150 ${
+                      paymentProvider === ""
+                        ? "!border-text-secondary bg-bg-secondary"
+                        : "border-border-color hover:border-gray-400"
+                    }`}
                   >
                     <Atm02Icon className="w-5 h-5" />
                     <span className="text-[12px] font-semibold">Manual</span>
-                    <span className="text-[10px] text-text-tertiary">Transfer</span>
+                    <span className="text-[10px] text-text-tertiary">
+                      Transfer
+                    </span>
                   </button>
                 </div>
 
                 <div className="mt-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-700 dark:text-emerald-400 text-[12px]">
-                  💡 Payment link akan otomatis dibuat saat invoice dikirim (Simpan & Kirim). Draft tidak akan membuat payment link.
+                  {t("invoiceForm.autoPaymentHint")}
                 </div>
               </div>
             )}
@@ -573,14 +726,22 @@ export default function CreateInvoicePage() {
         {/* Preview */}
         <div className="sticky top-[calc(var(--header-height)+24px)] max-lg:relative max-lg:top-0">
           <div className="card p-7">
-            <div className={`flex justify-between items-start mb-6 pb-5 border-b-2 ${!accentColor ? 'border-red-500' : ''}`} style={accentColor ? { borderBottomColor: accentColor } : {}}>
+            <div
+              className={`flex justify-between items-start mb-6 pb-5 border-b-2 ${!accentColor ? "border-red-500" : ""}`}
+              style={accentColor ? { borderBottomColor: accentColor } : {}}
+            >
               <div>
                 <div
-                  className={`w-10 h-10 rounded-sm flex items-center justify-center font-extrabold text-sm text-white mb-2 ${!hasLogo && !hasAccent
-                    ? 'bg-gradient-to-br from-red-600 to-red-500'
-                    : ''
-                    }`}
-                  style={!hasLogo && hasAccent ? { backgroundColor: accentColor } : undefined}
+                  className={`w-10 h-10 rounded-sm flex items-center justify-center font-extrabold text-sm text-white mb-2 ${
+                    !hasLogo && !hasAccent
+                      ? "bg-gradient-to-br from-red-600 to-red-500"
+                      : ""
+                  }`}
+                  style={
+                    !hasLogo && hasAccent
+                      ? { backgroundColor: accentColor }
+                      : undefined
+                  }
                 >
                   {hasLogo ? (
                     <img
@@ -591,23 +752,42 @@ export default function CreateInvoicePage() {
                   ) : hasInitial ? (
                     companyInitial
                   ) : (
-                    'IQ'
+                    "IQ"
                   )}
                 </div>
-                <h2 className={`text-2xl font-black tracking-[2px] ${!accentColor ? 'bg-gradient-to-br from-red-600 to-red-500' : ''} bg-clip-text text-transparent`} style={accentColor ? { backgroundColor: accentColor } : {}}>INVOICE</h2>
+                <h2
+                  className={`text-2xl font-black tracking-[2px] ${!accentColor ? "bg-gradient-to-br from-red-600 to-red-500" : ""} bg-clip-text text-transparent`}
+                  style={accentColor ? { backgroundColor: accentColor } : {}}
+                >
+                  INVOICE
+                </h2>
               </div>
               <div className="text-right">
                 <div className="font-bold text-sm mb-1">INV-XXXX-XXX</div>
-                <div className="text-xs text-text-secondary">Tanggal: {new Date().toLocaleDateString('id-ID')}</div>
-                {dueDate && <div className="text-xs text-text-secondary">Jatuh Tempo: {new Date(dueDate).toLocaleDateString('id-ID')}</div>}
+                <div className="text-xs text-text-secondary">
+                  {t("dashboard.date")}:{" "}
+                  {new Date().toLocaleDateString(intlLocale)}
+                </div>
+                {dueDate && (
+                  <div className="text-xs text-text-secondary">
+                    {t("invoiceForm.dueDate")}:{" "}
+                    {new Date(dueDate).toLocaleDateString(intlLocale)}
+                  </div>
+                )}
               </div>
             </div>
 
             {client && (
               <div className="mb-5 p-3 bg-bg-secondary rounded-md">
-                <div className="text-[11px] font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-1">Tagihan untuk:</div>
-                <div className="font-semibold text-text-primary">{client.name}</div>
-                <div className="text-[13px] text-text-secondary">{client.company}</div>
+                <div className="text-[11px] font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-1">
+                  {t("invoiceDetail.billTo")}
+                </div>
+                <div className="font-semibold text-text-primary">
+                  {client.name}
+                </div>
+                <div className="text-[13px] text-text-secondary">
+                  {client.company}
+                </div>
                 <div className="text-xs text-text-primary">{client.email}</div>
               </div>
             )}
@@ -616,21 +796,39 @@ export default function CreateInvoicePage() {
               <table className="w-full border-collapse">
                 <thead>
                   <tr>
-                    <th className="py-2 px-2.5 text-left text-[11px] font-bold uppercase text-text-tertiary border-b border-border-color">Deskripsi</th>
-                    <th className="py-2 px-2.5 text-left text-[11px] font-bold uppercase text-text-tertiary border-b border-border-color">Qty</th>
-                    <th className="py-2 px-2.5 text-left text-[11px] font-bold uppercase text-text-tertiary border-b border-border-color">Harga</th>
-                    <th className="py-2 px-2.5 text-right text-[11px] font-bold uppercase text-text-tertiary border-b border-border-color">Total</th>
+                    <th className="py-2 px-2.5 text-left text-[11px] font-bold uppercase text-text-tertiary border-b border-border-color">
+                      {t("common.description")}
+                    </th>
+                    <th className="py-2 px-2.5 text-left text-[11px] font-bold uppercase text-text-tertiary border-b border-border-color">
+                      {t("invoiceDetail.quantity")}
+                    </th>
+                    <th className="py-2 px-2.5 text-left text-[11px] font-bold uppercase text-text-tertiary border-b border-border-color">
+                      {t("invoiceDetail.price")}
+                    </th>
+                    <th className="py-2 px-2.5 text-right text-[11px] font-bold uppercase text-text-tertiary border-b border-border-color">
+                      {t("invoices.totalValue")}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {items.filter(i => i.description).map((item, idx) => (
-                    <tr key={idx}>
-                      <td className="py-2 px-2.5 text-[13px] border-b border-border-light">{item.description}</td>
-                      <td className="py-2 px-2.5 text-[13px] border-b border-border-light">{item.quantity}</td>
-                      <td className="py-2 px-2.5 text-[13px] border-b border-border-light">{formatCurrency(item.price, currency)}</td>
-                      <td className="py-2 px-2.5 text-[13px] border-b border-border-light text-right">{formatCurrency(item.quantity * item.price, currency)}</td>
-                    </tr>
-                  ))}
+                  {items
+                    .filter((i) => i.description)
+                    .map((item, idx) => (
+                      <tr key={idx}>
+                        <td className="py-2 px-2.5 text-[13px] border-b border-border-light">
+                          {item.description}
+                        </td>
+                        <td className="py-2 px-2.5 text-[13px] border-b border-border-light">
+                          {item.quantity}
+                        </td>
+                        <td className="py-2 px-2.5 text-[13px] border-b border-border-light">
+                          {formatCurrency(item.price, currency)}
+                        </td>
+                        <td className="py-2 px-2.5 text-[13px] border-b border-border-light text-right">
+                          {formatCurrency(item.quantity * item.price, currency)}
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -641,28 +839,37 @@ export default function CreateInvoicePage() {
                 <span>{formatCurrency(subtotal, currency)}</span>
               </div>
               <div className="flex justify-between py-1.5 text-[13px] text-text-secondary">
-                <span>Pajak ({tax}%)</span>
+                <span>{t("invoiceDetail.tax")} ({tax}%)</span>
                 <span>{formatCurrency(taxAmount, currency)}</span>
               </div>
               {discount > 0 && (
                 <div className="flex justify-between py-1.5 text-[13px] text-text-secondary">
-                  <span>Diskon</span>
-                  <span className="text-success">-{formatCurrency(discount, currency)}</span>
+                  <span>{t("invoiceDetail.discount")}</span>
+                  <span className="text-success">
+                    -{formatCurrency(discount, currency)}
+                  </span>
                 </div>
               )}
-              <div className={`flex justify-between py-1.5 text-[13px] text-text-secondary text-lg font-extrabold text-text-primary pt-3 mt-2 border-t-2 ${!accentColor ? 'border-red-500' : ''}`} style={accentColor ? { borderTopColor: accentColor } : {}}>
+              <div
+                className={`flex justify-between py-1.5 text-[13px] text-text-secondary text-lg font-extrabold text-text-primary pt-3 mt-2 border-t-2 ${!accentColor ? "border-red-500" : ""}`}
+                style={accentColor ? { borderTopColor: accentColor } : {}}
+              >
                 <span>Total</span>
                 <span>{formatCurrency(total, currency)}</span>
               </div>
-              {paymentType === 'dp' && (
+              {paymentType === "dp" && (
                 <>
                   <div className="flex justify-between py-1.5 text-[13px] text-text-secondary mt-2 pt-2 border-t border-dashed border-amber-500/30">
                     <span className="text-amber-600">DP ({dpPercentage}%)</span>
-                    <span className="text-amber-600 font-bold">{formatCurrency(dpAmount, currency)}</span>
+                    <span className="text-amber-600 font-bold">
+                      {formatCurrency(dpAmount, currency)}
+                    </span>
                   </div>
                   <div className="flex justify-between py-1.5 text-[13px] text-text-secondary">
-                    <span>Sisa Bayar</span>
-                    <span className="text-text-primary font-semibold">{formatCurrency(remainingAmount, currency)}</span>
+                    <span>{t("invoices.outstanding.remainingPayment")}</span>
+                    <span className="text-text-primary font-semibold">
+                      {formatCurrency(remainingAmount, currency)}
+                    </span>
                   </div>
                 </>
               )}
@@ -670,7 +877,9 @@ export default function CreateInvoicePage() {
 
             {notes && (
               <div className="p-3 bg-bg-secondary rounded-md mb-5 text-[13px] text-text-secondary">
-                <div className="text-[11px] font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-1">Catatan:</div>
+                <div className="text-[11px] font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-1">
+                  {t("clients.notes")}:
+                </div>
                 <p>{notes}</p>
               </div>
             )}
@@ -678,22 +887,26 @@ export default function CreateInvoicePage() {
             <div className="flex flex-col gap-2">
               <button
                 className="btn btn-primary btn-lg w-full"
-                onClick={() => handleSubmit('sent')}
+                onClick={() => handleSubmit("sent")}
                 disabled={saving}
               >
-                {saving ? savingStep || 'Menyimpan...' : (
+                {saving ? (
+                  savingStep || "Menyimpan..."
+                ) : (
                   <>
-                    {autoPaymentLink ? 'Simpan, Kirim & Buat Payment Link' : 'Simpan & Kirim'}
+                    {autoPaymentLink
+                      ? t("invoiceForm.saveSendCreateLink")
+                      : t("invoiceForm.saveAndSend")}
                   </>
                 )}
               </button>
               <div className="flex gap-2">
                 <button
                   className="btn btn-secondary flex-1"
-                  onClick={() => handleSubmit('draft')}
+                  onClick={() => handleSubmit("draft")}
                   disabled={saving}
                 >
-                  Simpan Draft
+                  {t("invoiceForm.saveDraft")}
                 </button>
               </div>
             </div>
@@ -711,14 +924,20 @@ export default function CreateInvoicePage() {
                 <div className="w-16 h-16 mx-auto mb-4 bg-white/20 rounded-full flex items-center justify-center">
                   <Tick02Icon className="w-8 h-8" />
                 </div>
-                <h3 className="text-xl font-bold mb-1">Invoice & Payment Link Dibuat!</h3>
-                <p className="text-red-100 text-sm">Kedua item berhasil dibuat secara otomatis</p>
+                <h3 className="text-xl font-bold mb-1">
+                  {t("invoiceForm.successTitle")}
+                </h3>
+                <p className="text-red-100 text-sm">
+                  {t("invoiceForm.successSubtitle")}
+                </p>
               </div>
 
               {/* Body */}
               <div className="px-6 py-5">
                 <div className="mb-4">
-                  <label className="text-[11px] font-bold text-text-tertiary uppercase tracking-wider mb-1.5 block">Payment Link URL</label>
+                  <label className="text-[11px] font-bold text-text-tertiary uppercase tracking-wider mb-1.5 block">
+                    {t("invoiceForm.paymentLinkUrl")}
+                  </label>
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
@@ -728,43 +947,61 @@ export default function CreateInvoicePage() {
                     />
                     <button
                       onClick={handleCopyLink}
-                      className={`btn btn-icon shrink-0 transition-all duration-200 ${copied
-                        ? 'bg-emerald-500 text-white border-emerald-500'
-                        : 'btn-secondary'
-                        }`}
-                      title="Salin link"
+                      className={`btn btn-icon shrink-0 transition-all duration-200 ${
+                        copied
+                          ? "bg-emerald-500 text-white border-emerald-500"
+                          : "btn-secondary"
+                      }`}
+                      title={t("common.copyLink")}
                     >
-                      {copied ? <Tick02Icon className="w-4 h-4" /> : <Copy01Icon className="w-4 h-4" />}
+                      {copied ? (
+                        <Tick02Icon className="w-4 h-4" />
+                      ) : (
+                        <Copy01Icon className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
                   {copied && (
-                    <p className="text-emerald-600 text-xs mt-1.5 animate-fade-in">✓ Link berhasil disalin!</p>
+                    <p className="text-emerald-600 text-xs mt-1.5 animate-fade-in">
+                      {t("invoiceForm.copySuccess")}
+                    </p>
                   )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-[13px] mb-5">
                   <div className="p-3 bg-bg-secondary rounded-lg">
-                    <div className="text-text-tertiary text-[11px] mb-0.5">Judul</div>
-                    <div className="font-semibold truncate">{createdPaymentLink.title}</div>
+                    <div className="text-text-tertiary text-[11px] mb-0.5">
+                      {t("common.title")}
+                    </div>
+                    <div className="font-semibold truncate">
+                      {createdPaymentLink.title}
+                    </div>
                   </div>
                   <div className="p-3 bg-bg-secondary rounded-lg">
-                    <div className="text-text-tertiary text-[11px] mb-0.5">Jumlah</div>
-                    <div className="font-bold text-emerald-600">{formatCurrency(createdPaymentLink.amount, createdPaymentLink.currency)}</div>
+                    <div className="text-text-tertiary text-[11px] mb-0.5">
+                      {t("dashboard.amount")}
+                    </div>
+                    <div className="font-bold text-emerald-600">
+                      {formatCurrency(
+                        createdPaymentLink.amount,
+                        createdPaymentLink.currency,
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 <div className="flex gap-2">
                   <button
-                    onClick={() => router.push('/invoices')}
+                    onClick={() => router.push("/invoices")}
                     className="btn btn-secondary flex-1"
                   >
-                    Ke Daftar Invoice
+                    {t("invoiceForm.goToInvoices")}
                   </button>
                   <button
-                    onClick={() => router.push('/payments')}
+                    onClick={() => router.push("/payments")}
                     className="btn btn-primary flex-1"
                   >
-                    Ke Payment Links
+                    {t("invoiceForm.goToPayments")}
                   </button>
                 </div>
               </div>

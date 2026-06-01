@@ -1,25 +1,47 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 const API_BASE = "https://api.invoicequ.my.id/api/v1";
 
-// ── Plan data ──
-const plansData: Record<string, {
+// Map feature keys from DB to human-readable Indonesian labels
+const featureLabels: Record<string, string> = {
+  basic_invoicing: "Invoicing Dasar",
+  email_notifications: "Notifikasi Email",
+  custom_branding: "Custom Branding",
+  priority_support: "Prioritas Support",
+  xendit_integration: "Integrasi Xendit",
+  api_access: "API Access",
+  dedicated_support: "Dedicated Support",
+  sla: "SLA Agreement",
+};
+
+interface PlanInfo {
   id: string; displayName: string; price: number; priceLabel: string;
   desc: string; badge: string; badgeColor: string; accentColor: string;
   features: string[]; limits: { invoices: string; clients: string; paymentLinks: string };
-}> = {
+}
+
+// ── Fallback plan data ──
+const fallbackPlansData: Record<string, PlanInfo> = {
   pro: {
     id: "plan_pro", displayName: "Pro", price: 99000, priceLabel: "Rp 99.000",
     desc: "Untuk bisnis yang berkembang dengan kebutuhan lebih.",
     badge: "🔥 Paling Populer", badgeColor: "bg-red-500/10 text-red-400", accentColor: "text-red-400",
-    features: ["Custom Branding", "Integrasi Xendit", "Prioritas Support", "Notifikasi Email"],
+    features: ["Invoicing Dasar", "Notifikasi Email", "Custom Branding", "Prioritas Support", "Integrasi Xendit"],
     limits: { invoices: "100", clients: "500", paymentLinks: "100" },
   },
 };
+
+function formatLimit(n: number) {
+  return n === -1 ? "Unlimited" : `${n}`;
+}
+
+function parseFeatures(raw: string): string[] {
+  try { return JSON.parse(raw); } catch { return []; }
+}
 
 // ── Enterprise token decoder ──
 function decodeToken(token: string): { amount: number; label: string; desc: string; exp: number } | null {
@@ -52,15 +74,58 @@ function CheckoutContent() {
   const enterprise = planKey === "enterprise" && token ? decodeToken(token) : null;
   const isExpired = enterprise ? Date.now() > enterprise.exp : false;
 
+  // State for dynamically loaded plan data
+  const [dynamicPlans, setDynamicPlans] = useState<Record<string, PlanInfo>>(fallbackPlansData);
+
+  // Fetch plans from API on mount
+  useEffect(() => {
+    fetch(`${API_BASE}/plans`)
+      .then((r) => r.json())
+      .then((res) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data: any[] = res.data || res;
+        if (!Array.isArray(data) || data.length === 0) return;
+        const mapped: Record<string, PlanInfo> = {};
+        for (const p of data) {
+          if (!p.is_active) continue;
+          const key = (p.name || "").toLowerCase();
+          const isEnt = key === "enterprise";
+          const isFree = p.price <= 0;
+          const isPro = key === "pro";
+          const featureKeys = parseFeatures(p.features || "[]");
+          mapped[key] = {
+            id: p.id,
+            displayName: p.display_name || p.name,
+            price: p.price,
+            priceLabel: isEnt ? "Custom" : isFree ? "Gratis" : formatRupiah(p.price),
+            desc: isEnt ? "Untuk perusahaan dengan volume transaksi tinggi."
+              : isPro ? "Untuk bisnis yang berkembang dengan kebutuhan lebih."
+              : "Untuk freelancer dan bisnis kecil yang baru mulai.",
+            badge: isEnt ? "⭐ Enterprise" : isPro ? "🔥 Paling Populer" : "🆓 Gratis",
+            badgeColor: isEnt ? "bg-orange-500/10 text-orange-400" : isPro ? "bg-red-500/10 text-red-400" : "bg-white/10 text-white/60",
+            accentColor: isEnt ? "text-orange-400" : isPro ? "text-red-400" : "text-white",
+            features: featureKeys.map((k: string) => featureLabels[k] || k),
+            limits: {
+              invoices: formatLimit(p.max_invoices),
+              clients: formatLimit(p.max_clients),
+              paymentLinks: formatLimit(p.max_payment_links),
+            },
+          };
+        }
+        if (Object.keys(mapped).length > 0) setDynamicPlans(mapped);
+      })
+      .catch(() => { /* keep fallback */ });
+  }, []);
+
   // Build plan info
   const plan = planKey === "enterprise" && enterprise ? {
     id: "plan_enterprise", displayName: enterprise.label, price: enterprise.amount,
     priceLabel: formatRupiah(enterprise.amount),
     desc: enterprise.desc || "Paket Enterprise Custom",
     badge: "⭐ Enterprise", badgeColor: "bg-orange-500/10 text-orange-400", accentColor: "text-orange-400",
-    features: ["Unlimited Invoice", "Unlimited Klien", "Unlimited Payment Link", "API Access", "Dedicated Support", "SLA Agreement"],
+    features: (dynamicPlans["enterprise"]?.features || ["API Access", "Dedicated Support", "SLA Agreement"]),
     limits: { invoices: "Unlimited", clients: "Unlimited", paymentLinks: "Unlimited" },
-  } : plansData[planKey];
+  } : dynamicPlans[planKey];
 
   const [step, setStep] = useState<Step>("form");
   const [name, setName] = useState("");
@@ -207,9 +272,9 @@ function CheckoutContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-white">
+    <div className="min-h-screen bg-[#09090b] text-white flex flex-col">
       {/* Header */}
-      <header className="border-b border-white/5">
+      <header className="border-b border-white/5 flex-shrink-0">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <img src="/images/invoiceque.svg" alt="InvoiceQu" className="h-8 w-auto" />
@@ -219,12 +284,10 @@ function CheckoutContent() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-12 md:py-16">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 lg:gap-14">
-
-          {/* ── Left: Plan Summary ── */}
-          <div className="lg:col-span-2 order-2 lg:order-1">
-            <div className="lg:sticky lg:top-8">
+      <div className="flex flex-1 flex-col lg:flex-row lg:overflow-hidden">
+        {/* ── Left: Plan Summary (fixed on desktop) ── */}
+        <div className="lg:w-[380px] xl:w-[420px] flex-shrink-0 lg:h-[calc(100vh-65px)] lg:overflow-y-auto border-r border-white/5 p-6 lg:p-8 order-2 lg:order-1">
+          <div>
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-7">
                 <span className={`text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${plan.badgeColor}`}>{plan.badge}</span>
                 <h2 className="text-2xl font-extrabold mt-3 mb-1">Paket {plan.displayName}</h2>
@@ -257,8 +320,8 @@ function CheckoutContent() {
             </div>
           </div>
 
-          {/* ── Right: Form / Steps ── */}
-          <div className="lg:col-span-3 order-1 lg:order-2">
+        {/* ── Right: Form / Steps (scrollable) ── */}
+        <div className="flex-1 lg:h-[calc(100vh-65px)] lg:overflow-y-auto p-6 lg:p-12 order-1 lg:order-2">
 
             {/* Step indicator */}
             <div className="flex items-center gap-3 mb-8">
@@ -426,9 +489,8 @@ function CheckoutContent() {
                 </form>
               </>
             )}
-          </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

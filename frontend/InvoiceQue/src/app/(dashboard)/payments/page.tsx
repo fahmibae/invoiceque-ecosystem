@@ -1,42 +1,77 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { paymentLinkApi, type PaymentLink } from '@/lib/api';
-import { formatCurrency, getStatusColor, convertToIDR, fetchExchangeRates } from '@/lib/utils';
-import { Search01Icon, Copy01Icon, Payment01Icon, Edit02Icon, FilterIcon, Cancel01Icon, SortingUpIcon, PaypalIcon, Delete02Icon, FileLinkIcon, Link04Icon, MouseLeftClick02Icon, MoneyBag02Icon, LockedIcon, WhatsappIcon, Tick02Icon } from 'hugeicons-react';
-import ConfirmModal from '@/components/ui/ConfirmModal';
-import ClickableAmount from '@/components/ui/ClickableAmount';
-import Portal from '@/components/ui/Portal';
-import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
-import { createPaymentWhatsAppUrl } from '@/lib/payment-share';
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { paymentLinkApi, type PaymentLink } from "@/lib/api";
+import {
+  formatCurrency,
+  getStatusColor,
+  convertToIDR,
+  fetchExchangeRates,
+} from "@/lib/utils";
+import {
+  Search01Icon,
+  Copy01Icon,
+  Payment01Icon,
+  Edit02Icon,
+  FilterIcon,
+  Cancel01Icon,
+  SortingUpIcon,
+  PaypalIcon,
+  Delete02Icon,
+  FileLinkIcon,
+  Link04Icon,
+  MouseLeftClick02Icon,
+  MoneyBag02Icon,
+  LockedIcon,
+  WhatsappIcon,
+  Tick02Icon,
+} from "hugeicons-react";
+import ConfirmModal from "@/components/ui/ConfirmModal";
+import ClickableAmount from "@/components/ui/ClickableAmount";
+import Portal from "@/components/ui/Portal";
+import { useSubscriptionUsage } from "@/hooks/useSubscriptionUsage";
+import { createPaymentWhatsAppUrl } from "@/lib/payment-share";
+import { useLanguage } from "@/context/LanguageContext";
+import type { TranslationKey } from "@/lib/app-i18n";
+
+const paymentStatusLabelKeys: Record<string, TranslationKey> = {
+  active: "status.active",
+  completed: "status.completed",
+  expired: "status.expired",
+  inactive: "status.inactive",
+};
 
 export default function PaymentsPage() {
+  const { t, intlLocale } = useLanguage();
   const [paymentLinks, setPaymentLinks] = useState<PaymentLink[]>([]);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [showFilter, setShowFilter] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
   // Filter states
-  const [filterStatus, setFilterStatus] = useState<string>('');
-  const [filterMinAmount, setFilterMinAmount] = useState<string>('');
-  const [filterMaxAmount, setFilterMaxAmount] = useState<string>('');
-  const [filterDateFrom, setFilterDateFrom] = useState('');
-  const [filterDateTo, setFilterDateTo] = useState('');
-  const [filterSort, setFilterSort] = useState<string>('newest');
+  const [filterStatus, setFilterStatus] = useState<string>("");
+  const [filterMinAmount, setFilterMinAmount] = useState<string>("");
+  const [filterMaxAmount, setFilterMaxAmount] = useState<string>("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+  const [filterSort, setFilterSort] = useState<string>("newest");
 
   // Temp filter states (inside modal before apply)
-  const [tmpStatus, setTmpStatus] = useState('');
-  const [tmpMinAmount, setTmpMinAmount] = useState('');
-  const [tmpMaxAmount, setTmpMaxAmount] = useState('');
-  const [tmpDateFrom, setTmpDateFrom] = useState('');
-  const [tmpDateTo, setTmpDateTo] = useState('');
-  const [tmpSort, setTmpSort] = useState('newest');
+  const [tmpStatus, setTmpStatus] = useState("");
+  const [tmpMinAmount, setTmpMinAmount] = useState("");
+  const [tmpMaxAmount, setTmpMaxAmount] = useState("");
+  const [tmpDateFrom, setTmpDateFrom] = useState("");
+  const [tmpDateTo, setTmpDateTo] = useState("");
+  const [tmpSort, setTmpSort] = useState("newest");
 
-  const [exchangeRates, setExchangeRates] = useState<Record<string, number> | null>(null);
+  const [exchangeRates, setExchangeRates] = useState<Record<
+    string,
+    number
+  > | null>(null);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -48,7 +83,7 @@ export default function PaymentsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const subscription = useSubscriptionUsage();
-  const paymentLinkLocked = subscription.isResourceLocked('payment_links');
+  const paymentLinkLocked = subscription.isResourceLocked("payment_links");
 
   useEffect(() => {
     async function fetchPaymentLinks() {
@@ -56,7 +91,9 @@ export default function PaymentsPage() {
         const res = await paymentLinkApi.list(1, 50);
         setPaymentLinks(res.data || []);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Gagal memuat payment links');
+        setError(
+          err instanceof Error ? err.message : t("payments.loadError"),
+        );
       } finally {
         setLoading(false);
       }
@@ -66,10 +103,26 @@ export default function PaymentsPage() {
   }, []);
 
   useEffect(() => {
-    setSelected(new Set()); setSelectionMode(false);
-  }, [search, filterStatus, filterMinAmount, filterMaxAmount, filterDateFrom, filterDateTo, filterSort]);
+    setSelected(new Set());
+    setSelectionMode(false);
+  }, [
+    search,
+    filterStatus,
+    filterMinAmount,
+    filterMaxAmount,
+    filterDateFrom,
+    filterDateTo,
+    filterSort,
+  ]);
 
-  const activeFilterCount = [filterStatus, filterMinAmount, filterMaxAmount, filterDateFrom, filterDateTo, filterSort !== 'newest' ? filterSort : ''].filter(Boolean).length;
+  const activeFilterCount = [
+    filterStatus,
+    filterMinAmount,
+    filterMaxAmount,
+    filterDateFrom,
+    filterDateTo,
+    filterSort !== "newest" ? filterSort : "",
+  ].filter(Boolean).length;
 
   const openFilterModal = () => {
     setTmpStatus(filterStatus);
@@ -92,54 +145,103 @@ export default function PaymentsPage() {
   };
 
   const resetFilters = () => {
-    setTmpStatus('');
-    setTmpMinAmount('');
-    setTmpMaxAmount('');
-    setTmpDateFrom('');
-    setTmpDateTo('');
-    setTmpSort('newest');
+    setTmpStatus("");
+    setTmpMinAmount("");
+    setTmpMaxAmount("");
+    setTmpDateFrom("");
+    setTmpDateTo("");
+    setTmpSort("newest");
   };
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, filterStatus, filterMinAmount, filterMaxAmount, filterDateFrom, filterDateTo, filterSort]);
+  }, [
+    search,
+    filterStatus,
+    filterMinAmount,
+    filterMaxAmount,
+    filterDateFrom,
+    filterDateTo,
+    filterSort,
+  ]);
 
   const filtered = paymentLinks
     .filter((pl) => {
-      const matchSearch = pl.title.toLowerCase().includes(search.toLowerCase()) || pl.description.toLowerCase().includes(search.toLowerCase());
+      const matchSearch =
+        pl.title.toLowerCase().includes(search.toLowerCase()) ||
+        pl.description.toLowerCase().includes(search.toLowerCase());
       const matchStatus = !filterStatus || pl.status === filterStatus;
-      const matchMin = !filterMinAmount || pl.amount >= parseInt(filterMinAmount);
-      const matchMax = !filterMaxAmount || pl.amount <= parseInt(filterMaxAmount);
-      const matchFrom = !filterDateFrom || new Date(pl.created_at) >= new Date(filterDateFrom);
-      const matchTo = !filterDateTo || new Date(pl.created_at) <= new Date(filterDateTo + 'T23:59:59');
-      return matchSearch && matchStatus && matchMin && matchMax && matchFrom && matchTo;
+      const matchMin =
+        !filterMinAmount || pl.amount >= parseInt(filterMinAmount);
+      const matchMax =
+        !filterMaxAmount || pl.amount <= parseInt(filterMaxAmount);
+      const matchFrom =
+        !filterDateFrom || new Date(pl.created_at) >= new Date(filterDateFrom);
+      const matchTo =
+        !filterDateTo ||
+        new Date(pl.created_at) <= new Date(filterDateTo + "T23:59:59");
+      return (
+        matchSearch &&
+        matchStatus &&
+        matchMin &&
+        matchMax &&
+        matchFrom &&
+        matchTo
+      );
     })
     .sort((a, b) => {
       switch (filterSort) {
-        case 'oldest': return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-        case 'amount_high': return b.amount - a.amount;
-        case 'amount_low': return a.amount - b.amount;
-        case 'clicks': return b.clicks - a.clicks;
-        case 'payments': return b.payments - a.payments;
-        default: return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case "oldest":
+          return (
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+        case "amount_high":
+          return b.amount - a.amount;
+        case "amount_low":
+          return a.amount - b.amount;
+        case "clicks":
+          return b.clicks - a.clicks;
+        case "payments":
+          return b.payments - a.payments;
+        default:
+          return (
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
       }
     });
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
-  const currentData = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const currentData = filtered.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage,
+  );
 
   const totalRevenue = paymentLinks
-    .filter(pl => pl.status === 'completed')
-    .reduce((sum, pl) => sum + convertToIDR(pl.amount, pl.currency, exchangeRates ?? undefined), 0);
+    .filter((pl) => pl.status === "completed")
+    .reduce(
+      (sum, pl) =>
+        sum + convertToIDR(pl.amount, pl.currency, exchangeRates ?? undefined),
+      0,
+    );
 
-  const hasMixedCurrencies = new Set(paymentLinks.filter(pl => pl.status === 'completed').map(pl => pl.currency || 'IDR')).size > 1
-    || paymentLinks.some(pl => pl.status === 'completed' && pl.currency && pl.currency !== 'IDR');
+  const hasMixedCurrencies =
+    new Set(
+      paymentLinks
+        .filter((pl) => pl.status === "completed")
+        .map((pl) => pl.currency || "IDR"),
+    ).size > 1 ||
+    paymentLinks.some(
+      (pl) => pl.status === "completed" && pl.currency && pl.currency !== "IDR",
+    );
 
-  const currencyBreakdown = filtered.reduce<Record<string, number>>((acc, pl) => {
-    const cur = pl.currency || 'IDR';
-    acc[cur] = (acc[cur] || 0) + pl.amount;
-    return acc;
-  }, {});
+  const currencyBreakdown = filtered.reduce<Record<string, number>>(
+    (acc, pl) => {
+      const cur = pl.currency || "IDR";
+      acc[cur] = (acc[cur] || 0) + pl.amount;
+      return acc;
+    },
+    {},
+  );
   const handleCopy = (url: string) => {
     navigator.clipboard.writeText(url);
   };
@@ -158,7 +260,7 @@ export default function PaymentsPage() {
       setShowDeleteModal(false);
       setDeleteTargetId(null);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Gagal menghapus');
+      alert(err instanceof Error ? err.message : t("payments.deleteError"));
     } finally {
       setIsDeleting(false);
     }
@@ -195,7 +297,11 @@ export default function PaymentsPage() {
       const res = await paymentLinkApi.list(1, 50);
       setPaymentLinks(res.data || []);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Gagal menghapus payment links');
+      alert(
+        err instanceof Error
+          ? err.message
+          : t("payments.deleteError"),
+      );
     } finally {
       setBulkDeleting(false);
     }
@@ -205,7 +311,7 @@ export default function PaymentsPage() {
     return (
       <div className="animate-fade-in p-10 text-center text-text-secondary flex flex-col items-center justify-center min-h-[400px]">
         <div className="w-10 h-10 border-4 border-red-200 border-t-red-600 rounded-full animate-spin mb-4"></div>
-        <p>Memuat payment links...</p>
+        <p>{t("payments.loading")}</p>
       </div>
     );
   }
@@ -214,7 +320,12 @@ export default function PaymentsPage() {
     return (
       <div className="animate-fade-in p-10 text-center">
         <p className="text-red-500 mb-4">{error}</p>
-        <button className="btn btn-primary" onClick={() => window.location.reload()}>Coba Lagi</button>
+        <button
+          className="btn btn-primary"
+          onClick={() => window.location.reload()}
+        >
+          {t("common.retry")}
+        </button>
       </div>
     );
   }
@@ -224,20 +335,23 @@ export default function PaymentsPage() {
       {/* Single Delete Modal */}
       <ConfirmModal
         isOpen={showDeleteModal}
-        title="Hapus Payment Link"
-        message="Yakin ingin menghapus payment link ini? Tindakan ini tidak dapat dibatalkan."
-        confirmText="Ya, Hapus"
+        title={t("payments.deleteTitle")}
+        message={t("payments.deleteMessage")}
+        confirmText={t("payments.deleteConfirm")}
         onConfirm={confirmDelete}
-        onCancel={() => { setShowDeleteModal(false); setDeleteTargetId(null); }}
+        onCancel={() => {
+          setShowDeleteModal(false);
+          setDeleteTargetId(null);
+        }}
         isLoading={isDeleting}
         type="danger"
       />
       {/* Bulk Delete Modal */}
       <ConfirmModal
         isOpen={showBulkDeleteModal}
-        title="Hapus Payment Links"
-        message={`Apakah Anda yakin ingin menghapus ${selected.size} payment link terpilih? Tindakan ini tidak dapat dibatalkan.`}
-        confirmText={`Hapus ${selected.size} Link`}
+        title={t("payments.deleteBulkTitle")}
+        message={t("payments.deleteBulkMessage", { count: selected.size })}
+        confirmText={t("payments.deleteBulkConfirm", { count: selected.size })}
         onConfirm={handleBulkDelete}
         onCancel={() => setShowBulkDeleteModal(false)}
         isLoading={bulkDeleting}
@@ -246,12 +360,23 @@ export default function PaymentsPage() {
       {/* Filter Modal */}
       {showFilter && (
         <Portal>
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] flex items-stretch sm:items-center justify-center p-0 sm:p-5" onClick={() => setShowFilter(false)}>
-            <div className="bg-bg-card w-full h-full sm:h-auto sm:max-w-[480px] sm:rounded-2xl sm:max-h-[85vh] shadow-xl overflow-hidden border border-border-color animate-fade-in flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] flex items-stretch sm:items-center justify-center p-0 sm:p-5"
+            onClick={() => setShowFilter(false)}
+          >
+            <div
+              className="bg-bg-card w-full h-full sm:h-auto sm:max-w-[480px] sm:rounded-2xl sm:max-h-[85vh] shadow-xl overflow-hidden border border-border-color animate-fade-in flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
               {/* Header */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-border-light shrink-0">
-                <h3 className="text-lg font-bold flex items-center gap-2"><FilterIcon width={20} height={20} /> Filter</h3>
-                <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-bg-secondary transition-colors" onClick={() => setShowFilter(false)}>
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  <FilterIcon width={20} height={20} /> {t("common.filter")}
+                </h3>
+                <button
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-bg-secondary transition-colors"
+                  onClick={() => setShowFilter(false)}
+                >
                   <Cancel01Icon width={20} height={20} />
                 </button>
               </div>
@@ -260,10 +385,22 @@ export default function PaymentsPage() {
               <div className="overflow-y-auto flex-1 px-6 py-5 flex flex-col gap-5">
                 {/* Status */}
                 <div>
-                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2.5">Status</label>
+                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2.5">
+                    {t("dashboard.status")}
+                  </label>
                   <div className="flex flex-wrap gap-2">
-                    {[{ value: '', label: 'Semua' }, { value: 'active', label: 'Aktif' }, { value: 'completed', label: 'Selesai' }, { value: 'expired', label: 'Kadaluarsa' }, { value: 'inactive', label: 'Nonaktif' }].map((s) => (
-                      <button key={s.value} className={`px-3.5 py-2 rounded-lg text-xs font-semibold border transition-all duration-150 ${tmpStatus === s.value ? 'bg-gradient-to-br from-red-600 to-red-500 text-white border-red-500 shadow-sm' : 'bg-bg-secondary border-border-color text-text-secondary hover:border-red-300'}`} onClick={() => setTmpStatus(s.value)}>
+                    {[
+                      { value: "", label: t("common.all") },
+                      { value: "active", label: t("status.active") },
+                      { value: "completed", label: t("status.completed") },
+                      { value: "expired", label: t("status.expired") },
+                      { value: "inactive", label: t("status.inactive") },
+                    ].map((s) => (
+                      <button
+                        key={s.value}
+                        className={`px-3.5 py-2 rounded-lg text-xs font-semibold border transition-all duration-150 ${tmpStatus === s.value ? "bg-gradient-to-br from-red-600 to-red-500 text-white border-red-500 shadow-sm" : "bg-bg-secondary border-border-color text-text-secondary hover:border-red-300"}`}
+                        onClick={() => setTmpStatus(s.value)}
+                      >
                         {s.label}
                       </button>
                     ))}
@@ -272,30 +409,79 @@ export default function PaymentsPage() {
 
                 {/* Amount Range */}
                 <div>
-                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2.5">Rentang Nominal (Rp)</label>
+                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2.5">
+                    {t("payments.amountRange")}
+                  </label>
                   <div className="flex gap-2 items-center">
-                    <input type="number" placeholder="Min" className="flex-1 py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-red-400 transition-colors" value={tmpMinAmount} onChange={(e) => setTmpMinAmount(e.target.value)} />
-                    <span className="text-text-tertiary text-sm">—</span>
-                    <input type="number" placeholder="Max" className="flex-1 py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-red-400 transition-colors" value={tmpMaxAmount} onChange={(e) => setTmpMaxAmount(e.target.value)} />
+                    <input
+                      type="number"
+                      placeholder={t("common.min")}
+                      className="flex-1 py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-red-400 transition-colors"
+                      value={tmpMinAmount}
+                      onChange={(e) => setTmpMinAmount(e.target.value)}
+                    />
+                    <span className="text-text-tertiary text-sm">-</span>
+                    <input
+                      type="number"
+                      placeholder={t("common.max")}
+                      className="flex-1 py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-red-400 transition-colors"
+                      value={tmpMaxAmount}
+                      onChange={(e) => setTmpMaxAmount(e.target.value)}
+                    />
                   </div>
                 </div>
 
                 {/* Date Range */}
                 <div>
-                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2.5">Rentang Tanggal</label>
+                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2.5">
+                    {t("invoices.dateRange")}
+                  </label>
                   <div className="flex gap-2 items-center">
-                    <input type="date" className="flex-1 py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-red-400 transition-colors" value={tmpDateFrom} onChange={(e) => setTmpDateFrom(e.target.value)} />
-                    <span className="text-text-tertiary text-sm">—</span>
-                    <input type="date" className="flex-1 py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-red-400 transition-colors" value={tmpDateTo} onChange={(e) => setTmpDateTo(e.target.value)} />
+                    <input
+                      type="date"
+                      className="flex-1 py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-red-400 transition-colors"
+                      value={tmpDateFrom}
+                      onChange={(e) => setTmpDateFrom(e.target.value)}
+                    />
+                    <span className="text-text-tertiary text-sm">-</span>
+                    <input
+                      type="date"
+                      className="flex-1 py-2.5 px-3 border border-border-color rounded-lg bg-bg-secondary text-sm outline-none focus:border-red-400 transition-colors"
+                      value={tmpDateTo}
+                      onChange={(e) => setTmpDateTo(e.target.value)}
+                    />
                   </div>
                 </div>
 
                 {/* Sort */}
                 <div>
-                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2.5 flex items-center gap-1.5"><SortingUpIcon width={14} height={14} /> Urutkan</label>
+                  <label className="block text-xs font-semibold text-text-tertiary uppercase tracking-[0.5px] mb-2.5 flex items-center gap-1.5">
+                    <SortingUpIcon width={14} height={14} />{" "}
+                    {t("common.sort")}
+                  </label>
                   <div className="flex flex-wrap gap-2">
-                    {[{ value: 'newest', label: 'Terbaru' }, { value: 'oldest', label: 'Terlama' }, { value: 'amount_high', label: 'Nominal ↑' }, { value: 'amount_low', label: 'Nominal ↓' }, { value: 'clicks', label: 'Klik Terbanyak' }, { value: 'payments', label: 'Pembayaran Terbanyak' }].map((s) => (
-                      <button key={s.value} className={`px-3.5 py-2 rounded-lg text-xs font-semibold border transition-all duration-150 ${tmpSort === s.value ? 'bg-gradient-to-br from-red-600 to-red-500 text-white border-red-500 shadow-sm' : 'bg-bg-secondary border-border-color text-text-secondary hover:border-red-300'}`} onClick={() => setTmpSort(s.value)}>
+                    {[
+                      { value: "newest", label: t("invoices.sortNewest") },
+                      { value: "oldest", label: t("invoices.sortOldest") },
+                      {
+                        value: "amount_high",
+                        label: t("invoices.sortAmountHigh"),
+                      },
+                      {
+                        value: "amount_low",
+                        label: t("invoices.sortAmountLow"),
+                      },
+                      { value: "clicks", label: t("payments.sortClicks") },
+                      {
+                        value: "payments",
+                        label: t("payments.sortPayments"),
+                      },
+                    ].map((s) => (
+                      <button
+                        key={s.value}
+                        className={`px-3.5 py-2 rounded-lg text-xs font-semibold border transition-all duration-150 ${tmpSort === s.value ? "bg-gradient-to-br from-red-600 to-red-500 text-white border-red-500 shadow-sm" : "bg-bg-secondary border-border-color text-text-secondary hover:border-red-300"}`}
+                        onClick={() => setTmpSort(s.value)}
+                      >
                         {s.label}
                       </button>
                     ))}
@@ -305,9 +491,18 @@ export default function PaymentsPage() {
 
               {/* Footer */}
               <div className="flex gap-3 px-6 py-4 border-t border-border-light shrink-0">
-                <button className="btn btn-secondary flex-1" onClick={resetFilters}>Reset</button>
-                <button className="btn btn-primary flex-1" onClick={applyFilters}>
-                  <FilterIcon width={16} height={16} /> Terapkan Filter
+                <button
+                  className="btn btn-secondary flex-1"
+                  onClick={resetFilters}
+                >
+                  {t("common.reset")}
+                </button>
+                <button
+                  className="btn btn-primary flex-1"
+                  onClick={applyFilters}
+                >
+                  <FilterIcon width={16} height={16} />{" "}
+                  {t("common.applyFilter")}
                 </button>
               </div>
             </div>
@@ -316,22 +511,36 @@ export default function PaymentsPage() {
       )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Payment Links</h1>
-          <p className="text-sm text-text-secondary mt-0.5">Buat dan kelola link pembayaran Anda</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-text-primary">
+            {t("payments.title")}
+          </h1>
+          <p className="text-sm text-text-secondary mt-0.5">
+            {t("payments.subtitle")}
+          </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           {!selectionMode && currentData.length > 0 && (
-            <button onClick={() => setSelectionMode(true)} className="btn btn-secondary flex items-center gap-1.5 text-xs sm:text-sm py-2 px-3">
-              <Tick02Icon width={15} height={15} /> Pilih
+            <button
+              onClick={() => setSelectionMode(true)}
+              className="btn btn-secondary flex items-center gap-1.5 text-xs sm:text-sm py-2 px-3"
+            >
+              <Tick02Icon width={15} height={15} /> {t("common.select")}
             </button>
           )}
           {paymentLinkLocked ? (
-            <button className="btn btn-primary opacity-60 cursor-not-allowed text-xs sm:text-sm" disabled title={subscription.limitMessage('payment_links')}>
-              <LockedIcon width={16} height={16} /> Buat Payment Link
+            <button
+              className="btn btn-primary opacity-60 cursor-not-allowed text-xs sm:text-sm"
+              disabled
+              title={subscription.limitMessage("payment_links")}
+            >
+              <LockedIcon width={16} height={16} /> {t("payments.create")}
             </button>
           ) : (
-            <Link href="/payments/create" className="btn btn-primary text-xs sm:text-sm">
-              <span>＋</span> Buat Payment Link
+            <Link
+              href="/payments/create"
+              className="btn btn-primary text-xs sm:text-sm"
+            >
+              <span>＋</span> {t("payments.create")}
             </Link>
           )}
         </div>
@@ -340,31 +549,72 @@ export default function PaymentsPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-sm:gap-2.5 mb-6">
         <div className="bg-bg-card border border-border-color rounded-lg p-5 flex items-start gap-4 relative overflow-hidden transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 after:content-[''] after:absolute after:top-0 after:right-0 after:w-20 after:h-20 after:bg-gradient-to-br after:from-red-500/10 after:to-transparent after:rounded-bl-full">
-          <div className="w-12 h-12 rounded-md flex items-center justify-center shrink-0 text-[22px]" style={{ background: 'rgba(59,130,246,0.1)', color: '#3B82F6' }}><FileLinkIcon /></div>
+          <div
+            className="w-12 h-12 rounded-md flex items-center justify-center shrink-0 text-[22px]"
+            style={{ background: "rgba(59,130,246,0.1)", color: "#3B82F6" }}
+          >
+            <FileLinkIcon />
+          </div>
           <div className="flex flex-col gap-1 flex-1 min-w-0 z-10">
-            <span className="text-xs text-text-tertiary font-medium">Total Links</span>
-            <ClickableAmount text={paymentLinks.length} className="text-[22px] max-sm:text-lg font-extrabold tracking-tight whitespace-nowrap overflow-hidden text-ellipsis" />
+            <span className="text-xs text-text-tertiary font-medium">
+              {t("payments.totalLinks")}
+            </span>
+            <ClickableAmount
+              text={paymentLinks.length}
+              className="text-[22px] max-sm:text-lg font-extrabold tracking-tight whitespace-nowrap overflow-hidden text-ellipsis"
+            />
           </div>
         </div>
         <div className="bg-bg-card border border-border-color rounded-lg p-5 flex items-start gap-4 relative overflow-hidden transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 after:content-[''] after:absolute after:top-0 after:right-0 after:w-20 after:h-20 after:bg-gradient-to-br after:from-red-500/10 after:to-transparent after:rounded-bl-full">
-          <div className="w-12 h-12 rounded-md flex items-center justify-center shrink-0 text-[22px]" style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981' }}><Link04Icon /></div>
+          <div
+            className="w-12 h-12 rounded-md flex items-center justify-center shrink-0 text-[22px]"
+            style={{ background: "rgba(16,185,129,0.1)", color: "#10B981" }}
+          >
+            <Link04Icon />
+          </div>
           <div className="flex flex-col gap-1 flex-1 min-w-0 z-10">
-            <span className="text-xs text-text-tertiary font-medium">Link Aktif</span>
-            <ClickableAmount text={paymentLinks.filter((pl) => pl.status === 'active').length} className="text-[22px] max-sm:text-lg font-extrabold tracking-tight text-success whitespace-nowrap overflow-hidden text-ellipsis" />
+            <span className="text-xs text-text-tertiary font-medium">
+              {t("payments.activeLinks")}
+            </span>
+            <ClickableAmount
+              text={paymentLinks.filter((pl) => pl.status === "active").length}
+              className="text-[22px] max-sm:text-lg font-extrabold tracking-tight text-success whitespace-nowrap overflow-hidden text-ellipsis"
+            />
           </div>
         </div>
         <div className="bg-bg-card border border-border-color rounded-lg p-5 flex items-start gap-4 relative overflow-hidden transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 after:content-[''] after:absolute after:top-0 after:right-0 after:w-20 after:h-20 after:bg-gradient-to-br after:from-red-500/10 after:to-transparent after:rounded-bl-full">
-          <div className="w-12 h-12 rounded-md flex items-center justify-center shrink-0 text-[22px]" style={{ background: 'rgba(59,130,246,0.1)', color: '#3B82F6' }}><MouseLeftClick02Icon /></div>
+          <div
+            className="w-12 h-12 rounded-md flex items-center justify-center shrink-0 text-[22px]"
+            style={{ background: "rgba(59,130,246,0.1)", color: "#3B82F6" }}
+          >
+            <MouseLeftClick02Icon />
+          </div>
           <div className="flex flex-col gap-1 flex-1 min-w-0 z-10">
-            <span className="text-xs text-text-tertiary font-medium">Total Klik</span>
-            <ClickableAmount text={paymentLinks.reduce((s, pl) => s + pl.clicks, 0)} className="text-[22px] max-sm:text-lg font-extrabold tracking-tight whitespace-nowrap overflow-hidden text-ellipsis" />
+            <span className="text-xs text-text-tertiary font-medium">
+              {t("payments.totalClicks")}
+            </span>
+            <ClickableAmount
+              text={paymentLinks.reduce((s, pl) => s + pl.clicks, 0)}
+              className="text-[22px] max-sm:text-lg font-extrabold tracking-tight whitespace-nowrap overflow-hidden text-ellipsis"
+            />
           </div>
         </div>
         <div className="bg-bg-card border border-border-color rounded-lg p-5 flex items-start gap-4 relative overflow-hidden transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 after:content-[''] after:absolute after:top-0 after:right-0 after:w-20 after:h-20 after:bg-gradient-to-br after:from-red-500/10 after:to-transparent after:rounded-bl-full">
-          <div className="w-12 h-12 rounded-md flex items-center justify-center shrink-0 text-[22px]" style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981' }}><MoneyBag02Icon /></div>
+          <div
+            className="w-12 h-12 rounded-md flex items-center justify-center shrink-0 text-[22px]"
+            style={{ background: "rgba(16,185,129,0.1)", color: "#10B981" }}
+          >
+            <MoneyBag02Icon />
+          </div>
           <div className="flex flex-col gap-1 flex-1 min-w-0 z-10">
-            <ClickableAmount text={`Total Pembayaran ${hasMixedCurrencies ? '(≈ IDR)' : ''}`} className="text-xs text-text-tertiary font-medium tracking-tight whitespace-nowrap overflow-hidden text-ellipsis" />
-            <ClickableAmount text={formatCurrency(totalRevenue)} className="text-[22px] max-sm:text-lg font-extrabold tracking-tight whitespace-nowrap overflow-hidden text-ellipsis" />
+            <ClickableAmount
+              text={`${t("payments.totalPayments")} ${hasMixedCurrencies ? "(≈ IDR)" : ""}`}
+              className="text-xs text-text-tertiary font-medium tracking-tight whitespace-nowrap overflow-hidden text-ellipsis"
+            />
+            <ClickableAmount
+              text={formatCurrency(totalRevenue)}
+              className="text-[22px] max-sm:text-lg font-extrabold tracking-tight whitespace-nowrap overflow-hidden text-ellipsis"
+            />
           </div>
         </div>
       </div>
@@ -372,10 +622,12 @@ export default function PaymentsPage() {
       {/* Search + Filter */}
       <div className="flex gap-2 mb-6">
         <div className="relative flex-1">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm opacity-50"><Search01Icon /></span>
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm opacity-50">
+            <Search01Icon />
+          </span>
           <input
             type="text"
-            placeholder="Cari payment link..."
+            placeholder={t("payments.searchPlaceholder")}
             className="w-full py-3 pr-4 pl-11 border border-border-color rounded-md bg-bg-card text-text-primary text-sm outline-none transition-all duration-150 focus:border-red-400 focus:ring-3 focus:ring-red-500/10"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -386,9 +638,11 @@ export default function PaymentsPage() {
           onClick={openFilterModal}
         >
           <FilterIcon width={18} height={18} />
-          <span className="max-sm:hidden">Filter</span>
+          <span className="max-sm:hidden">{t("common.filter")}</span>
           {activeFilterCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gradient-to-br from-red-600 to-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{activeFilterCount}</span>
+            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gradient-to-br from-red-600 to-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+              {activeFilterCount}
+            </span>
           )}
         </button>
       </div>
@@ -400,26 +654,42 @@ export default function PaymentsPage() {
             onClick={toggleSelectAll}
             className={`w-7 h-7 shrink-0 flex items-center justify-center rounded-lg border-2 transition-all duration-150 cursor-pointer ${
               selected.size === currentData.length && currentData.length > 0
-                ? 'bg-red-600 border-red-600 text-white'
-                : 'border-gray-300 dark:border-gray-600 hover:border-red-400'
+                ? "bg-red-600 border-red-600 text-white"
+                : "border-gray-300 dark:border-gray-600 hover:border-red-400"
             }`}
           >
-            {selected.size === currentData.length && currentData.length > 0 && <Tick02Icon width={14} height={14} />}
+            {selected.size === currentData.length && currentData.length > 0 && (
+              <Tick02Icon width={14} height={14} />
+            )}
           </button>
           <span className="text-sm font-medium text-text-primary whitespace-nowrap">
-            {selected.size > 0 ? `${selected.size} dipilih` : 'Pilih payment link'}
+            {selected.size > 0
+              ? t("common.selected", { count: selected.size })
+              : t("payments.selectPaymentLink")}
           </span>
           <div className="flex-1" />
           {selected.size > 0 && (
-            <button onClick={confirmBulkDelete} disabled={bulkDeleting} className="flex items-center gap-1.5 text-xs sm:text-sm py-1.5 px-3 bg-red-600 text-white hover:bg-red-700 rounded-lg font-medium transition-colors cursor-pointer">
+            <button
+              onClick={confirmBulkDelete}
+              disabled={bulkDeleting}
+              className="flex items-center gap-1.5 text-xs sm:text-sm py-1.5 px-3 bg-red-600 text-white hover:bg-red-700 rounded-lg font-medium transition-colors cursor-pointer"
+            >
               <Delete02Icon width={14} height={14} />
-              <span className="hidden sm:inline">Hapus ({selected.size})</span>
+              <span className="hidden sm:inline">
+                {t("common.delete")} ({selected.size})
+              </span>
               <span className="sm:hidden">{selected.size}</span>
             </button>
           )}
-          <button onClick={() => { setSelectionMode(false); setSelected(new Set()); }} className="flex items-center gap-1 text-xs sm:text-sm py-1.5 px-3 bg-bg-card border border-border-light text-text-secondary hover:bg-bg-hover rounded-lg font-medium transition-colors cursor-pointer">
+          <button
+            onClick={() => {
+              setSelectionMode(false);
+              setSelected(new Set());
+            }}
+            className="flex items-center gap-1 text-xs sm:text-sm py-1.5 px-3 bg-bg-card border border-border-light text-text-secondary hover:bg-bg-hover rounded-lg font-medium transition-colors cursor-pointer"
+          >
             <Cancel01Icon width={14} height={14} />
-            <span className="hidden sm:inline">Batal</span>
+            <span className="hidden sm:inline">{t("common.cancel")}</span>
           </button>
         </div>
       )}
@@ -432,16 +702,20 @@ export default function PaymentsPage() {
               key={pl.id}
               onClick={() => selectionMode && toggleSelect(pl.id)}
               className={`card relative overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-lg before:absolute before:top-0 before:inset-x-0 before:h-[3px] before:bg-gradient-to-br before:from-red-600 before:to-red-500
-                ${isSelected ? 'ring-2 ring-red-500 bg-red-50/10 border-l-[4px] border-l-red-500' : ''}
-                ${selectionMode ? 'cursor-pointer active:scale-[0.98]' : ''}
+                ${isSelected ? "ring-2 ring-red-500 bg-red-50/10 border-l-[4px] border-l-red-500" : ""}
+                ${selectionMode ? "cursor-pointer active:scale-[0.98]" : ""}
               `}
             >
               {/* Selection indicator */}
               {selectionMode && (
                 <div className="absolute top-4 right-4 z-10">
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-150 ${
-                    isSelected ? 'bg-red-600 border-red-600 text-white' : 'border-gray-300 dark:border-gray-600'
-                  }`}>
+                  <div
+                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-150 ${
+                      isSelected
+                        ? "bg-red-600 border-red-600 text-white"
+                        : "border-gray-300 dark:border-gray-600"
+                    }`}
+                  >
                     {isSelected && <Tick02Icon width={12} height={12} />}
                   </div>
                 </div>
@@ -451,61 +725,133 @@ export default function PaymentsPage() {
                   <Payment01Icon className="text-red-600" />
                 </div>
                 <div className="flex items-center gap-2">
-                  {pl.payment_provider && pl.payment_provider !== 'manual' && (
-                    <span className={`inline-flex items-center gap-1 py-0.5 px-2 rounded-full text-[10px] font-bold ${pl.payment_provider === 'paypal' ? 'bg-blue-500/10 text-blue-600' : 'bg-emerald-500/10 text-emerald-600'
-                      }`}>
-                      {pl.payment_provider === 'paypal' ? <PaypalIcon width={14} height={14}> PayPal</PaypalIcon> : <Payment01Icon width={14} height={14}> Xendit</Payment01Icon>}
+                  {pl.payment_provider && pl.payment_provider !== "manual" && (
+                    <span
+                      className={`inline-flex items-center gap-1 py-0.5 px-2 rounded-full text-[10px] font-bold ${
+                        pl.payment_provider === "paypal"
+                          ? "bg-blue-500/10 text-blue-600"
+                          : "bg-emerald-500/10 text-emerald-600"
+                      }`}
+                    >
+                      {pl.payment_provider === "paypal" ? (
+                        <PaypalIcon width={14} height={14}>
+                          {" "}
+                          PayPal
+                        </PaypalIcon>
+                      ) : (
+                        <Payment01Icon width={14} height={14}>
+                          {" "}
+                          Xendit
+                        </Payment01Icon>
+                      )}
                     </span>
                   )}
                   <span className={`badge ${getStatusColor(pl.status)}`}>
-                    {pl.status.charAt(0).toUpperCase() + pl.status.slice(1)}
+                    {t(paymentStatusLabelKeys[pl.status] ?? "status.unknown")}
                   </span>
                 </div>
               </div>
-              <Link href={`/payments/${pl.id}`} className="text-[17px] font-bold mb-1.5 block hover:text-red-600 transition-colors no-underline text-text-primary">{pl.title}</Link>
-              <p className="text-[13px] text-text-secondary mb-3 leading-relaxed line-clamp-2" title={pl.description}>{pl.description}</p>
+              <Link
+                href={`/payments/${pl.id}`}
+                className="text-[17px] font-bold mb-1.5 block hover:text-red-600 transition-colors no-underline text-text-primary"
+              >
+                {pl.title}
+              </Link>
+              <p
+                className="text-[13px] text-text-secondary mb-3 leading-relaxed line-clamp-2"
+                title={pl.description}
+              >
+                {pl.description}
+              </p>
               <div className="text-[22px] font-extrabold bg-gradient-to-br from-red-600 to-red-500 bg-clip-text text-transparent mb-4">
-                {new Intl.NumberFormat(pl.currency === 'IDR' ? 'id-ID' : 'en-US', { style: 'currency', currency: pl.currency || 'IDR', minimumFractionDigits: pl.currency === 'IDR' || pl.currency === 'JPY' ? 0 : 2 }).format(pl.amount)}
+                {new Intl.NumberFormat(
+                  pl.currency === "IDR" ? "id-ID" : "en-US",
+                  {
+                    style: "currency",
+                    currency: pl.currency || "IDR",
+                    minimumFractionDigits:
+                      pl.currency === "IDR" || pl.currency === "JPY" ? 0 : 2,
+                  },
+                ).format(pl.amount)}
               </div>
               <div className="grid grid-cols-3 gap-2 mb-4 p-3 bg-bg-secondary rounded-md">
                 <div className="flex flex-col items-center gap-0.5">
                   <span className="text-base font-bold">{pl.clicks}</span>
-                  <span className="text-[11px] text-text-tertiary font-medium">Klik</span>
+                  <span className="text-[11px] text-text-tertiary font-medium">
+                    {t("payments.clicks")}
+                  </span>
                 </div>
                 <div className="flex flex-col items-center gap-0.5">
                   <span className="text-base font-bold">{pl.payments}</span>
-                  <span className="text-[11px] text-text-tertiary font-medium">Pembayaran</span>
+                  <span className="text-[11px] text-text-tertiary font-medium">
+                    {t("payments.payments")}
+                  </span>
                 </div>
                 <div className="flex flex-col items-center gap-0.5">
                   <span className="text-base font-bold">
-                    {pl.clicks > 0 ? Math.round((pl.payments / pl.clicks) * 100) : 0}%
+                    {pl.clicks > 0
+                      ? Math.round((pl.payments / pl.clicks) * 100)
+                      : 0}
+                    %
                   </span>
-                  <span className="text-[11px] text-text-tertiary font-medium">Konversi</span>
+                  <span className="text-[11px] text-text-tertiary font-medium">
+                    {t("payments.conversion")}
+                  </span>
                 </div>
               </div>
               <div className="flex items-center gap-2 px-3 py-2.5 bg-bg-secondary border border-border-light rounded-md mb-3">
-                <span className="flex-1 text-xs text-text-secondary overflow-hidden text-ellipsis whitespace-nowrap font-mono">{pl.url}</span>
-                <button className="w-[30px] h-[30px] flex items-center justify-center rounded-sm bg-bg-card border border-border-color cursor-pointer text-sm transition-all duration-150 hover:bg-red-50 hover:border-red-300" title="Salin link" onClick={(e) => { e.stopPropagation(); handleCopy(pl.url); }}>
-                  <Copy01Icon width={16} height={16} className="text-text-secondary" />
+                <span className="flex-1 text-xs text-text-secondary overflow-hidden text-ellipsis whitespace-nowrap font-mono">
+                  {pl.url}
+                </span>
+                <button
+                  className="w-[30px] h-[30px] flex items-center justify-center rounded-sm bg-bg-card border border-border-color cursor-pointer text-sm transition-all duration-150 hover:bg-red-50 hover:border-red-300"
+                  title={t("common.copyLink")}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopy(pl.url);
+                  }}
+                >
+                  <Copy01Icon
+                    width={16}
+                    height={16}
+                    className="text-text-secondary"
+                  />
                 </button>
                 <a
                   href={createPaymentWhatsAppUrl(pl)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-[30px] h-[30px] flex items-center justify-center rounded-sm bg-bg-card border border-border-color cursor-pointer text-sm transition-all duration-150 hover:bg-emerald-50 hover:border-emerald-300"
-                  title="Bagikan via WhatsApp"
-                  aria-label={`Bagikan ${pl.title} via WhatsApp`}
+                  title={t("common.shareViaWhatsApp")}
+                  aria-label={`${t("common.shareViaWhatsApp")}: ${pl.title}`}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <WhatsappIcon width={16} height={16} className="text-emerald-600" />
+                  <WhatsappIcon
+                    width={16}
+                    height={16}
+                    className="text-emerald-600"
+                  />
                 </a>
               </div>
               <div className="flex justify-between mt-1 items-center">
-                <span className="text-[11px] text-text-tertiary">Dibuat: {new Date(pl.created_at).toLocaleDateString('id-ID')}</span>
+                <span className="text-[11px] text-text-tertiary">
+                  {t("common.created")}:{" "}
+                  {new Date(pl.created_at).toLocaleDateString(intlLocale)}
+                </span>
                 {!selectionMode && (
                   <div className="flex gap-1.5">
-                    <Link href={`/payments/${pl.id}/edit`} className="btn btn-ghost btn-sm text-text-secondary hover:text-red-600 hover:bg-red-50"><Edit02Icon width={14} height={14} /> Edit</Link>
-                    <button className="btn btn-ghost btn-sm text-danger hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(pl.id)}>Hapus</button>
+                    <Link
+                      href={`/payments/${pl.id}/edit`}
+                      className="btn btn-ghost btn-sm text-text-secondary hover:text-red-600 hover:bg-red-50"
+                    >
+                      <Edit02Icon width={14} height={14} /> {t("common.edit")}
+                    </Link>
+                    <button
+                      className="btn btn-ghost btn-sm text-danger hover:text-red-600 hover:bg-red-50"
+                      onClick={() => handleDelete(pl.id)}
+                    >
+                      {t("common.delete")}
+                    </button>
                   </div>
                 )}
               </div>
@@ -518,25 +864,29 @@ export default function PaymentsPage() {
       {filtered.length > 0 && (
         <div className="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4 p-4 border border-border-color bg-bg-card rounded-lg">
           <div className="text-sm text-text-secondary text-center sm:text-left">
-            Menampilkan <span className="font-semibold text-text-primary">{(currentPage - 1) * itemsPerPage + 1}</span> - <span className="font-semibold text-text-primary">{Math.min(currentPage * itemsPerPage, filtered.length)}</span> dari <span className="font-semibold text-text-primary">{filtered.length}</span> data
+            {t("common.showingRange", {
+              from: (currentPage - 1) * itemsPerPage + 1,
+              to: Math.min(currentPage * itemsPerPage, filtered.length),
+              total: filtered.length,
+            })}
           </div>
           <div className="flex gap-1.5 w-full sm:w-auto justify-center sm:justify-end">
             <button
               className="flex-1 sm:flex-none px-3 py-1.5 text-sm border border-border-color rounded-md bg-bg-secondary text-text-primary disabled:opacity-50 disabled:cursor-not-allowed hover:bg-bg-hover transition-colors"
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
             >
-              Sebelumnya
+              {t("common.previous")}
             </button>
             <div className="flex items-center justify-center px-3 text-sm font-semibold bg-red-50 dark:bg-red-900/20 text-red-600 rounded-md min-w-[50px]">
               {currentPage} / {totalPages}
             </div>
             <button
               className="flex-1 sm:flex-none px-3 py-1.5 text-sm border border-border-color rounded-md bg-bg-secondary text-text-primary disabled:opacity-50 disabled:cursor-not-allowed hover:bg-bg-hover transition-colors"
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
             >
-              Selanjutnya
+              {t("common.next")}
             </button>
           </div>
         </div>
@@ -544,15 +894,27 @@ export default function PaymentsPage() {
 
       {filtered.length === 0 && (
         <div className="card text-center py-16 px-5">
-          <div className="text-5xl mb-4 opacity-50 flex justify-center"><Payment01Icon width={48} height={48} /></div>
-          <h3 className="text-lg font-semibold mb-2">Belum ada payment link</h3>
-          <p className="text-sm text-text-secondary mb-6">Buat payment link pertama Anda</p>
+          <div className="text-5xl mb-4 opacity-50 flex justify-center">
+            <Payment01Icon width={48} height={48} />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">
+            {t("payments.emptyTitle")}
+          </h3>
+          <p className="text-sm text-text-secondary mb-6">
+            {t("payments.emptySubtitle")}
+          </p>
           {paymentLinkLocked ? (
-            <button className="btn btn-primary opacity-60 cursor-not-allowed" disabled title={subscription.limitMessage('payment_links')}>
-              <LockedIcon width={16} height={16} /> Buat Payment Link
+            <button
+              className="btn btn-primary opacity-60 cursor-not-allowed"
+              disabled
+              title={subscription.limitMessage("payment_links")}
+            >
+              <LockedIcon width={16} height={16} /> {t("payments.create")}
             </button>
           ) : (
-            <Link href="/payments/create" className="btn btn-primary">Buat Payment Link</Link>
+            <Link href="/payments/create" className="btn btn-primary">
+              {t("payments.create")}
+            </Link>
           )}
         </div>
       )}

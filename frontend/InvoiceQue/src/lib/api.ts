@@ -1,9 +1,11 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1";
 
 function getAuthHeaders(): HeadersInit {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
   return {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
@@ -21,11 +23,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const error = await res.json().catch(() => ({ error: res.statusText }));
 
     // Auto-logout on 401 Unauthorized (token missing, expired, or invalid)
-    if (res.status === 401 && typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('auth:logout'));
+    if (res.status === 401 && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("auth:logout"));
     }
 
-    throw new Error(error.error || error.message || `Request failed: ${res.status}`);
+    throw new Error(
+      error.error || error.message || `Request failed: ${res.status}`,
+    );
   }
 
   return res.json();
@@ -76,66 +80,74 @@ export interface AuthMessageResponse {
 
 export const authApi = {
   login: (email: string, password: string) =>
-    request<AuthResponse>('/auth/login', {
-      method: 'POST',
+    request<AuthResponse>("/auth/login", {
+      method: "POST",
       body: JSON.stringify({ email, password }),
     }),
 
-  register: (name: string, email: string, password: string, company?: string, phone?: string) =>
-    request<EmailVerificationResponse>('/auth/register', {
-      method: 'POST',
+  register: (
+    name: string,
+    email: string,
+    password: string,
+    company?: string,
+    phone?: string,
+  ) =>
+    request<EmailVerificationResponse>("/auth/register", {
+      method: "POST",
       body: JSON.stringify({ name, email, password, company, phone }),
     }),
 
   verifyEmail: (token: string) =>
-    request<EmailVerificationResponse>('/auth/verify-email', {
-      method: 'POST',
+    request<EmailVerificationResponse>("/auth/verify-email", {
+      method: "POST",
       body: JSON.stringify({ token }),
     }),
 
   resendVerification: (email: string) =>
-    request<EmailVerificationResponse>('/auth/resend-verification', {
-      method: 'POST',
+    request<EmailVerificationResponse>("/auth/resend-verification", {
+      method: "POST",
       body: JSON.stringify({ email }),
     }),
 
   forgotPassword: (email: string) =>
-    request<AuthMessageResponse>('/auth/forgot-password', {
-      method: 'POST',
+    request<AuthMessageResponse>("/auth/forgot-password", {
+      method: "POST",
       body: JSON.stringify({ email }),
     }),
 
   resetPassword: (token: string, newPassword: string) =>
-    request<AuthMessageResponse>('/auth/reset-password', {
-      method: 'POST',
+    request<AuthMessageResponse>("/auth/reset-password", {
+      method: "POST",
       body: JSON.stringify({ token, new_password: newPassword }),
     }),
 
   googleLogin: (idToken: string) =>
-    request<AuthResponse>('/auth/google', {
-      method: 'POST',
+    request<AuthResponse>("/auth/google", {
+      method: "POST",
       body: JSON.stringify({ id_token: idToken }),
     }),
 
   refresh: (refreshToken: string) =>
-    request<AuthResponse>('/auth/refresh', {
-      method: 'POST',
+    request<AuthResponse>("/auth/refresh", {
+      method: "POST",
       body: JSON.stringify({ refresh_token: refreshToken }),
     }),
 
-  profile: () =>
-    request<User>('/auth/profile'),
+  profile: () => request<User>("/auth/profile"),
 
   updateProfile: (name: string, company: string, phone: string) =>
-    request<User>('/auth/profile', {
-      method: 'PUT',
+    request<User>("/auth/profile", {
+      method: "PUT",
       body: JSON.stringify({ name, company, phone }),
     }),
 
   changePassword: (oldPassword: string, newPassword: string) =>
-    request<{ message: string }>('/auth/password', {
-      method: 'PUT',
-      body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+    request<{ message: string }>("/auth/password", {
+      method: "PUT",
+      body: JSON.stringify({
+        old_password: oldPassword,
+        new_password: newPassword,
+      }),
     }),
 };
 
@@ -189,35 +201,34 @@ export interface UpdateClientRequest {
 export const clientApi = {
   list: (search?: string, page = 1, perPage = 10) => {
     const params = new URLSearchParams();
-    if (search) params.set('search', search);
-    params.set('page', String(page));
-    params.set('per_page', String(perPage));
+    if (search) params.set("search", search);
+    params.set("page", String(page));
+    params.set("per_page", String(perPage));
     return request<PaginatedResponse<Client>>(`/clients?${params}`);
   },
 
-  get: (id: string) =>
-    request<Client>(`/clients/${id}`),
+  get: (id: string) => request<Client>(`/clients/${id}`),
 
   create: (body: CreateClientRequest) =>
-    request<Client>('/clients', {
-      method: 'POST',
+    request<Client>("/clients", {
+      method: "POST",
       body: JSON.stringify(body),
     }),
 
   update: (id: string, body: UpdateClientRequest) =>
     request<Client>(`/clients/${id}`, {
-      method: 'PUT',
+      method: "PUT",
       body: JSON.stringify(body),
     }),
 
   delete: (id: string) =>
     request<{ message: string }>(`/clients/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
     }),
 
   bulkDelete: (ids: string[]) =>
-    request<{ message: string; deleted: number }>('/clients/bulk-delete', {
-      method: 'POST',
+    request<{ message: string; deleted: number }>("/clients/bulk-delete", {
+      method: "POST",
       body: JSON.stringify({ ids }),
     }),
 };
@@ -266,38 +277,40 @@ type InvoiceApiResponse = Invoice & {
 };
 
 function normalizeInvoice(invoice: InvoiceApiResponse): Invoice {
-  const invoiceNumber = invoice.number || invoice.invoice_number || '';
+  const invoiceNumber = invoice.number || invoice.invoice_number || "";
 
   return {
     ...invoice,
     number: invoiceNumber,
     invoice_number: invoice.invoice_number || invoiceNumber,
-    client_id: invoice.client_id || '',
-    client_name: invoice.client_name || '',
-    client_email: invoice.client_email || '',
+    client_id: invoice.client_id || "",
+    client_name: invoice.client_name || "",
+    client_email: invoice.client_email || "",
     items: invoice.items || [],
     subtotal: invoice.subtotal ?? 0,
     tax: invoice.tax ?? 0,
     discount: invoice.discount ?? 0,
     total: invoice.total ?? 0,
-    status: invoice.status || 'draft',
-    payment_type: invoice.payment_type || 'full',
+    status: invoice.status || "draft",
+    payment_type: invoice.payment_type || "full",
     dp_percentage: invoice.dp_percentage ?? 0,
     dp_amount: invoice.dp_amount ?? 0,
     amount_paid: invoice.amount_paid ?? 0,
     amount_remaining: invoice.amount_remaining ?? 0,
-    due_date: invoice.due_date || '',
-    created_at: invoice.created_at || '',
-    paid_at: invoice.paid_at || '',
-    notes: invoice.notes || '',
-    payment_link: invoice.payment_link || '',
-    remaining_payment_link: invoice.remaining_payment_link || '',
-    currency: invoice.currency || 'IDR',
+    due_date: invoice.due_date || "",
+    created_at: invoice.created_at || "",
+    paid_at: invoice.paid_at || "",
+    notes: invoice.notes || "",
+    payment_link: invoice.payment_link || "",
+    remaining_payment_link: invoice.remaining_payment_link || "",
+    currency: invoice.currency || "IDR",
     exchange_rate_idr: invoice.exchange_rate_idr ?? 0,
   };
 }
 
-function normalizeInvoicePage(response: PaginatedResponse<InvoiceApiResponse>): PaginatedResponse<Invoice> {
+function normalizeInvoicePage(
+  response: PaginatedResponse<InvoiceApiResponse>,
+): PaginatedResponse<Invoice> {
   return {
     ...response,
     data: (response.data || []).map(normalizeInvoice),
@@ -322,36 +335,37 @@ export interface CreateInvoiceRequest {
 export const invoiceApi = {
   list: (status?: string, page = 0, size = 10) => {
     const params = new URLSearchParams();
-    if (status) params.set('status', status);
-    params.set('page', String(page));
-    params.set('size', String(size));
-    return request<PaginatedResponse<InvoiceApiResponse>>(`/invoices?${params}`)
-      .then(normalizeInvoicePage);
+    if (status) params.set("status", status);
+    params.set("page", String(page));
+    params.set("size", String(size));
+    return request<PaginatedResponse<InvoiceApiResponse>>(
+      `/invoices?${params}`,
+    ).then(normalizeInvoicePage);
   },
 
   get: (id: string) =>
     request<InvoiceApiResponse>(`/invoices/${id}`).then(normalizeInvoice),
 
   create: (body: CreateInvoiceRequest) =>
-    request<InvoiceApiResponse>('/invoices', {
-      method: 'POST',
+    request<InvoiceApiResponse>("/invoices", {
+      method: "POST",
       body: JSON.stringify(body),
     }).then(normalizeInvoice),
 
   update: (id: string, body: CreateInvoiceRequest) =>
     request<InvoiceApiResponse>(`/invoices/${id}`, {
-      method: 'PUT',
+      method: "PUT",
       body: JSON.stringify(body),
     }).then(normalizeInvoice),
 
   delete: (id: string) =>
     request<{ message: string }>(`/invoices/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
     }),
 
   send: (id: string) =>
     request<InvoiceApiResponse>(`/invoices/${id}/send`, {
-      method: 'PUT',
+      method: "PUT",
     }).then(normalizeInvoice),
 
   downloadPdf: async (id: string, filename: string) => {
@@ -359,18 +373,19 @@ export const invoiceApi = {
   },
 
   bulkDelete: (ids: string[]) =>
-    request<{ message: string; deleted: number }>('/invoices/bulk-delete', {
-      method: 'POST',
+    request<{ message: string; deleted: number }>("/invoices/bulk-delete", {
+      method: "POST",
       body: JSON.stringify({ ids }),
     }),
 
   /** Returns invoices that can still receive a payment link (not fully paid, or DP with remaining balance) */
   listLinkable: () =>
-    request<{ data: InvoiceApiResponse[] }>('/invoices/linkable')
-      .then((response) => ({
+    request<{ data: InvoiceApiResponse[] }>("/invoices/linkable").then(
+      (response) => ({
         ...response,
         data: (response.data || []).map(normalizeInvoice),
-      })),
+      }),
+    ),
 };
 
 // ── Dashboard API ─────────────────────────────────────
@@ -390,8 +405,7 @@ export interface RevenueChartItem {
 }
 
 export const dashboardApi = {
-  getStats: () =>
-    request<DashboardStats>('/dashboard/stats'),
+  getStats: () => request<DashboardStats>("/dashboard/stats"),
 
   getRevenueChart: (months = 6) =>
     request<RevenueChartItem[]>(`/dashboard/revenue-chart?months=${months}`),
@@ -441,47 +455,49 @@ export interface UpdatePaymentLinkRequest {
 export const paymentLinkApi = {
   list: (page = 1, perPage = 10) => {
     const params = new URLSearchParams();
-    params.set('page', String(page));
-    params.set('per_page', String(perPage));
+    params.set("page", String(page));
+    params.set("per_page", String(perPage));
     return request<PaginatedResponse<PaymentLink>>(`/payments?${params}`);
   },
 
-  get: (id: string) =>
-    request<PaymentLink>(`/payments/${id}`),
+  get: (id: string) => request<PaymentLink>(`/payments/${id}`),
 
   create: (body: CreatePaymentLinkRequest) =>
-    request<PaymentLink>('/payments', {
-      method: 'POST',
+    request<PaymentLink>("/payments", {
+      method: "POST",
       body: JSON.stringify(body),
     }),
 
   update: (id: string, body: UpdatePaymentLinkRequest) =>
     request<PaymentLink>(`/payments/${id}`, {
-      method: 'PUT',
+      method: "PUT",
       body: JSON.stringify(body),
     }),
 
   delete: (id: string) =>
     request<{ message: string }>(`/payments/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
     }),
 
   bulkDelete: (ids: string[]) =>
-    request<{ message: string; deleted: number }>('/payments/bulk-delete', {
-      method: 'POST',
+    request<{ message: string; deleted: number }>("/payments/bulk-delete", {
+      method: "POST",
       body: JSON.stringify({ ids }),
     }),
 
   /** Cascade delete payment links associated with a single invoice */
   deleteByInvoice: (invoiceId: string) =>
-    request<{ message: string; deleted: number }>(`/payments/by-invoice/${invoiceId}`, {
-      method: 'DELETE',
-    }),
+    request<{ message: string; deleted: number }>(
+      `/payments/by-invoice/${invoiceId}`,
+      {
+        method: "DELETE",
+      },
+    ),
 
   /** Cascade delete payment links associated with multiple invoices */
   deleteByInvoices: (invoiceIds: string[]) =>
-    request<{ message: string; deleted: number }>('/payments/by-invoices', {
-      method: 'POST',
+    request<{ message: string; deleted: number }>("/payments/by-invoices", {
+      method: "POST",
       body: JSON.stringify({ invoice_ids: invoiceIds }),
     }),
 };
@@ -502,36 +518,46 @@ export interface NotificationLog {
 export const notificationApi = {
   list: (page = 1, perPage = 15) => {
     const params = new URLSearchParams();
-    params.set('page', String(page));
-    params.set('per_page', String(perPage));
-    return request<{ data: NotificationLog[]; total: number; page: number; per_page: number; total_pages: number; unread_count: number }>(`/notifications?${params}`);
+    params.set("page", String(page));
+    params.set("per_page", String(perPage));
+    return request<{
+      data: NotificationLog[];
+      total: number;
+      page: number;
+      per_page: number;
+      total_pages: number;
+      unread_count: number;
+    }>(`/notifications?${params}`);
   },
 
   markAsRead: (id: string) =>
     request<{ message: string }>(`/notifications/${id}/read`, {
-      method: 'PUT',
+      method: "PUT",
     }),
 
   markAllAsRead: () =>
     request<{ message: string; updated: number }>(`/notifications/read-all`, {
-      method: 'PUT',
+      method: "PUT",
     }),
 
   delete: (id: string) =>
     request<{ message: string }>(`/notifications/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
     }),
 
   deleteAll: () =>
     request<{ message: string; deleted: number }>(`/notifications`, {
-      method: 'DELETE',
+      method: "DELETE",
     }),
 
   deleteBatch: (ids: string[]) =>
-    request<{ message: string; deleted: number }>(`/notifications/delete-batch`, {
-      method: 'POST',
-      body: JSON.stringify({ ids }),
-    }),
+    request<{ message: string; deleted: number }>(
+      `/notifications/delete-batch`,
+      {
+        method: "POST",
+        body: JSON.stringify({ ids }),
+      },
+    ),
 };
 
 // ── Subscription API ──────────────────────────────────
@@ -578,9 +604,32 @@ export interface UsageData {
   plan_display_name?: string;
   plan_price?: number;
   locked_resources?: SubscriptionResource[];
+  // ── Extended tier fields ──
+  projects_limit?: number;
+  tasks_limit?: number;
+  quotations_limit?: number;
+  unlocked_features?: string[];
 }
 
-export type SubscriptionResource = 'invoices' | 'clients' | 'payment_links';
+export type SubscriptionResource = "invoices" | "clients" | "payment_links";
+
+export type PremiumFeature =
+  | "crm"
+  | "reports"
+  | "meetings"
+  | "time_tracking"
+  | "chasers"
+  | "calendar"
+  | "custom_branding"
+  | "xendit_integration"
+  | "paypal_integration"
+  | "toolkit_contracts"
+  | "toolkit_rate_cards"
+  | "toolkit_brand_kits"
+  | "toolkit_briefs"
+  | "toolkit_campaigns"
+  | "toolkit_intake_forms"
+  | "toolkit_palettes";
 
 export interface LimitCheckResponse {
   allowed: boolean;
@@ -594,7 +643,9 @@ export interface LimitCheckResponse {
 
 export const subscriptionApi = {
   getPlans: async () => {
-    const res = await request<SubscriptionPlan[] | { data: SubscriptionPlan[] }>('/plans');
+    const res = await request<
+      SubscriptionPlan[] | { data: SubscriptionPlan[] }
+    >("/plans");
     // backend may return either an array of plans or an object { data: [...] }
     if (Array.isArray(res)) {
       return { data: res as SubscriptionPlan[] };
@@ -602,35 +653,50 @@ export const subscriptionApi = {
     return res as { data: SubscriptionPlan[] };
   },
 
-  getCurrent: () =>
-    request<Subscription>('/subscriptions/current'),
+  getCurrent: () => request<Subscription>("/subscriptions/current"),
 
-  getUsage: () =>
-    request<UsageData>('/subscriptions/usage'),
+  getUsage: () => request<UsageData>("/subscriptions/usage"),
 
   checkLimit: (resource: SubscriptionResource) =>
     request<LimitCheckResponse>(`/subscriptions/check?resource=${resource}`),
 
   sendUpgradeRecommendation: (resource?: SubscriptionResource) =>
-    request<{ sent: number; skipped: number; failed: number; locked_resources: SubscriptionResource[] }>('/subscriptions/upgrade-recommendation', {
-      method: 'POST',
+    request<{
+      sent: number;
+      skipped: number;
+      failed: number;
+      locked_resources: SubscriptionResource[];
+    }>("/subscriptions/upgrade-recommendation", {
+      method: "POST",
       body: JSON.stringify(resource ? { resource } : {}),
     }),
 
   subscribe: (planId: string) =>
-    request<{ message: string; plan: SubscriptionPlan }>('/subscriptions/subscribe', {
-      method: 'POST',
-      body: JSON.stringify({ plan_id: planId }),
-    }),
+    request<{ message: string; plan: SubscriptionPlan }>(
+      "/subscriptions/subscribe",
+      {
+        method: "POST",
+        body: JSON.stringify({ plan_id: planId }),
+      },
+    ),
 
   checkout: (planId: string) =>
-    request<{ checkout_url: string; transaction_id: string; external_id: string }>('/subscriptions/checkout', {
-      method: 'POST',
+    request<{
+      checkout_url: string;
+      transaction_id: string;
+      external_id: string;
+    }>("/subscriptions/checkout", {
+      method: "POST",
       body: JSON.stringify({ plan_id: planId }),
     }),
 
   checkoutStatus: (externalId: string) =>
-    request<{ status: string; external_id: string; plan_id: string; amount: number }>(`/subscription/checkout/status/${externalId}`),
+    request<{
+      status: string;
+      external_id: string;
+      plan_id: string;
+      amount: number;
+    }>(`/subscription/checkout/status/${externalId}`),
 };
 
 // ── Xendit Account API ────────────────────────────────
@@ -645,12 +711,11 @@ export interface XenditAccount {
 }
 
 export const xenditApi = {
-  getAccount: () =>
-    request<XenditAccount>('/payments/xendit/account'),
+  getAccount: () => request<XenditAccount>("/payments/xendit/account"),
 
   setup: (email: string, businessName: string) =>
-    request<XenditAccount>('/payments/xendit/setup', {
-      method: 'POST',
+    request<XenditAccount>("/payments/xendit/setup", {
+      method: "POST",
       body: JSON.stringify({
         account_email: email,
         business_name: businessName,
@@ -658,8 +723,8 @@ export const xenditApi = {
     }),
 
   disconnect: () =>
-    request<{ message: string }>('/payments/xendit/account', {
-      method: 'DELETE',
+    request<{ message: string }>("/payments/xendit/account", {
+      method: "DELETE",
     }),
 };
 
@@ -672,25 +737,27 @@ export interface PaypalAccount {
 }
 
 export const paypalApi = {
-  getAccount: () =>
-    request<PaypalAccount>('/payments/paypal/account'),
+  getAccount: () => request<PaypalAccount>("/payments/paypal/account"),
 
   /** Connect user's PayPal — just needs their PayPal email */
   connect: (paypalEmail: string) =>
-    request<PaypalAccount>('/payments/paypal/setup', {
-      method: 'POST',
+    request<PaypalAccount>("/payments/paypal/setup", {
+      method: "POST",
       body: JSON.stringify({ paypal_email: paypalEmail }),
     }),
 
   disconnect: () =>
-    request<{ message: string }>('/payments/paypal/account', {
-      method: 'DELETE',
+    request<{ message: string }>("/payments/paypal/account", {
+      method: "DELETE",
     }),
 
   captureOrder: (orderId: string) =>
-    request<{ status: string; order_id: string; message: string }>(`/payments/paypal/capture/${orderId}`, {
-      method: 'POST',
-    }),
+    request<{ status: string; order_id: string; message: string }>(
+      `/payments/paypal/capture/${orderId}`,
+      {
+        method: "POST",
+      },
+    ),
 };
 
 // ── Invoice Settings API ──────────────────────────────
@@ -711,12 +778,11 @@ export interface InvoiceSettingsData {
 }
 
 export const invoiceSettingsApi = {
-  get: () =>
-    request<InvoiceSettingsData>('/invoice-settings'),
+  get: () => request<InvoiceSettingsData>("/invoice-settings"),
 
   update: (data: Partial<InvoiceSettingsData>) =>
-    request<InvoiceSettingsData>('/invoice-settings', {
-      method: 'PUT',
+    request<InvoiceSettingsData>("/invoice-settings", {
+      method: "PUT",
       body: JSON.stringify(data),
     }),
 };
@@ -775,29 +841,44 @@ export interface QuotationStats {
   rejected: number;
   converted: number;
   total_value: number;
+  deal_value: number;
   conversion_rate: number;
 }
 
 export const quotationApi = {
   list: (status?: string, page = 1, perPage = 10) => {
     const params = new URLSearchParams();
-    if (status) params.set('status', status);
-    params.set('page', String(page));
-    params.set('per_page', String(perPage));
+    if (status) params.set("status", status);
+    params.set("page", String(page));
+    params.set("per_page", String(perPage));
     return request<PaginatedResponse<Quotation>>(`/quotations?${params}`);
   },
   get: (id: string) => request<Quotation>(`/quotations/${id}`),
   create: (body: CreateQuotationRequest) =>
-    request<Quotation>('/quotations', { method: 'POST', body: JSON.stringify(body) }),
+    request<Quotation>("/quotations", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   update: (id: string, body: CreateQuotationRequest) =>
-    request<Quotation>(`/quotations/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-  delete: (id: string) => request<{ message: string }>(`/quotations/${id}`, { method: 'DELETE' }),
-  send: (id: string) => request<Quotation>(`/quotations/${id}/send`, { method: 'PUT' }),
+    request<Quotation>(`/quotations/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  delete: (id: string) =>
+    request<{ message: string }>(`/quotations/${id}`, { method: "DELETE" }),
+  send: (id: string) =>
+    request<Quotation>(`/quotations/${id}/send`, { method: "PUT" }),
   convert: (id: string) =>
-    request<{ message: string; invoice_id: string; invoice_number: string }>(`/quotations/${id}/convert`, { method: 'POST' }),
-  stats: () => request<QuotationStats>('/quotations/stats'),
+    request<{ message: string; invoice_id: string; invoice_number: string }>(
+      `/quotations/${id}/convert`,
+      { method: "POST" },
+    ),
+  stats: () => request<QuotationStats>("/quotations/stats"),
   bulkDelete: (ids: string[]) =>
-    request<{ message: string; deleted: number }>('/quotations/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) }),
+    request<{ message: string; deleted: number }>("/quotations/bulk-delete", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
 };
 
 // ── Client Portal API ─────────────────────────────────
@@ -855,25 +936,34 @@ export interface PortalDashboard {
 }
 
 export const portalApi = {
-  listLinks: () => request<{ data: PortalToken[] }>('/portal/links'),
+  listLinks: () => request<{ data: PortalToken[] }>("/portal/links"),
   generateLink: (clientId: string) =>
-    request<PortalToken>(`/portal/generate/${clientId}`, { method: 'POST' }),
+    request<PortalToken>(`/portal/generate/${clientId}`, { method: "POST" }),
   revokeLink: (clientId: string) =>
-    request<{ message: string }>(`/portal/revoke/${clientId}`, { method: 'DELETE' }),
+    request<{ message: string }>(`/portal/revoke/${clientId}`, {
+      method: "DELETE",
+    }),
   updateLink: (clientId: string, body: { name?: string; email?: string }) =>
-    request<PortalToken>(`/portal/update/${clientId}`, { method: 'PUT', body: JSON.stringify(body) }),
+    request<PortalToken>(`/portal/update/${clientId}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
   bulkDelete: (ids: string[]) =>
-    request<{ message: string; deleted: number }>('/portal/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) }),
+    request<{ message: string; deleted: number }>("/portal/bulk-delete", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
   /** Public — no auth needed */
-  getPortal: (token: string) =>
-    request<PortalDashboard>(`/portal/${token}`),
+  getPortal: (token: string) => request<PortalDashboard>(`/portal/${token}`),
 };
 
 // ── Public Quotation API (no auth) ────────────────────
 export const publicQuoteApi = {
   get: (token: string) => request<Quotation>(`/quote/${token}`),
-  accept: (token: string) => request<Quotation>(`/quote/${token}/accept`, { method: 'POST' }),
-  reject: (token: string) => request<Quotation>(`/quote/${token}/reject`, { method: 'POST' }),
+  accept: (token: string) =>
+    request<Quotation>(`/quote/${token}/accept`, { method: "POST" }),
+  reject: (token: string) =>
+    request<Quotation>(`/quote/${token}/reject`, { method: "POST" }),
 };
 
 // ── Payment Chaser API ────────────────────────────────
@@ -920,24 +1010,32 @@ export interface ChaserStats {
 export const chaserApi = {
   list: (status?: string, page = 1, perPage = 10) => {
     const params = new URLSearchParams();
-    if (status) params.set('status', status);
-    params.set('page', String(page));
-    params.set('per_page', String(perPage));
+    if (status) params.set("status", status);
+    params.set("page", String(page));
+    params.set("per_page", String(perPage));
     return request<PaginatedResponse<PaymentChaser>>(`/chasers?${params}`);
   },
   create: (invoiceId: string, schedule?: string) =>
-    request<PaymentChaser>('/chasers', {
-      method: 'POST',
+    request<PaymentChaser>("/chasers", {
+      method: "POST",
       body: JSON.stringify({ invoice_id: invoiceId, schedule }),
     }),
-  delete: (id: string) => request<{ message: string }>(`/chasers/${id}`, { method: 'DELETE' }),
-  toggle: (id: string) => request<PaymentChaser>(`/chasers/${id}/toggle`, { method: 'PUT' }),
+  delete: (id: string) =>
+    request<{ message: string }>(`/chasers/${id}`, { method: "DELETE" }),
+  toggle: (id: string) =>
+    request<PaymentChaser>(`/chasers/${id}/toggle`, { method: "PUT" }),
   sendReminder: (id: string) =>
-    request<{ message: string; log_id: string }>(`/chasers/${id}/send`, { method: 'POST' }),
-  getLogs: (id: string) => request<{ data: ChaserLog[] }>(`/chasers/${id}/logs`),
-  stats: () => request<ChaserStats>('/chasers/stats'),
+    request<{ message: string; log_id: string }>(`/chasers/${id}/send`, {
+      method: "POST",
+    }),
+  getLogs: (id: string) =>
+    request<{ data: ChaserLog[] }>(`/chasers/${id}/logs`),
+  stats: () => request<ChaserStats>("/chasers/stats"),
   bulkDelete: (ids: string[]) =>
-    request<{ message: string; deleted: number }>('/chasers/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) }),
+    request<{ message: string; deleted: number }>("/chasers/bulk-delete", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
 };
 
 // ── Business Health Score API ─────────────────────────
@@ -947,6 +1045,7 @@ export interface ClientHealthScore {
   client_name: string;
   total_invoices: number;
   total_paid: number;
+  currency?: string;
   avg_days_to_pay: number;
   on_time_rate: number;
   reliability_score: number;
@@ -978,7 +1077,7 @@ export interface HealthScore {
 }
 
 export const healthApi = {
-  getScore: () => request<HealthScore>('/dashboard/health-score'),
+  getScore: () => request<HealthScore>("/dashboard/health-score"),
 };
 
 // ── Task API ──────────────────────────────────────────
@@ -989,8 +1088,8 @@ export interface Task {
   project_id?: string;
   title: string;
   description: string;
-  status: 'backlog' | 'todo' | 'inprogress' | 'done';
-  priority: 'low' | 'medium' | 'high';
+  status: "backlog" | "todo" | "inprogress" | "done";
+  priority: "low" | "medium" | "high";
   client_id?: string;
   client_name: string;
   project_name: string;
@@ -1016,26 +1115,38 @@ export interface TaskStats {
 }
 
 export const taskApi = {
-  list: (params?: { status?: string; priority?: string; search?: string; page?: number; per_page?: number }) => {
+  list: (params?: {
+    status?: string;
+    priority?: string;
+    search?: string;
+    page?: number;
+    per_page?: number;
+  }) => {
     const qs = new URLSearchParams();
-    if (params?.status) qs.set('status', params.status);
-    if (params?.priority) qs.set('priority', params.priority);
-    if (params?.search) qs.set('search', params.search);
-    if (params?.page) qs.set('page', String(params.page));
-    if (params?.per_page) qs.set('per_page', String(params.per_page));
+    if (params?.status) qs.set("status", params.status);
+    if (params?.priority) qs.set("priority", params.priority);
+    if (params?.search) qs.set("search", params.search);
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.per_page) qs.set("per_page", String(params.per_page));
     const q = qs.toString();
-    return request<PaginatedResponse<Task>>(`/tasks${q ? `?${q}` : ''}`);
+    return request<PaginatedResponse<Task>>(`/tasks${q ? `?${q}` : ""}`);
   },
   get: (id: string) => request<Task>(`/tasks/${id}`),
   create: (data: Partial<Task>) =>
-    request<Task>('/tasks', { method: 'POST', body: JSON.stringify(data) }),
+    request<Task>("/tasks", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Task>) =>
-    request<Task>(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    request<Task>(`/tasks/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
   delete: (id: string) =>
-    request<{ message: string }>(`/tasks/${id}`, { method: 'DELETE' }),
+    request<{ message: string }>(`/tasks/${id}`, { method: "DELETE" }),
   bulkDelete: (ids: string[]) =>
-    request<{ message: string; deleted: number }>('/tasks/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) }),
-  stats: () => request<TaskStats>('/tasks/stats'),
+    request<{ message: string; deleted: number }>("/tasks/bulk-delete", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
+  stats: () => request<TaskStats>("/tasks/stats"),
 };
 
 // ── Project API ───────────────────────────────────────
@@ -1047,7 +1158,7 @@ export interface Project {
   description: string;
   client_id?: string;
   client_name: string;
-  status: 'active' | 'completed' | 'on_hold' | 'cancelled';
+  status: "active" | "completed" | "on_hold" | "cancelled";
   budget: number;
   hourly_rate: number;
   color: string;
@@ -1059,22 +1170,203 @@ export interface Project {
 }
 
 export const projectApi = {
-  list: (params?: { status?: string; search?: string; page?: number; per_page?: number }) => {
+  list: (params?: {
+    status?: string;
+    search?: string;
+    page?: number;
+    per_page?: number;
+  }) => {
     const qs = new URLSearchParams();
-    if (params?.status) qs.set('status', params.status);
-    if (params?.search) qs.set('search', params.search);
-    if (params?.page) qs.set('page', String(params.page));
-    if (params?.per_page) qs.set('per_page', String(params.per_page));
+    if (params?.status) qs.set("status", params.status);
+    if (params?.search) qs.set("search", params.search);
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.per_page) qs.set("per_page", String(params.per_page));
     const q = qs.toString();
-    return request<PaginatedResponse<Project>>(`/projects${q ? `?${q}` : ''}`);
+    return request<PaginatedResponse<Project>>(`/projects${q ? `?${q}` : ""}`);
   },
   get: (id: string) => request<Project>(`/projects/${id}`),
   create: (data: Partial<Project>) =>
-    request<Project>('/projects', { method: 'POST', body: JSON.stringify(data) }),
+    request<Project>("/projects", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
   update: (id: string, data: Partial<Project>) =>
-    request<Project>(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    request<Project>(`/projects/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
   delete: (id: string) =>
-    request<{ message: string }>(`/projects/${id}`, { method: 'DELETE' }),
+    request<{ message: string }>(`/projects/${id}`, { method: "DELETE" }),
+};
+
+// ── Meeting API ───────────────────────────────────────
+
+export type MeetingStatus = "scheduled" | "completed" | "cancelled";
+export type MeetingProvider =
+  | "zoom"
+  | "google_meet"
+  | "teams"
+  | "whatsapp"
+  | "offline"
+  | "other";
+
+export interface Meeting {
+  id: string;
+  user_id: string;
+  client_id?: string;
+  client_name: string;
+  project_id?: string;
+  project_name: string;
+  title: string;
+  meeting_url: string;
+  provider: MeetingProvider;
+  scheduled_at: string;
+  duration_minutes: number;
+  status: MeetingStatus;
+  agenda: string;
+  notes: string;
+  summary: string;
+  decisions: string[];
+  next_steps: string[];
+  action_items: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateMeetingRequest {
+  client_id?: string;
+  client_name?: string;
+  project_id?: string;
+  project_name?: string;
+  title: string;
+  meeting_url?: string;
+  provider?: MeetingProvider;
+  scheduled_at?: string;
+  duration_minutes?: number;
+  status?: MeetingStatus;
+  agenda?: string;
+  notes?: string;
+  summary?: string;
+  decisions?: string[];
+  next_steps?: string[];
+  action_items?: string[];
+}
+
+export type UpdateMeetingRequest = Partial<CreateMeetingRequest>;
+
+export interface MeetingStats {
+  scheduled: number;
+  completed: number;
+  cancelled: number;
+  total: number;
+  upcoming: number;
+}
+
+type MeetingApiResponse = Omit<
+  Meeting,
+  "decisions" | "next_steps" | "action_items" | "provider" | "status"
+> & {
+  decisions?: unknown;
+  next_steps?: unknown;
+  action_items?: unknown;
+  provider?: string;
+  status?: string;
+};
+
+function normalizeStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed))
+        return parsed.map((item) => String(item)).filter(Boolean);
+    } catch {
+      return value ? [value] : [];
+    }
+  }
+  return [];
+}
+
+function normalizeMeeting(meeting: MeetingApiResponse): Meeting {
+  return {
+    ...meeting,
+    client_id: meeting.client_id || "",
+    client_name: meeting.client_name || "",
+    project_id: meeting.project_id || "",
+    project_name: meeting.project_name || "",
+    title: meeting.title || "",
+    meeting_url: meeting.meeting_url || "",
+    provider: (meeting.provider || "other") as MeetingProvider,
+    scheduled_at: meeting.scheduled_at || "",
+    duration_minutes: meeting.duration_minutes ?? 30,
+    status: (meeting.status || "scheduled") as MeetingStatus,
+    agenda: meeting.agenda || "",
+    notes: meeting.notes || "",
+    summary: meeting.summary || "",
+    decisions: normalizeStringArray(meeting.decisions),
+    next_steps: normalizeStringArray(meeting.next_steps),
+    action_items: normalizeStringArray(meeting.action_items),
+    created_at: meeting.created_at || "",
+    updated_at: meeting.updated_at || "",
+  };
+}
+
+function normalizeMeetingPage(
+  response: PaginatedResponse<MeetingApiResponse>,
+): PaginatedResponse<Meeting> {
+  return {
+    ...response,
+    data: (response.data || []).map(normalizeMeeting),
+  };
+}
+
+export const meetingApi = {
+  list: (params?: {
+    status?: string;
+    search?: string;
+    client_id?: string;
+    project_id?: string;
+    date_from?: string;
+    date_to?: string;
+    page?: number;
+    per_page?: number;
+  }) => {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set("status", params.status);
+    if (params?.search) qs.set("search", params.search);
+    if (params?.client_id) qs.set("client_id", params.client_id);
+    if (params?.project_id) qs.set("project_id", params.project_id);
+    if (params?.date_from) qs.set("date_from", params.date_from);
+    if (params?.date_to) qs.set("date_to", params.date_to);
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.per_page) qs.set("per_page", String(params.per_page));
+    const q = qs.toString();
+    return request<PaginatedResponse<MeetingApiResponse>>(
+      `/meetings${q ? `?${q}` : ""}`,
+    ).then(normalizeMeetingPage);
+  },
+  get: (id: string) =>
+    request<MeetingApiResponse>(`/meetings/${id}`).then(normalizeMeeting),
+  create: (data: CreateMeetingRequest) =>
+    request<MeetingApiResponse>("/meetings", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then(normalizeMeeting),
+  update: (id: string, data: UpdateMeetingRequest) =>
+    request<MeetingApiResponse>(`/meetings/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }).then(normalizeMeeting),
+  delete: (id: string) =>
+    request<{ message: string }>(`/meetings/${id}`, { method: "DELETE" }),
+  bulkDelete: (ids: string[]) =>
+    request<{ message: string; deleted: number }>("/meetings/bulk-delete", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
+  stats: () => request<MeetingStats>("/meetings/stats"),
 };
 
 // ── Time Entry API ──────────────────────────────────────────────
@@ -1100,26 +1392,48 @@ export interface TimeEntryStats {
 }
 
 export const timeEntryApi = {
-  list: (params?: { date?: string; date_from?: string; date_to?: string; page?: number; per_page?: number }) => {
+  list: (params?: {
+    date?: string;
+    date_from?: string;
+    date_to?: string;
+    page?: number;
+    per_page?: number;
+  }) => {
     const qs = new URLSearchParams();
-    if (params?.date) qs.set('date', params.date);
-    if (params?.date_from) qs.set('date_from', params.date_from);
-    if (params?.date_to) qs.set('date_to', params.date_to);
-    if (params?.page) qs.set('page', String(params.page));
-    if (params?.per_page) qs.set('per_page', String(params.per_page));
+    if (params?.date) qs.set("date", params.date);
+    if (params?.date_from) qs.set("date_from", params.date_from);
+    if (params?.date_to) qs.set("date_to", params.date_to);
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.per_page) qs.set("per_page", String(params.per_page));
     const q = qs.toString();
-    return request<PaginatedResponse<TimeEntry>>(`/time-entries${q ? `?${q}` : ''}`);
+    return request<PaginatedResponse<TimeEntry>>(
+      `/time-entries${q ? `?${q}` : ""}`,
+    );
   },
   create: (data: Partial<TimeEntry>) =>
-    request<TimeEntry>('/time-entries', { method: 'POST', body: JSON.stringify(data) }),
+    request<TimeEntry>("/time-entries", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
   delete: (id: string) =>
-    request<{ message: string }>(`/time-entries/${id}`, { method: 'DELETE' }),
-  stats: () => request<TimeEntryStats>('/time-entries/stats'),
+    request<{ message: string }>(`/time-entries/${id}`, { method: "DELETE" }),
+  stats: () => request<TimeEntryStats>("/time-entries/stats"),
 };
 
 // ── Toolkit API ──────────────────────────────────────────────
 
-export type ToolkitType = 'snippet' | 'checklist' | 'palette' | 'brand_kit' | 'brief' | 'campaign' | 'session' | 'note' | 'contract_template' | 'rate_card' | 'link';
+export type ToolkitType =
+  | "snippet"
+  | "checklist"
+  | "palette"
+  | "brand_kit"
+  | "brief"
+  | "campaign"
+  | "session"
+  | "note"
+  | "contract_template"
+  | "rate_card"
+  | "link";
 
 export interface ToolkitItem {
   id: string;
@@ -1161,36 +1475,68 @@ export interface UpdateToolkitItemRequest {
 }
 
 export const toolkitApi = {
-  list: (params?: { type?: ToolkitType; search?: string; language?: string; favorited?: boolean; page?: number; per_page?: number }) => {
+  list: (params?: {
+    type?: ToolkitType;
+    search?: string;
+    language?: string;
+    favorited?: boolean;
+    page?: number;
+    per_page?: number;
+  }) => {
     const qs = new URLSearchParams();
-    if (params?.type) qs.set('type', params.type);
-    if (params?.search) qs.set('search', params.search);
-    if (params?.language) qs.set('language', params.language);
-    if (params?.favorited) qs.set('favorited', 'true');
-    if (params?.page) qs.set('page', String(params.page));
-    if (params?.per_page) qs.set('per_page', String(params.per_page));
+    if (params?.type) qs.set("type", params.type);
+    if (params?.search) qs.set("search", params.search);
+    if (params?.language) qs.set("language", params.language);
+    if (params?.favorited) qs.set("favorited", "true");
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.per_page) qs.set("per_page", String(params.per_page));
     const q = qs.toString();
-    return request<PaginatedResponse<ToolkitItem>>(`/toolkit${q ? `?${q}` : ''}`);
+    return request<PaginatedResponse<ToolkitItem>>(
+      `/toolkit${q ? `?${q}` : ""}`,
+    );
   },
   get: (id: string) => request<ToolkitItem>(`/toolkit/${id}`),
   create: (data: CreateToolkitItemRequest) =>
-    request<ToolkitItem>('/toolkit', { method: 'POST', body: JSON.stringify(data) }),
+    request<ToolkitItem>("/toolkit", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
   update: (id: string, data: UpdateToolkitItemRequest) =>
-    request<ToolkitItem>(`/toolkit/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    request<ToolkitItem>(`/toolkit/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
   delete: (id: string) =>
-    request<{ message: string }>(`/toolkit/${id}`, { method: 'DELETE' }),
+    request<{ message: string }>(`/toolkit/${id}`, { method: "DELETE" }),
   bulkDelete: (ids: string[]) =>
-    request<{ message: string; deleted: number }>('/toolkit/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) }),
-  stats: () => request<Record<string, number>>('/toolkit/stats'),
+    request<{ message: string; deleted: number }>("/toolkit/bulk-delete", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
+  stats: () => request<Record<string, number>>("/toolkit/stats"),
 };
 
 // ── Expense API ──────────────────────────────────────────────
 
 export type ExpenseCategory =
-  | 'software' | 'hardware' | 'internet' | 'hosting' | 'domain'
-  | 'subscription' | 'coworking' | 'travel' | 'food' | 'office_supplies'
-  | 'marketing' | 'education' | 'insurance' | 'tax' | 'contractor'
-  | 'communication' | 'utilities' | 'other';
+  | "software"
+  | "hardware"
+  | "internet"
+  | "hosting"
+  | "domain"
+  | "subscription"
+  | "coworking"
+  | "travel"
+  | "food"
+  | "office_supplies"
+  | "marketing"
+  | "education"
+  | "insurance"
+  | "tax"
+  | "contractor"
+  | "communication"
+  | "utilities"
+  | "other";
 
 export interface Expense {
   id: string;
@@ -1255,35 +1601,115 @@ export interface ExpenseStats {
 }
 
 export const expenseApi = {
-  list: (params?: { category?: ExpenseCategory; search?: string; date_from?: string; date_to?: string; project_id?: string; client_id?: string; tax_deductible?: boolean; page?: number; per_page?: number }) => {
+  list: (params?: {
+    category?: ExpenseCategory;
+    search?: string;
+    date_from?: string;
+    date_to?: string;
+    project_id?: string;
+    client_id?: string;
+    tax_deductible?: boolean;
+    page?: number;
+    per_page?: number;
+  }) => {
     const qs = new URLSearchParams();
-    if (params?.category) qs.set('category', params.category);
-    if (params?.search) qs.set('search', params.search);
-    if (params?.date_from) qs.set('date_from', params.date_from);
-    if (params?.date_to) qs.set('date_to', params.date_to);
-    if (params?.project_id) qs.set('project_id', params.project_id);
-    if (params?.client_id) qs.set('client_id', params.client_id);
-    if (params?.tax_deductible) qs.set('tax_deductible', 'true');
-    if (params?.page) qs.set('page', String(params.page));
-    if (params?.per_page) qs.set('per_page', String(params.per_page));
+    if (params?.category) qs.set("category", params.category);
+    if (params?.search) qs.set("search", params.search);
+    if (params?.date_from) qs.set("date_from", params.date_from);
+    if (params?.date_to) qs.set("date_to", params.date_to);
+    if (params?.project_id) qs.set("project_id", params.project_id);
+    if (params?.client_id) qs.set("client_id", params.client_id);
+    if (params?.tax_deductible) qs.set("tax_deductible", "true");
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.per_page) qs.set("per_page", String(params.per_page));
     const q = qs.toString();
-    return request<PaginatedResponse<Expense>>(`/expenses${q ? `?${q}` : ''}`);
+    return request<PaginatedResponse<Expense>>(`/expenses${q ? `?${q}` : ""}`);
   },
   get: (id: string) => request<Expense>(`/expenses/${id}`),
   create: (data: CreateExpenseRequest) =>
-    request<Expense>('/expenses', { method: 'POST', body: JSON.stringify(data) }),
+    request<Expense>("/expenses", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
   update: (id: string, data: UpdateExpenseRequest) =>
-    request<Expense>(`/expenses/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    request<Expense>(`/expenses/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
   delete: (id: string) =>
-    request<{ message: string }>(`/expenses/${id}`, { method: 'DELETE' }),
+    request<{ message: string }>(`/expenses/${id}`, { method: "DELETE" }),
   bulkDelete: (ids: string[]) =>
-    request<{ message: string; deleted: number }>('/expenses/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) }),
+    request<{ message: string; deleted: number }>("/expenses/bulk-delete", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
   stats: (year?: string) => {
     const qs = new URLSearchParams();
-    if (year) qs.set('year', year);
+    if (year) qs.set("year", year);
     const q = qs.toString();
-    return request<ExpenseStats>(`/expenses/stats${q ? `?${q}` : ''}`);
+    return request<ExpenseStats>(`/expenses/stats${q ? `?${q}` : ""}`);
   },
-  categories: () => request<{ categories: string[] }>('/expenses/categories'),
+  categories: () => request<{ categories: string[] }>("/expenses/categories"),
 };
 
+// ── API Key Management ────────────────────────────────
+
+export interface ApiKey {
+  id: string;
+  user_id: string;
+  name: string;
+  key_prefix: string;
+  scopes: string[];
+  last_used_at: string;
+  expires_at: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateApiKeyResponse {
+  data: {
+    id: string;
+    name: string;
+    key: string;
+    key_prefix: string;
+    scopes: string[];
+    created_at: string;
+  };
+  meta: { warning: string };
+}
+
+export interface ApiKeyListResponse {
+  data: ApiKey[];
+  meta: { total: number; available_scopes: string[] };
+}
+
+export const apiKeyApi = {
+  list: () => request<ApiKeyListResponse>("/api-keys"),
+
+  create: (name: string, scopes?: string[], expires_at?: string) =>
+    request<CreateApiKeyResponse>("/api-keys", {
+      method: "POST",
+      body: JSON.stringify({ name, scopes, expires_at }),
+    }),
+
+  update: (id: string, body: { name?: string; scopes?: string[]; is_active?: boolean }) =>
+    request<{ data: { id: string; updated: boolean }; meta: { message: string } }>(
+      `/api-keys/${id}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(body),
+      },
+    ),
+
+  revoke: (id: string) =>
+    request<{ data: { id: string; is_active: boolean }; meta: { message: string } }>(
+      `/api-keys/${id}`,
+      { method: "DELETE" },
+    ),
+
+  listScopes: () =>
+    request<{ data: string[]; meta: { total: number; description: string } }>(
+      "/api-keys/scopes",
+    ),
+};

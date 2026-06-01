@@ -14,6 +14,24 @@ pub struct JwtClaims {
     pub role: String,
 }
 
+/// The type of authentication used.
+#[derive(Debug, Clone, PartialEq)]
+pub enum AuthType {
+    Jwt,
+    ApiKey,
+}
+
+/// Unified auth context that works for both JWT and API Key auth.
+#[derive(Debug, Clone)]
+pub struct AuthContext {
+    pub user_id: String,
+    pub email: String,
+    pub role: String,
+    pub auth_type: AuthType,
+    /// Scopes for API key auth. JWT always gets `["*"]`.
+    pub scopes: Vec<String>,
+}
+
 /// Validate a JWT token and extract claims.
 pub fn validate_jwt(token: &str, secret: &str) -> std::result::Result<JwtClaims, String> {
     let parts: Vec<&str> = token.split('.').collect();
@@ -150,6 +168,93 @@ pub fn extract_auth(req: &Request, jwt_secret: &str) -> std::result::Result<JwtC
             .unwrap()
             .with_status(401)
     })
+}
+
+/// Extract authentication from either JWT Bearer token or API Key.
+/// Returns a unified AuthContext that works for both auth methods.
+///
+/// Supported formats:
+/// - `Authorization: Bearer <jwt_token>` — standard JWT auth
+/// - `Authorization: ApiKey <iq_live_xxx>` — API key auth
+/// - `Authorization: Bearer <iq_live_xxx>` — API key via Bearer (convenience)
+pub async fn extract_auth_dual(
+    req: &Request,
+    env: &worker::Env,
+    jwt_secret: &str,
+) -> std::result::Result<AuthContext, Response> {
+    let auth_header = req.headers().get("Authorization").ok().flatten();
+    let auth_header = match auth_header {
+        Some(h) => h,
+        None => {
+            return Err(Response::from_json(
+                &serde_json::json!({"error": "Authorization header required"}),
+            )
+            .unwrap()
+            .with_status(401))
+        }
+    };
+
+    // Check for API Key format: "ApiKey iq_live_xxx" or "Bearer iq_live_xxx"
+    let token_value = if auth_header.starts_with("ApiKey ") || auth_header.starts_with("apikey ") {
+        Some(&auth_header[7..])
+    } else if auth_header.to_lowercase().starts_with("bearer ") {
+        let val = &auth_header[7..];
+        if val.starts_with("iq_live_") || val.starts_with("iq_test_") {
+            Some(val)
+        } else {
+            None // It's a JWT token, handle below
+        }
+    } else {
+        None
+    };
+
+    // If we detected an API key, validate it
+    if let Some(api_key) = token_value {
+        if api_key.starts_with("iq_live_") || api_key.starts_with("iq_test_") {
+            match crate::services::api_key::validate_api_key(api_key, env).await {
+                Ok(ctx) => {
+                    return Ok(AuthContext {
+                        user_id: ctx.user_id,
+                        email: ctx.email,
+                        role: "user".to_string(),
+                        auth_type: AuthType::ApiKey,
+                        scopes: ctx.scopes,
+                    });
+                }
+                Err(e) => {
+                    return Err(Response::from_json(
+                        &serde_json::json!({"error": e}),
+                    )
+                    .unwrap()
+                    .with_status(401));
+                }
+            }
+        }
+    }
+
+    // Fall back to JWT auth
+    let token = if auth_header.to_lowercase().starts_with("bearer ") {
+        &auth_header[7..]
+    } else {
+        return Err(Response::from_json(
+            &serde_json::json!({"error": "Invalid authorization format. Use 'Bearer <jwt>' or 'ApiKey <key>'"}),
+        )
+        .unwrap()
+        .with_status(401));
+    };
+
+    match validate_jwt(token, jwt_secret) {
+        Ok(claims) => Ok(AuthContext {
+            user_id: claims.user_id,
+            email: claims.email,
+            role: claims.role,
+            auth_type: AuthType::Jwt,
+            scopes: vec!["*".to_string()],
+        }),
+        Err(e) => Err(Response::from_json(&serde_json::json!({"error": e}))
+            .unwrap()
+            .with_status(401)),
+    }
 }
 
 /// Build CORS headers for a response.

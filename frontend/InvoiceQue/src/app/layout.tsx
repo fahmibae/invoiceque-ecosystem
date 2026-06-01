@@ -4,18 +4,20 @@ import "./globals.css";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { NotificationProvider } from "@/context/NotificationContext";
+import { LanguageProvider } from "@/context/LanguageContext";
 import IdleDetector from "@/components/IdleDetector";
 
 const sora = Sora({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700', '800'],
-  variable: '--font-sora',
-  display: 'swap',
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  variable: "--font-sora",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
   title: "InvoiceQu Application",
-  description: "Platform invoice dan payment link modern untuk bisnis Indonesia. Buat, kirim, dan lacak invoice dengan mudah.",
+  description:
+    "Platform invoice dan payment link modern untuk bisnis Indonesia. Buat, kirim, dan lacak invoice dengan mudah.",
   keywords: "invoice, payment link, SaaS, bisnis, Indonesia",
   applicationName: "InvoiceQu",
   icons: {
@@ -31,7 +33,7 @@ export const metadata: Metadata = {
   },
 };
 
-import { GoogleOAuthProvider } from '@react-oauth/google';
+import { GoogleOAuthProvider } from "@react-oauth/google";
 
 export default function RootLayout({
   children,
@@ -42,12 +44,16 @@ export default function RootLayout({
     <html lang="id" suppressHydrationWarning className={sora.variable}>
       <body className={sora.className}>
         <IdleDetector />
-        <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "placeholder-client-id"}>
+        <GoogleOAuthProvider
+          clientId={
+            process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "placeholder-client-id"
+          }
+        >
           <AuthProvider>
             <NotificationProvider>
-              <ThemeProvider>
-                {children}
-              </ThemeProvider>
+              <LanguageProvider>
+                <ThemeProvider>{children}</ThemeProvider>
+              </LanguageProvider>
             </NotificationProvider>
           </AuthProvider>
         </GoogleOAuthProvider>

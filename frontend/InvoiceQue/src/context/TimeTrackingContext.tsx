@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import React, {
   createContext,
@@ -7,12 +7,12 @@ import React, {
   useEffect,
   useMemo,
   useState,
-} from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { timeEntryApi, type TimeEntry } from '@/lib/api';
+} from "react";
+import { useAuth } from "@/context/AuthContext";
+import { timeEntryApi, type TimeEntry } from "@/lib/api";
 
-const STORAGE_PREFIX = 'invoicequ:time-tracking:v1';
-export const TIME_ENTRY_SAVED_EVENT = 'invoicequ:time-entry-saved';
+const STORAGE_PREFIX = "invoicequ:time-tracking:v1";
+export const TIME_ENTRY_SAVED_EVENT = "invoicequ:time-entry-saved";
 
 export interface TimeTrackingDraft {
   taskId?: string;
@@ -43,7 +43,9 @@ interface TimeTrackingContextValue {
   clearError: () => void;
 }
 
-const TimeTrackingContext = createContext<TimeTrackingContextValue | undefined>(undefined);
+const TimeTrackingContext = createContext<TimeTrackingContextValue | undefined>(
+  undefined,
+);
 
 function storageKeyForUser(userId?: string) {
   return userId ? `${STORAGE_PREFIX}:${userId}` : null;
@@ -59,10 +61,10 @@ function parseStoredSession(raw: string | null): ActiveTimeSession | null {
   try {
     const value = JSON.parse(raw) as Partial<ActiveTimeSession>;
     if (
-      typeof value.taskTitle !== 'string' ||
+      typeof value.taskTitle !== "string" ||
       !value.taskTitle.trim() ||
-      typeof value.projectName !== 'string' ||
-      typeof value.startedAt !== 'string' ||
+      typeof value.projectName !== "string" ||
+      typeof value.startedAt !== "string" ||
       !isValidDate(value.startedAt)
     ) {
       return null;
@@ -73,14 +75,18 @@ function parseStoredSession(raw: string | null): ActiveTimeSession | null {
       : 0;
     const isRunning = value.isRunning === true;
     const lastStartedAt =
-      typeof value.lastStartedAt === 'string' && isValidDate(value.lastStartedAt)
+      typeof value.lastStartedAt === "string" &&
+      isValidDate(value.lastStartedAt)
         ? value.lastStartedAt
         : isRunning
           ? new Date().toISOString()
           : null;
 
     return {
-      taskId: typeof value.taskId === 'string' && value.taskId ? value.taskId : undefined,
+      taskId:
+        typeof value.taskId === "string" && value.taskId
+          ? value.taskId
+          : undefined,
       taskTitle: value.taskTitle.trim(),
       projectName: value.projectName,
       startedAt: value.startedAt,
@@ -93,7 +99,10 @@ function parseStoredSession(raw: string | null): ActiveTimeSession | null {
   }
 }
 
-function calculateElapsedSeconds(session: ActiveTimeSession | null, nowMs = Date.now()) {
+function calculateElapsedSeconds(
+  session: ActiveTimeSession | null,
+  nowMs = Date.now(),
+) {
   if (!session) return 0;
 
   const base = Math.max(0, Math.floor(session.accumulatedSeconds));
@@ -111,14 +120,14 @@ function calculateElapsedSeconds(session: ActiveTimeSession | null, nowMs = Date
 
 function formatLocalDate(date: Date) {
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
 function formatLocalTime(date: Date) {
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
   return `${hours}:${minutes}`;
 }
 
@@ -126,17 +135,25 @@ function toSaveError(error: unknown) {
   if (error instanceof Error && error.message) {
     return error.message;
   }
-  return 'Gagal menyimpan time entry. Coba lagi.';
+  return "Gagal menyimpan time entry. Coba lagi.";
 }
 
-export function TimeTrackingProvider({ children }: { children: React.ReactNode }) {
+export function TimeTrackingProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { user } = useAuth();
   const storageKey = storageKeyForUser(user?.id);
-  const [activeSession, setActiveSession] = useState<ActiveTimeSession | null>(null);
-  const [hydratedStorageKey, setHydratedStorageKey] = useState<string | null>(null);
+  const [activeSession, setActiveSession] = useState<ActiveTimeSession | null>(
+    null,
+  );
+  const [hydratedStorageKey, setHydratedStorageKey] = useState<string | null>(
+    null,
+  );
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!storageKey) {
@@ -178,7 +195,7 @@ export function TimeTrackingProvider({ children }: { children: React.ReactNode }
     if (!taskTitle) return;
 
     const now = new Date().toISOString();
-    setError('');
+    setError("");
     setActiveSession({
       taskId: draft.taskId || undefined,
       taskTitle,
@@ -223,7 +240,10 @@ export function TimeTrackingProvider({ children }: { children: React.ReactNode }
     if (!activeSession || isSaving) return null;
 
     const stoppedAt = new Date();
-    const durationSeconds = calculateElapsedSeconds(activeSession, stoppedAt.getTime());
+    const durationSeconds = calculateElapsedSeconds(
+      activeSession,
+      stoppedAt.getTime(),
+    );
     const stoppedSession: ActiveTimeSession = {
       ...activeSession,
       accumulatedSeconds: durationSeconds,
@@ -240,7 +260,7 @@ export function TimeTrackingProvider({ children }: { children: React.ReactNode }
     }
 
     setIsSaving(true);
-    setError('');
+    setError("");
 
     try {
       const startedAt = new Date(activeSession.startedAt);
@@ -255,7 +275,9 @@ export function TimeTrackingProvider({ children }: { children: React.ReactNode }
       });
 
       setActiveSession(null);
-      window.dispatchEvent(new CustomEvent(TIME_ENTRY_SAVED_EVENT, { detail: entry }));
+      window.dispatchEvent(
+        new CustomEvent(TIME_ENTRY_SAVED_EVENT, { detail: entry }),
+      );
       return entry;
     } catch (err) {
       setError(toSaveError(err));
@@ -265,30 +287,33 @@ export function TimeTrackingProvider({ children }: { children: React.ReactNode }
     }
   }, [activeSession, isSaving]);
 
-  const clearError = useCallback(() => setError(''), []);
+  const clearError = useCallback(() => setError(""), []);
 
-  const value = useMemo<TimeTrackingContextValue>(() => ({
-    activeSession,
-    elapsedSeconds,
-    isRunning: activeSession?.isRunning === true,
-    isSaving,
-    error,
-    startTimer,
-    pauseTimer,
-    resumeTimer,
-    stopTimer,
-    clearError,
-  }), [
-    activeSession,
-    elapsedSeconds,
-    isSaving,
-    error,
-    startTimer,
-    pauseTimer,
-    resumeTimer,
-    stopTimer,
-    clearError,
-  ]);
+  const value = useMemo<TimeTrackingContextValue>(
+    () => ({
+      activeSession,
+      elapsedSeconds,
+      isRunning: activeSession?.isRunning === true,
+      isSaving,
+      error,
+      startTimer,
+      pauseTimer,
+      resumeTimer,
+      stopTimer,
+      clearError,
+    }),
+    [
+      activeSession,
+      elapsedSeconds,
+      isSaving,
+      error,
+      startTimer,
+      pauseTimer,
+      resumeTimer,
+      stopTimer,
+      clearError,
+    ],
+  );
 
   return (
     <TimeTrackingContext.Provider value={value}>
@@ -300,7 +325,9 @@ export function TimeTrackingProvider({ children }: { children: React.ReactNode }
 export function useTimeTracking() {
   const context = useContext(TimeTrackingContext);
   if (!context) {
-    throw new Error('useTimeTracking must be used within a TimeTrackingProvider');
+    throw new Error(
+      "useTimeTracking must be used within a TimeTrackingProvider",
+    );
   }
   return context;
 }
@@ -310,5 +337,5 @@ export function formatTimer(seconds: number) {
   const h = Math.floor(safeSeconds / 3600);
   const m = Math.floor((safeSeconds % 3600) / 60);
   const s = safeSeconds % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }

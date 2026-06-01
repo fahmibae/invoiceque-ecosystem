@@ -202,21 +202,180 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: var(--bg-secondary);
+    background: rgba(220, 38, 38, 0.04);
   }
 
   ::-webkit-scrollbar-thumb {
-    background: var(--border-color);
+    background: rgba(220, 38, 38, 0.2);
     border-radius: 3px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--text-tertiary);
+    background: rgba(220, 38, 38, 0.35);
+  }
+
+  /* Firefox global scrollbar */
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(220, 38, 38, 0.2) rgba(220, 38, 38, 0.04);
+  }
+
+  /* Sidebar scrollbar — blends with red gradient */
+  aside ::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  aside ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  aside ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+  }
+
+  aside ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.35);
+  }
+
+  /* Firefox sidebar scrollbar */
+  aside * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
   }
 
 }
 
+/* ===== react-phone-number-input — premium dark/light mode ===== */
+
+/* Container: inherits .form-input wrapper, so reset inner elements */
+.PhoneInput {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* The actual text input — blend into the parent .form-input seamlessly */
+.PhoneInputInput {
+  flex: 1;
+  background: transparent;
+  color: var(--text-primary);
+  border: none;
+  padding: 0;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  min-width: 0;
+}
+
+.PhoneInputInput::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Country selector container — pill-shaped elegant button */
+.PhoneInputCountry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  padding: 5px 8px 5px 6px;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.PhoneInputCountry:hover {
+  border-color: rgba(220, 38, 38, 0.4);
+  background: rgba(220, 38, 38, 0.04);
+  box-shadow: 0 1px 3px rgba(220, 38, 38, 0.08);
+}
+
+/* The invisible native select — covers the button for accessibility */
+.PhoneInputCountrySelect {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+  font-size: 16px;
+}
+
+/* Flag icon */
+.PhoneInputCountryIcon {
+  width: 22px;
+  height: 16px;
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+}
+
+.PhoneInputCountryIcon--border {
+  box-shadow: 0 0 0 1px var(--border-color);
+}
+
+.PhoneInputCountryIconImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Chevron arrow — elegant small indicator */
+.PhoneInputCountrySelectArrow {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-style: solid;
+  border-color: var(--text-tertiary);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+  margin-top: -2px;
+  opacity: 0.6;
+  transition: all 0.2s ease;
+}
+
+.PhoneInputCountry:hover .PhoneInputCountrySelectArrow {
+  opacity: 1;
+  border-color: #dc2626;
+  transform: rotate(45deg) scale(1.1);
+}
+
+/* Native select dropdown options — dark/light aware */
+.PhoneInputCountrySelect option {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  padding: 10px 14px;
+  font-size: 14px;
+}
+
+/* Focus state — glowing ring on the pill */
+.PhoneInputCountrySelect:focus + .PhoneInputCountryIcon,
+.PhoneInputCountry:focus-within {
+  border-color: rgba(220, 38, 38, 0.5);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.08);
+}
+
+/* Separator between country and input */
+.PhoneInputCountry::after {
+  content: '';
+  display: block;
+  width: 1px;
+  height: 18px;
+  background: var(--border-color);
+  margin-left: 4px;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
 @layer components {
+
 
   /* Layout */
   .app-layout {
@@ -421,13 +580,17 @@
     min-height: 100px;
   }
 
+  select,
   .form-select {
     appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-    background-position: right 12px center;
+    background-position: right 16px center;
     background-repeat: no-repeat;
     background-size: 16px;
-    padding-right: 40px;
+    padding-right: 44px;
+    cursor: pointer;
   }
 
   .form-row {

@@ -2,74 +2,132 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const plans = [
+const API_BASE = "https://api.invoicequ.my.id/api/v1";
+
+// Map feature keys from DB to human-readable Indonesian labels
+const featureLabels: Record<string, string> = {
+  basic_invoicing: "Invoicing Dasar",
+  email_notifications: "Notifikasi Email",
+  custom_branding: "Custom Branding",
+  priority_support: "Prioritas Support",
+  xendit_integration: "Integrasi Xendit",
+  api_access: "API Access",
+  dedicated_support: "Dedicated Support",
+  sla: "SLA Agreement",
+};
+
+interface ApiPlan {
+  id: string;
+  name: string;
+  display_name: string;
+  price: number;
+  currency: string;
+  billing_period: string;
+  max_invoices: number;
+  max_clients: number;
+  max_payment_links: number;
+  features: string;
+  is_active: boolean;
+}
+
+interface DisplayPlan {
+  name: string;
+  description: string;
+  price: string;
+  priceNote: string;
+  features: string[];
+  cta: string;
+  ctaLink: string;
+  popular: boolean;
+}
+
+function formatLimit(n: number) {
+  return n === -1 ? "Unlimited" : `${n}`;
+}
+
+function formatPrice(price: number) {
+  if (price <= 0) return "Gratis";
+  if (price >= 1000) return `Rp ${Math.round(price / 1000)}K`;
+  return `Rp ${price.toLocaleString("id-ID")}`;
+}
+
+function parseFeatures(raw: string): string[] {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+function apiPlanToDisplay(plan: ApiPlan): DisplayPlan {
+  const isEnterprise = plan.name.toLowerCase() === "enterprise";
+  const isFree = plan.price <= 0;
+  const isPro = plan.name.toLowerCase() === "pro";
+
+  const resourceLimits = [
+    `${formatLimit(plan.max_invoices)} Invoice`,
+    `${formatLimit(plan.max_clients)} Klien`,
+    `${formatLimit(plan.max_payment_links)} Payment Link`,
+  ];
+
+  const featureKeys = parseFeatures(plan.features);
+  const featureList = featureKeys.map((k) => featureLabels[k] || k);
+
+  return {
+    name: plan.display_name || plan.name,
+    description: isEnterprise
+      ? "Untuk perusahaan dengan volume transaksi tinggi."
+      : isPro
+        ? "Untuk bisnis yang berkembang dengan kebutuhan lebih."
+        : "Untuk freelancer dan bisnis kecil yang baru mulai.",
+    price: isEnterprise ? "Custom" : formatPrice(plan.price),
+    priceNote: isEnterprise ? "Hubungi Kami" : isFree ? "Selamanya" : "/ bulan",
+    features: [...resourceLimits, ...featureList],
+    cta: isEnterprise ? "Hubungi Sales" : isPro ? "Daftar Pro" : "Mulai Gratis",
+    ctaLink: isEnterprise
+      ? "#kontak"
+      : isPro
+        ? "/checkout?plan=pro"
+        : "https://app.invoicequ.my.id/register",
+    popular: isPro,
+  };
+}
+
+// Hardcoded fallback if API is unreachable
+const fallbackPlans: DisplayPlan[] = [
   {
     name: "Free",
     description: "Untuk freelancer dan bisnis kecil yang baru mulai.",
     price: "Gratis",
     priceNote: "Selamanya",
-    features: [
-      "5 Invoice",
-      "10 Klien",
-      "5 Payment Link",
-      "Kanban Tugas Dasar",
-      "Invoicing Dasar",
-      "Notifikasi Email",
-    ],
+    features: ["5 Invoice", "10 Klien", "5 Payment Link", "Invoicing Dasar", "Notifikasi Email"],
     cta: "Mulai Gratis",
     ctaLink: "https://app.invoicequ.my.id/register",
     popular: false,
-    gradient: "from-white/5 to-white/[0.02]",
   },
   {
     name: "Pro",
     description: "Untuk bisnis yang berkembang dengan kebutuhan lebih.",
     price: "Rp 99K",
     priceNote: "/ bulan",
-    features: [
-      "100 Invoice",
-      "500 Klien",
-      "100 Payment Link",
-      "Manajemen Tugas & Proyek",
-      "Time Tracking",
-      "Custom Branding",
-      "Integrasi Xendit",
-      "Integrasi Paypal",
-      "Prioritas Support",
-    ],
+    features: ["100 Invoice", "500 Klien", "100 Payment Link", "Invoicing Dasar", "Notifikasi Email", "Custom Branding", "Prioritas Support", "Integrasi Xendit"],
     cta: "Daftar Pro",
     ctaLink: "/checkout?plan=pro",
     popular: true,
-    gradient: "from-red-500/10 to-red-600/5",
   },
   {
     name: "Enterprise",
     description: "Untuk perusahaan dengan volume transaksi tinggi.",
     price: "Custom",
     priceNote: "Hubungi Kami",
-    features: [
-      "Unlimited Invoice",
-      "Unlimited Klien",
-      "Unlimited Payment Link",
-      "Workflow Tugas ke Invoice",
-      "API Access",
-      "Dedicated Support",
-      "SLA Agreement",
-    ],
+    features: ["Unlimited Invoice", "Unlimited Klien", "Unlimited Payment Link", "Invoicing Dasar", "Notifikasi Email", "Custom Branding", "Prioritas Support", "Integrasi Xendit", "API Access", "Dedicated Support", "SLA Agreement"],
     cta: "Hubungi Sales",
     ctaLink: "#kontak",
     popular: false,
-    gradient: "from-white/5 to-white/[0.02]",
   },
 ];
 
-function PricingCard({
-  plan,
-  index,
-}: {
-  plan: (typeof plans)[0];
-  index: number;
-}) {
+function PricingCard({ plan, index }: { plan: DisplayPlan; index: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
 
@@ -152,6 +210,22 @@ function PricingCard({
 }
 
 export default function PricingSection() {
+  const [plans, setPlans] = useState<DisplayPlan[]>(fallbackPlans);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/plans`)
+      .then((r) => r.json())
+      .then((res) => {
+        const data: ApiPlan[] = res.data || res;
+        if (Array.isArray(data) && data.length > 0) {
+          setPlans(data.filter((p) => p.is_active).map(apiPlanToDisplay));
+        }
+      })
+      .catch(() => {
+        // Keep fallback plans
+      });
+  }, []);
+
   return (
     <section id="harga" className="relative py-28 md:py-36">
       {/* Background */}

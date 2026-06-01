@@ -1,23 +1,56 @@
-import { NO_DECIMAL_CURRENCIES } from './currencies';
+import { NO_DECIMAL_CURRENCIES } from "./currencies";
 
 /** Locale map for common currencies; others use 'en-US' as a safe default. */
 const CURRENCY_LOCALE: Record<string, string> = {
-  IDR: 'id-ID', USD: 'en-US', EUR: 'de-DE', GBP: 'en-GB', JPY: 'ja-JP',
-  CNY: 'zh-CN', KRW: 'ko-KR', INR: 'en-IN', BRL: 'pt-BR', RUB: 'ru-RU',
-  TRY: 'tr-TR', THB: 'th-TH', VND: 'vi-VN', MYR: 'ms-MY', SGD: 'en-SG',
-  AUD: 'en-AU', CAD: 'en-CA', CHF: 'de-CH', SEK: 'sv-SE', NOK: 'nb-NO',
-  DKK: 'da-DK', PLN: 'pl-PL', CZK: 'cs-CZ', HUF: 'hu-HU', PHP: 'en-PH',
-  AED: 'ar-AE', SAR: 'ar-SA', EGP: 'ar-EG', NGN: 'en-NG', ZAR: 'en-ZA',
-  ARS: 'es-AR', CLP: 'es-CL', COP: 'es-CO', MXN: 'es-MX', PEN: 'es-PE',
-  NZD: 'en-NZ', HKD: 'zh-HK', TWD: 'zh-TW',
+  IDR: "id-ID",
+  USD: "en-US",
+  EUR: "de-DE",
+  GBP: "en-GB",
+  JPY: "ja-JP",
+  CNY: "zh-CN",
+  KRW: "ko-KR",
+  INR: "en-IN",
+  BRL: "pt-BR",
+  RUB: "ru-RU",
+  TRY: "tr-TR",
+  THB: "th-TH",
+  VND: "vi-VN",
+  MYR: "ms-MY",
+  SGD: "en-SG",
+  AUD: "en-AU",
+  CAD: "en-CA",
+  CHF: "de-CH",
+  SEK: "sv-SE",
+  NOK: "nb-NO",
+  DKK: "da-DK",
+  PLN: "pl-PL",
+  CZK: "cs-CZ",
+  HUF: "hu-HU",
+  PHP: "en-PH",
+  AED: "ar-AE",
+  SAR: "ar-SA",
+  EGP: "ar-EG",
+  NGN: "en-NG",
+  ZAR: "en-ZA",
+  ARS: "es-AR",
+  CLP: "es-CL",
+  COP: "es-CO",
+  MXN: "es-MX",
+  PEN: "es-PE",
+  NZD: "en-NZ",
+  HKD: "zh-HK",
+  TWD: "zh-TW",
 };
 
-export function formatCurrency(amount: number, currency: string = 'IDR'): string {
+export function formatCurrency(
+  amount: number,
+  currency: string = "IDR",
+): string {
   const cur = currency.toUpperCase();
-  const locale = CURRENCY_LOCALE[cur] || 'en-US';
+  const locale = CURRENCY_LOCALE[cur] || "en-US";
   const isNoDecimal = NO_DECIMAL_CURRENCIES.has(cur);
   return new Intl.NumberFormat(locale, {
-    style: 'currency',
+    style: "currency",
     currency: cur,
     minimumFractionDigits: isNoDecimal ? 0 : 2,
     maximumFractionDigits: isNoDecimal ? 0 : 2,
@@ -50,14 +83,14 @@ export async function fetchExchangeRates(): Promise<Record<string, number>> {
     return cachedRates;
   }
   try {
-    const res = await fetch('https://open.er-api.com/v6/latest/IDR');
+    const res = await fetch("https://open.er-api.com/v6/latest/IDR");
     const data = await res.json();
-    if (data.result === 'success' && data.rates) {
+    if (data.result === "success" && data.rates) {
       // data.rates gives: 1 IDR = X <currency>
       // We need: 1 <currency> = ? IDR  →  1 / X
       const rates: Record<string, number> = { IDR: 1 };
       for (const [cur, val] of Object.entries(data.rates)) {
-        if (typeof val === 'number' && val > 0) {
+        if (typeof val === "number" && val > 0) {
           rates[cur] = Math.round((1 / val) * 100) / 100;
         }
       }
@@ -72,7 +105,12 @@ export async function fetchExchangeRates(): Promise<Record<string, number>> {
 }
 
 /** Convert an amount from any supported currency to IDR (sync, uses locked rate, cached or fallback rates) */
-export function convertToIDR(amount: number, currency: string = 'IDR', liveRates?: Record<string, number>, lockedRate?: number): number {
+export function convertToIDR(
+  amount: number,
+  currency: string = "IDR",
+  liveRates?: Record<string, number>,
+  lockedRate?: number,
+): number {
   if (lockedRate && lockedRate > 0) {
     return Math.round(amount * lockedRate);
   }
@@ -82,23 +120,23 @@ export function convertToIDR(amount: number, currency: string = 'IDR', liveRates
 }
 
 export function formatDate(date: string): string {
-  return new Intl.DateTimeFormat('id-ID', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
   }).format(new Date(date));
 }
 
 export function formatDateFull(date: string): string {
-  return new Intl.DateTimeFormat('id-ID', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
   }).format(new Date(date));
 }
 
 export function cn(...classes: (string | undefined | false | null)[]): string {
-  return classes.filter(Boolean).join(' ');
+  return classes.filter(Boolean).join(" ");
 }
 
 export function generateId(): string {
@@ -107,37 +145,37 @@ export function generateId(): string {
 
 export function getStatusColor(status: string): string {
   switch (status.toLowerCase()) {
-    case 'paid':
-    case 'completed':
-    case 'success':
-    case 'active':
-      return 'badge-success';
-    case 'pending':
-    case 'sent':
-    case 'partially_paid':
-      return 'badge-warning';
-    case 'overdue':
-    case 'failed':
-    case 'cancelled':
-    case 'expired':
-      return 'badge-danger';
-    case 'draft':
-      return 'badge-default';
+    case "paid":
+    case "completed":
+    case "success":
+    case "active":
+      return "badge-success";
+    case "pending":
+    case "sent":
+    case "partially_paid":
+      return "badge-warning";
+    case "overdue":
+    case "failed":
+    case "cancelled":
+    case "expired":
+      return "badge-danger";
+    case "draft":
+      return "badge-default";
     default:
-      return 'badge-info';
+      return "badge-info";
   }
 }
 
 export function getInitials(name: string): string {
   return name
-    .split(' ')
+    .split(" ")
     .map((n) => n[0])
-    .join('')
+    .join("")
     .toUpperCase()
     .substring(0, 2);
 }
 
 export function truncate(str: string, len: number): string {
   if (str.length <= len) return str;
-  return str.substring(0, len) + '...';
+  return str.substring(0, len) + "...";
 }

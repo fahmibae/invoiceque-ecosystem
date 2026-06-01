@@ -27,6 +27,7 @@ struct ClientScore {
     client_name: String,
     total_invoices: i64,
     total_paid: f64,
+    currency: String,
     avg_days_to_pay: f64,
     on_time_rate: f64,
     reliability_score: f64, // 0-100
@@ -131,7 +132,7 @@ pub async fn get_health_score(
 
     // === Top & Worst Clients ===
     let top_clients_raw = db.query_as_maps(
-        "SELECT client_id, client_name, COUNT(*) as total_invoices, COALESCE(SUM(amount_paid),0) as total_paid, COALESCE(AVG(CASE WHEN paid_at IS NOT NULL THEN EXTRACT(EPOCH FROM (paid_at - created_at))/86400 END),0) as avg_days FROM invoices WHERE user_id=$1 AND status='paid' GROUP BY client_id, client_name ORDER BY total_paid DESC LIMIT 5",
+        "SELECT client_id, client_name, currency, COUNT(*) as total_invoices, COALESCE(SUM(amount_paid),0) as total_paid, COALESCE(AVG(CASE WHEN paid_at IS NOT NULL THEN EXTRACT(EPOCH FROM (paid_at - created_at))/86400 END),0) as avg_days FROM invoices WHERE user_id=$1 AND status='paid' GROUP BY client_id, client_name, currency ORDER BY total_paid DESC LIMIT 5",
         &[uid.clone()]
     ).await.unwrap_or_default();
 
@@ -143,6 +144,7 @@ pub async fn get_health_score(
             client_name: m.get("client_name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
             total_invoices: m.get("total_invoices").and_then(|v| v.as_i64()).unwrap_or(0),
             total_paid: m.get("total_paid").and_then(|v| v.as_f64()).unwrap_or(0.0),
+            currency: m.get("currency").and_then(|v| v.as_str()).unwrap_or("IDR").to_string(),
             avg_days_to_pay: (avg_d * 10.0).round() / 10.0,
             on_time_rate: 0.0,
             reliability_score: (reliability * 10.0).round() / 10.0,
@@ -150,7 +152,7 @@ pub async fn get_health_score(
     }).collect();
 
     let worst_clients_raw = db.query_as_maps(
-        "SELECT client_id, client_name, COUNT(*) as total_invoices, COALESCE(SUM(amount_remaining),0) as total_outstanding, COALESCE(AVG(CASE WHEN paid_at IS NOT NULL THEN EXTRACT(EPOCH FROM (paid_at - created_at))/86400 END), 999) as avg_days FROM invoices WHERE user_id=$1 AND status IN ('overdue','sent','partially_paid') GROUP BY client_id, client_name ORDER BY total_outstanding DESC LIMIT 5",
+        "SELECT client_id, client_name, currency, COUNT(*) as total_invoices, COALESCE(SUM(amount_remaining),0) as total_outstanding, COALESCE(AVG(CASE WHEN paid_at IS NOT NULL THEN EXTRACT(EPOCH FROM (paid_at - created_at))/86400 END), 999) as avg_days FROM invoices WHERE user_id=$1 AND status IN ('overdue','sent','partially_paid') GROUP BY client_id, client_name, currency ORDER BY total_outstanding DESC LIMIT 5",
         &[uid.clone()]
     ).await.unwrap_or_default();
 
@@ -162,6 +164,7 @@ pub async fn get_health_score(
             client_name: m.get("client_name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
             total_invoices: m.get("total_invoices").and_then(|v| v.as_i64()).unwrap_or(0),
             total_paid: m.get("total_outstanding").and_then(|v| v.as_f64()).unwrap_or(0.0),
+            currency: m.get("currency").and_then(|v| v.as_str()).unwrap_or("IDR").to_string(),
             avg_days_to_pay: if avg_d > 900.0 { 0.0 } else { (avg_d * 10.0).round() / 10.0 },
             on_time_rate: 0.0,
             reliability_score: (reliability * 10.0).round() / 10.0,

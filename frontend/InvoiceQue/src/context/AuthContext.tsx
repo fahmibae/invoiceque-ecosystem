@@ -1,8 +1,20 @@
-'use client';
+"use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { authApi, type User, type AuthResponse, type EmailVerificationResponse } from '@/lib/api';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from "react";
+import { useRouter } from "next/navigation";
+import {
+  authApi,
+  type User,
+  type AuthResponse,
+  type EmailVerificationResponse,
+} from "@/lib/api";
 
 interface AuthContextType {
   user: User | null;
@@ -11,7 +23,13 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   googleLogin: (idToken: string) => Promise<void>;
-  register: (name: string, email: string, password: string, company?: string, phone?: string) => Promise<EmailVerificationResponse>;
+  register: (
+    name: string,
+    email: string,
+    password: string,
+    company?: string,
+    phone?: string,
+  ) => Promise<EmailVerificationResponse>;
   logout: () => void;
 }
 
@@ -32,17 +50,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const savedToken = localStorage.getItem('token');
-      const savedUser = localStorage.getItem('user');
+      const savedToken = localStorage.getItem("token");
+      const savedUser = localStorage.getItem("user");
 
       if (savedToken && savedUser) {
         try {
           setToken(savedToken);
           setUser(JSON.parse(savedUser));
         } catch {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          localStorage.removeItem('refresh_token');
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          localStorage.removeItem("refresh_token");
         }
       }
 
@@ -61,33 +79,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const handleAuthResponse = useCallback((res: AuthResponse) => {
     setToken(res.token);
     setUser(res.user);
-    localStorage.setItem('token', res.token);
-    localStorage.setItem('refresh_token', res.refresh_token);
-    localStorage.setItem('user', JSON.stringify(res.user));
+    localStorage.setItem("token", res.token);
+    localStorage.setItem("refresh_token", res.refresh_token);
+    localStorage.setItem("user", JSON.stringify(res.user));
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await authApi.login(email, password);
-    handleAuthResponse(res);
-  }, [handleAuthResponse]);
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const res = await authApi.login(email, password);
+      handleAuthResponse(res);
+    },
+    [handleAuthResponse],
+  );
 
-  const googleLogin = useCallback(async (idToken: string) => {
-    const res = await authApi.googleLogin(idToken);
-    handleAuthResponse(res);
-  }, [handleAuthResponse]);
+  const googleLogin = useCallback(
+    async (idToken: string) => {
+      const res = await authApi.googleLogin(idToken);
+      handleAuthResponse(res);
+    },
+    [handleAuthResponse],
+  );
 
-  const register = useCallback(async (
-    name: string, email: string, password: string, company?: string, phone?: string
-  ) => {
-    return authApi.register(name, email, password, company, phone);
-  }, []);
+  const register = useCallback(
+    async (
+      name: string,
+      email: string,
+      password: string,
+      company?: string,
+      phone?: string,
+    ) => {
+      return authApi.register(name, email, password, company, phone);
+    },
+    [],
+  );
 
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user');
+    localStorage.removeItem("token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("user");
   }, []);
 
   // Auto-logout when API returns 401 (token expired / invalid)
@@ -97,24 +128,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const handleForceLogout = () => {
       logoutRef.current();
-      router.replace('/login');
+      router.replace("/login");
     };
 
-    window.addEventListener('auth:logout', handleForceLogout);
-    return () => window.removeEventListener('auth:logout', handleForceLogout);
+    window.addEventListener("auth:logout", handleForceLogout);
+    return () => window.removeEventListener("auth:logout", handleForceLogout);
   }, [router]);
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      token,
-      isAuthenticated: !!token,
-      isLoading,
-      login,
-      googleLogin,
-      register,
-      logout,
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        isAuthenticated: !!token,
+        isLoading,
+        login,
+        googleLogin,
+        register,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -123,7 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }

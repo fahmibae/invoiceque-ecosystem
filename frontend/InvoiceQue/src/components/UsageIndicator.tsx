@@ -1,14 +1,35 @@
-'use client';
+"use client";
 
-import React from 'react';
-import Link from 'next/link';
-import { Chart01Icon, GoogleDocIcon, UserGroup02Icon, Payment01Icon, ArrowRight02Icon, LockedIcon } from 'hugeicons-react';
-import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
+import React from "react";
+import Link from "next/link";
+import {
+  Chart01Icon,
+  GoogleDocIcon,
+  UserGroup02Icon,
+  Payment01Icon,
+  ArrowRight02Icon,
+  LockedIcon,
+} from "hugeicons-react";
+import { useSubscriptionUsage } from "@/hooks/useSubscriptionUsage";
 
-function UsageBar({ label, icon, used, limit }: { label: string; icon: React.ReactNode; used: number; limit: number; }) {
+function UsageBar({
+  label,
+  icon,
+  used,
+  limit,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  used: number;
+  limit: number;
+}) {
   const isUnlimited = limit === -1;
-  const percentage = isUnlimited ? 10 : limit > 0 ? Math.min((used / limit) * 100, 100) : 0;
-  
+  const percentage = isUnlimited
+    ? 10
+    : limit > 0
+      ? Math.min((used / limit) * 100, 100)
+      : 0;
+
   let barColorClass = "bg-gradient-to-br from-red-600 to-red-500";
   if (percentage >= 90) barColorClass = "bg-red-500";
   else if (percentage >= 70) barColorClass = "bg-amber-500";
@@ -16,13 +37,18 @@ function UsageBar({ label, icon, used, limit }: { label: string; icon: React.Rea
   return (
     <div className="mb-1.5">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[13px] font-semibold flex items-center gap-1.5">{icon} {label}</span>
+        <span className="text-[13px] font-semibold flex items-center gap-1.5">
+          {icon} {label}
+        </span>
         <span className="text-xs text-text-secondary">
-          {used} / {isUnlimited ? '∞' : limit}
+          {used} / {isUnlimited ? "∞" : limit}
         </span>
       </div>
       <div className="w-full h-1.5 bg-bg-secondary rounded-[3px] overflow-hidden mb-3.5 last:mb-0">
-        <div className={`h-full rounded-[3px] transition-[width] duration-500 ease-in-out ${barColorClass}`} style={{ width: `${percentage}%` }} />
+        <div
+          className={`h-full rounded-[3px] transition-[width] duration-500 ease-in-out ${barColorClass}`}
+          style={{ width: `${percentage}%` }}
+        />
       </div>
     </div>
   );
@@ -33,23 +59,45 @@ export default function UsageIndicator() {
 
   if (!usage) return null;
 
-  const isLimitReached = 
-    (usage.invoices_limit !== -1 && usage.invoices_used >= usage.invoices_limit) ||
+  const isLimitReached =
+    (usage.invoices_limit !== -1 &&
+      usage.invoices_used >= usage.invoices_limit) ||
     (usage.clients_limit !== -1 && usage.clients_used >= usage.clients_limit) ||
-    (usage.payment_links_limit !== -1 && usage.payment_links_used >= usage.payment_links_limit);
+    (usage.payment_links_limit !== -1 &&
+      usage.payment_links_used >= usage.payment_links_limit);
 
   return (
     <div className="bg-bg-card border border-border-color rounded-lg p-5 flex flex-col h-full">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-sm font-bold flex items-center gap-2 m-0"><Chart01Icon/> Penggunaan</h3>
-        <Link href="/subscription" className="text-xs text-red-500 font-semibold no-underline hover:underline">
+        <h3 className="text-sm font-bold flex items-center gap-2 m-0">
+          <Chart01Icon /> Penggunaan
+        </h3>
+        <Link
+          href="/subscription"
+          className="text-xs text-red-500 font-semibold no-underline hover:underline"
+        >
           Upgrade →
         </Link>
       </div>
       <div className="flex-1">
-        <UsageBar label="Invoice" icon={<GoogleDocIcon/>} used={usage.invoices_used} limit={usage.invoices_limit} />
-        <UsageBar label="Klien" icon={<UserGroup02Icon/>} used={usage.clients_used} limit={usage.clients_limit} />
-        <UsageBar label="Payment Link" icon={<Payment01Icon/>} used={usage.payment_links_used} limit={usage.payment_links_limit} />
+        <UsageBar
+          label="Invoice"
+          icon={<GoogleDocIcon />}
+          used={usage.invoices_used}
+          limit={usage.invoices_limit}
+        />
+        <UsageBar
+          label="Klien"
+          icon={<UserGroup02Icon />}
+          used={usage.clients_used}
+          limit={usage.clients_limit}
+        />
+        <UsageBar
+          label="Payment Link"
+          icon={<Payment01Icon />}
+          used={usage.payment_links_used}
+          limit={usage.payment_links_limit}
+        />
       </div>
 
       {isLimitReached && (
@@ -58,7 +106,7 @@ export default function UsageIndicator() {
           <div className="absolute top-0 right-0 w-40 h-40 bg-white/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:scale-125 transition-transform duration-700 ease-out"></div>
           <div className="absolute bottom-0 left-0 w-32 h-32 bg-yellow-300/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
           <div className="absolute top-1/2 left-1/2 w-full h-full bg-gradient-to-t from-black/20 to-transparent -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
-          
+
           <div className="relative z-10 flex flex-col items-center text-center">
             <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center mb-3 shadow-inner ring-1 ring-white/30 group-hover:-translate-y-1 transition-transform duration-300">
               <LockedIcon width={24} height={24} />
@@ -67,12 +115,18 @@ export default function UsageIndicator() {
               Limit Penggunaan Tercapai
             </h4>
             <p className="text-[13px] text-white/95 mb-5 leading-relaxed max-w-[250px] drop-shadow-sm font-medium">
-              Kapasitas plan Anda sudah penuh. Tingkatkan plan Anda untuk menikmati fitur premium dan akses tanpa batas!
+              Kapasitas plan Anda sudah penuh. Tingkatkan plan Anda untuk
+              menikmati fitur premium dan akses tanpa batas!
             </p>
-            <Link href="/subscription" className="w-full relative overflow-hidden group/btn bg-white text-red-600 text-[13px] font-extrabold py-3 px-4 rounded-lg shadow-[0_4px_15px_rgba(255,255,255,0.25)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.4)] transition-all duration-300 hover:-translate-y-0.5 flex items-center justify-center gap-2">
+            <Link
+              href="/subscription"
+              className="w-full relative overflow-hidden group/btn bg-white text-red-600 text-[13px] font-extrabold py-3 px-4 rounded-lg shadow-[0_4px_15px_rgba(255,255,255,0.25)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.4)] transition-all duration-300 hover:-translate-y-0.5 flex items-center justify-center gap-2"
+            >
               <span className="relative z-10 flex items-center gap-1.5">
-                Upgrade Plan Sekarang 
-                <span className="group-hover/btn:translate-x-1 transition-transform duration-300"><ArrowRight02Icon/></span>
+                Upgrade Plan Sekarang
+                <span className="group-hover/btn:translate-x-1 transition-transform duration-300">
+                  <ArrowRight02Icon />
+                </span>
               </span>
             </Link>
           </div>

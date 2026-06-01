@@ -38,9 +38,10 @@ export default function Navbar() {
       <header
         id="navbar"
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled
-          ? "bg-[#09090b]/80 backdrop-blur-xl border-b border-white/5 shadow-2xl shadow-black/20"
+          ? "bg-[rgba(9,9,11,0.8)] backdrop-blur-xl border-b border-[rgba(255,255,255,0.05)] shadow-2xl shadow-[rgba(0,0,0,0.2)]"
           : "bg-transparent"
           }`}
+        style={scrolled ? { WebkitBackdropFilter: "blur(24px)" } : undefined}
       >
         <nav className="max-w-7xl mx-auto px-6 lg:px-8 h-[72px] flex items-center justify-between">
           {/* Logo */}
@@ -118,10 +119,11 @@ export default function Navbar() {
 
       {/* Mobile Menu */}
       <div
-        className={`lg:hidden fixed inset-0 z-40 bg-[#09090b]/95 backdrop-blur-2xl transition-all duration-500 ${mobileOpen
+        className={`lg:hidden fixed inset-0 z-40 bg-[rgba(9,9,11,0.95)] backdrop-blur-2xl transition-all duration-500 ${mobileOpen
           ? "opacity-100 pointer-events-auto"
           : "opacity-0 pointer-events-none"
           }`}
+        style={{ WebkitBackdropFilter: "blur(40px)" }}
       >
         <div className="flex flex-col items-center justify-center h-full gap-6">
           {navLinks.map((link, i) => (

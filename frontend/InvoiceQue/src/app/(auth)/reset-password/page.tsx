@@ -1,58 +1,60 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { authApi } from '@/lib/api';
-import { ViewIcon, ViewOffSlashIcon } from 'hugeicons-react';
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useLanguage } from "@/context/LanguageContext";
+import { authApi } from "@/lib/api";
+import { ViewIcon, ViewOffSlashIcon } from "hugeicons-react";
 
 export default function ResetPasswordPage() {
-  const [token, setToken] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const { t } = useLanguage();
+  const [token, setToken] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
-    const resetToken = searchParams.get('token') || '';
+    const resetToken = searchParams.get("token") || "";
     setToken(resetToken);
 
     if (!resetToken) {
-      setError('Token reset password tidak ditemukan.');
+      setError(t("auth.reset.missingToken"));
     }
-  }, []);
+  }, [t]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
     if (!token) {
-      setError('Token reset password tidak ditemukan.');
+      setError(t("auth.reset.missingToken"));
       return;
     }
     if (password.length < 6) {
-      setError('Password baru minimal 6 karakter.');
+      setError(t("auth.reset.minPassword"));
       return;
     }
     if (password !== confirmPassword) {
-      setError('Konfirmasi password belum sama.');
+      setError(t("auth.reset.confirmMismatch"));
       return;
     }
 
     setLoading(true);
     try {
       const res = await authApi.resetPassword(token, password);
-      setSuccess(res.message || 'Password berhasil direset. Silakan login.');
-      setPassword('');
-      setConfirmPassword('');
-      setTimeout(() => router.push('/login?reset=1'), 900);
+      setSuccess(res.message || t("auth.reset.successDefault"));
+      setPassword("");
+      setConfirmPassword("");
+      setTimeout(() => router.push("/login?reset=1"), 900);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Reset password gagal.');
+      setError(err instanceof Error ? err.message : t("auth.reset.failed"));
     } finally {
       setLoading(false);
     }
@@ -62,9 +64,11 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen bg-bg-secondary flex items-center justify-center p-6">
       <div className="w-full max-w-[460px] bg-bg-card border border-border-color rounded-xl p-8 shadow-xl">
         <div className="mb-7">
-          <h1 className="text-2xl font-extrabold mb-2">Reset Password</h1>
+          <h1 className="text-2xl font-extrabold mb-2">
+            {t("auth.reset.title")}
+          </h1>
           <p className="text-sm text-text-secondary leading-relaxed">
-            Buat password baru untuk akun InvoiceQu Anda.
+            {t("auth.reset.subtitle")}
           </p>
         </div>
 
@@ -82,10 +86,10 @@ export default function ResetPasswordPage() {
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">Password Baru</label>
+            <label className="form-label">{t("auth.reset.newPassword")}</label>
             <div className="relative">
               <input
-                type={showPassword ? 'text' : 'password'}
+                type={showPassword ? "text" : "password"}
                 className="form-input"
                 placeholder="••••••••"
                 value={password}
@@ -99,17 +103,27 @@ export default function ResetPasswordPage() {
                 className="absolute right-3 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-text-secondary opacity-60 hover:opacity-100"
                 onClick={() => setShowPassword(!showPassword)}
                 disabled={loading}
-                aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                aria-label={
+                  showPassword
+                    ? t("auth.reset.hidePassword")
+                    : t("auth.reset.showPassword")
+                }
               >
-                {showPassword ? <ViewOffSlashIcon width={18} height={18} /> : <ViewIcon width={18} height={18} />}
+                {showPassword ? (
+                  <ViewOffSlashIcon width={18} height={18} />
+                ) : (
+                  <ViewIcon width={18} height={18} />
+                )}
               </button>
             </div>
           </div>
 
           <div className="form-group">
-            <label className="form-label">Konfirmasi Password</label>
+            <label className="form-label">
+              {t("auth.register.confirmPassword")}
+            </label>
             <input
-              type={showPassword ? 'text' : 'password'}
+              type={showPassword ? "text" : "password"}
               className="form-input"
               placeholder="••••••••"
               value={confirmPassword}
@@ -120,14 +134,23 @@ export default function ResetPasswordPage() {
             />
           </div>
 
-          <button type="submit" className="btn btn-primary btn-lg w-full mb-4" disabled={!token || loading}>
-            {loading ? 'Menyimpan...' : 'Simpan Password Baru'}
+          <button
+            type="submit"
+            className="btn btn-primary btn-lg w-full mb-4"
+            disabled={!token || loading}
+          >
+            {loading ? t("common.saving") : t("auth.reset.submit")}
           </button>
         </form>
 
         <p className="text-center text-sm text-text-secondary">
-          Ingat password lama?{' '}
-          <Link href="/login" className="text-red-600 font-semibold no-underline hover:underline">Ke Login</Link>
+          {t("auth.reset.oldPassword")}{" "}
+          <Link
+            href="/login"
+            className="text-red-600 font-semibold no-underline hover:underline"
+          >
+            {t("auth.backToLogin")}
+          </Link>
         </p>
       </div>
     </div>

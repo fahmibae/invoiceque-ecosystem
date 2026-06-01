@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from "react";
 
-type Theme = 'light' | 'dark';
+type Theme = "light" | "dark";
 
 interface ThemeContextType {
   theme: Theme;
@@ -10,33 +10,35 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'light',
+  theme: "light",
   toggleTheme: () => {},
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('light');
+  const [theme, setTheme] = useState<Theme>("light");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    const stored = localStorage.getItem('invoiceque-theme') as Theme;
+    const stored = localStorage.getItem("invoiceque-theme") as Theme;
     if (stored) {
       setTheme(stored);
-      document.documentElement.setAttribute('data-theme', stored);
+      document.documentElement.setAttribute("data-theme", stored);
     } else {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const initial = prefersDark ? 'dark' : 'light';
+      const prefersDark = window.matchMedia(
+        "(prefers-color-scheme: dark)",
+      ).matches;
+      const initial = prefersDark ? "dark" : "light";
       setTheme(initial);
-      document.documentElement.setAttribute('data-theme', initial);
+      document.documentElement.setAttribute("data-theme", initial);
     }
   }, []);
 
   const toggleTheme = () => {
-    const next = theme === 'light' ? 'dark' : 'light';
+    const next = theme === "light" ? "dark" : "light";
     setTheme(next);
-    localStorage.setItem('invoiceque-theme', next);
-    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem("invoiceque-theme", next);
+    document.documentElement.setAttribute("data-theme", next);
   };
 
   if (!mounted) {

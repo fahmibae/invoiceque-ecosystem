@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
 export default function AntiInspect() {
   useEffect(() => {
@@ -12,32 +12,32 @@ export default function AntiInspect() {
     // Disable common DevTools shortcuts
     const handleKeyDown = (e: KeyboardEvent) => {
       // F12
-      if (e.key === 'F12') {
+      if (e.key === "F12") {
         e.preventDefault();
         return;
       }
       // Ctrl+Shift+I (Inspect Element)
-      if (e.ctrlKey && e.shiftKey && e.key === 'I') {
+      if (e.ctrlKey && e.shiftKey && e.key === "I") {
         e.preventDefault();
         return;
       }
       // Ctrl+Shift+J (Console)
-      if (e.ctrlKey && e.shiftKey && e.key === 'J') {
+      if (e.ctrlKey && e.shiftKey && e.key === "J") {
         e.preventDefault();
         return;
       }
       // Ctrl+Shift+C (Element picker)
-      if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+      if (e.ctrlKey && e.shiftKey && e.key === "C") {
         e.preventDefault();
         return;
       }
       // Ctrl+U (View source)
-      if (e.ctrlKey && e.key === 'u') {
+      if (e.ctrlKey && e.key === "u") {
         e.preventDefault();
         return;
       }
       // Ctrl+S (Save page)
-      if (e.ctrlKey && e.key === 's') {
+      if (e.ctrlKey && e.key === "s") {
         e.preventDefault();
         return;
       }
@@ -51,19 +51,19 @@ export default function AntiInspect() {
     };
 
     // Disable text selection via CSS
-    document.body.style.userSelect = 'none';
-    document.body.style.webkitUserSelect = 'none';
+    document.body.style.userSelect = "none";
+    document.body.style.webkitUserSelect = "none";
 
-    document.addEventListener('contextmenu', handleContextMenu);
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('dragstart', handleDragStart);
+    document.addEventListener("contextmenu", handleContextMenu);
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("dragstart", handleDragStart);
 
     return () => {
-      document.body.style.userSelect = '';
-      document.body.style.webkitUserSelect = '';
-      document.removeEventListener('contextmenu', handleContextMenu);
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('dragstart', handleDragStart);
+      document.body.style.userSelect = "";
+      document.body.style.webkitUserSelect = "";
+      document.removeEventListener("contextmenu", handleContextMenu);
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("dragstart", handleDragStart);
     };
   }, []);
 

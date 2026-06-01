@@ -11,9 +11,33 @@ fn get_db(env: &Env) -> Result<NeonClient> {
 }
 
 /// SQL expression to normalize any amount to IDR:
-/// If currency=IDR (or exchange_rate_idr=0), use the raw amount; otherwise multiply by exchange_rate_idr.
-const TO_IDR_TOTAL: &str = "CASE WHEN UPPER(currency)='IDR' OR COALESCE(exchange_rate_idr,0)=0 THEN total ELSE total * exchange_rate_idr END";
-const TO_IDR_REMAINING: &str = "CASE WHEN UPPER(currency)='IDR' OR COALESCE(exchange_rate_idr,0)=0 THEN amount_remaining ELSE amount_remaining * exchange_rate_idr END";
+/// 1) If currency=IDR → use raw amount
+/// 2) If exchange_rate_idr > 0 → multiply by it
+/// 3) Otherwise → use fallback approximate rates for common currencies
+const TO_IDR_TOTAL: &str = "CASE \
+  WHEN UPPER(currency)='IDR' THEN total \
+  WHEN COALESCE(exchange_rate_idr,0) > 0 THEN total * exchange_rate_idr \
+  ELSE total * CASE UPPER(currency) \
+    WHEN 'USD' THEN 16200 WHEN 'EUR' THEN 18400 WHEN 'GBP' THEN 20800 \
+    WHEN 'SGD' THEN 12300 WHEN 'MYR' THEN 3700 WHEN 'AUD' THEN 10500 \
+    WHEN 'JPY' THEN 108 WHEN 'KRW' THEN 12 WHEN 'CNY' THEN 2250 \
+    WHEN 'INR' THEN 195 WHEN 'THB' THEN 460 WHEN 'VND' THEN 0.65 \
+    WHEN 'PHP' THEN 290 WHEN 'CAD' THEN 11900 WHEN 'CHF' THEN 18200 \
+    WHEN 'HKD' THEN 2080 WHEN 'NZD' THEN 9800 WHEN 'TWD' THEN 530 \
+    ELSE 1 END \
+  END";
+const TO_IDR_REMAINING: &str = "CASE \
+  WHEN UPPER(currency)='IDR' THEN amount_remaining \
+  WHEN COALESCE(exchange_rate_idr,0) > 0 THEN amount_remaining * exchange_rate_idr \
+  ELSE amount_remaining * CASE UPPER(currency) \
+    WHEN 'USD' THEN 16200 WHEN 'EUR' THEN 18400 WHEN 'GBP' THEN 20800 \
+    WHEN 'SGD' THEN 12300 WHEN 'MYR' THEN 3700 WHEN 'AUD' THEN 10500 \
+    WHEN 'JPY' THEN 108 WHEN 'KRW' THEN 12 WHEN 'CNY' THEN 2250 \
+    WHEN 'INR' THEN 195 WHEN 'THB' THEN 460 WHEN 'VND' THEN 0.65 \
+    WHEN 'PHP' THEN 290 WHEN 'CAD' THEN 11900 WHEN 'CHF' THEN 18200 \
+    WHEN 'HKD' THEN 2080 WHEN 'NZD' THEN 9800 WHEN 'TWD' THEN 530 \
+    ELSE 1 END \
+  END";
 
 pub async fn get_health_score(env: &Env, claims: &JwtClaims) -> Result<Response> {
     let db = get_db(env)?;
@@ -152,6 +176,16 @@ pub async fn get_health_score(env: &Env, claims: &JwtClaims) -> Result<Response>
         &[uid.clone()]
     ).await.unwrap_or_default();
 
+    // Inject currency = "IDR" since all amounts are normalized to IDR
+    let top_clients: Vec<serde_json::Value> = top_rows.into_iter().map(|mut m| {
+        m.insert("currency".to_string(), serde_json::json!("IDR"));
+        serde_json::json!(m)
+    }).collect();
+    let worst_clients: Vec<serde_json::Value> = worst_rows.into_iter().map(|mut m| {
+        m.insert("currency".to_string(), serde_json::json!("IDR"));
+        serde_json::json!(m)
+    }).collect();
+
     utils::json_response(
         &serde_json::json!({
             "overall_score": overall_score,
@@ -175,8 +209,8 @@ pub async fn get_health_score(env: &Env, claims: &JwtClaims) -> Result<Response>
                 "this_month_new_clients": this_month_new_clients
             },
             "total_clients_active": unique_clients,
-            "top_clients": top_rows,
-            "worst_clients": worst_rows
+            "top_clients": top_clients,
+            "worst_clients": worst_clients
         }),
         200,
     )

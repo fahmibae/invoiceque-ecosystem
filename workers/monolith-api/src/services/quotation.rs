@@ -5,6 +5,7 @@ use crate::middleware::JwtClaims;
 use crate::services::notification;
 use crate::utils;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use worker::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,6 +68,107 @@ pub struct QuotationItem {
 
 const QT_COLS: &str = "id, user_id, quotation_number, client_id, client_name, client_email, subtotal, tax, discount, total, status, COALESCE(valid_until,'') as valid_until, COALESCE(notes,'') as notes, currency, COALESCE(accept_token,'') as accept_token, COALESCE(converted_invoice_id,'') as converted_invoice_id, created_at::text, updated_at::text, accepted_at::text, rejected_at::text";
 const QI_COLS: &str = "id, quotation_id, description, quantity, price, total";
+
+fn fallback_rate_to_idr(currency: &str) -> f64 {
+    match currency.to_uppercase().as_str() {
+        "IDR" => 1.0,
+        "USD" => 16_200.0,
+        "EUR" => 18_400.0,
+        "GBP" => 20_800.0,
+        "SGD" => 12_300.0,
+        "MYR" => 3_700.0,
+        "JPY" => 108.0,
+        "AUD" => 10_500.0,
+        "CAD" => 12_000.0,
+        "CHF" => 18_600.0,
+        "CNY" => 2_250.0,
+        "HKD" => 2_080.0,
+        "INR" => 195.0,
+        "PHP" => 290.0,
+        "THB" => 470.0,
+        "VND" => 0.65,
+        "NZD" => 9_800.0,
+        "SEK" => 1_600.0,
+        "NOK" => 1_530.0,
+        "DKK" => 2_470.0,
+        "PLN" => 4_200.0,
+        "CZK" => 720.0,
+        "HUF" => 45.0,
+        "BRL" => 2_850.0,
+        "MXN" => 950.0,
+        "TWD" => 510.0,
+        "ILS" => 4_500.0,
+        "RUB" => 185.0,
+        _ => 1.0,
+    }
+}
+
+async fn fetch_exchange_rates_to_idr() -> HashMap<String, f64> {
+    let mut rates = HashMap::from([("IDR".to_string(), 1.0)]);
+    let request = match Request::new("https://open.er-api.com/v6/latest/IDR", Method::Get) {
+        Ok(req) => req,
+        Err(_) => return rates,
+    };
+    let mut response = match Fetch::Request(request).send().await {
+        Ok(resp) => resp,
+        Err(_) => return rates,
+    };
+    if response.status_code() != 200 {
+        return rates;
+    }
+
+    let data: serde_json::Value = match response.json().await {
+        Ok(json) => json,
+        Err(_) => return rates,
+    };
+    if data.get("result").and_then(|v| v.as_str()) != Some("success") {
+        return rates;
+    }
+
+    if let Some(api_rates) = data.get("rates").and_then(|v| v.as_object()) {
+        for (currency, value) in api_rates {
+            if let Some(rate_from_idr) = value.as_f64() {
+                if rate_from_idr > 0.0 {
+                    rates.insert(
+                        currency.to_uppercase(),
+                        ((1.0 / rate_from_idr) * 100.0).round() / 100.0,
+                    );
+                }
+            }
+        }
+    }
+
+    rates
+}
+
+fn json_number(row: &serde_json::Map<String, serde_json::Value>, key: &str) -> f64 {
+    row.get(key)
+        .and_then(|v| {
+            v.as_f64()
+                .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+        })
+        .unwrap_or(0.0)
+}
+
+fn json_text(row: &serde_json::Map<String, serde_json::Value>, key: &str) -> String {
+    row.get(key)
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string()
+}
+
+fn convert_to_idr(amount: f64, currency: &str, rates: &HashMap<String, f64>) -> f64 {
+    let currency = if currency.trim().is_empty() {
+        "IDR"
+    } else {
+        currency.trim()
+    };
+    let rate = rates
+        .get(&currency.to_uppercase())
+        .copied()
+        .unwrap_or_else(|| fallback_rate_to_idr(currency));
+    (amount * rate).round()
+}
 
 fn get_db(env: &Env) -> Result<NeonClient> {
     let url = utils::get_secret(env, "INVOICE_DB_URL");
@@ -430,21 +532,27 @@ pub async fn stats(env: &Env, claims: &JwtClaims) -> Result<Response> {
         )
         .await
         .unwrap_or(0);
-    let total_value: f64 = db
-        .query_scalar(
-            "SELECT COALESCE(SUM(total * CASE currency \
-            WHEN 'IDR' THEN 1 WHEN 'USD' THEN 16200 WHEN 'EUR' THEN 18400 WHEN 'GBP' THEN 20800 \
-            WHEN 'SGD' THEN 12300 WHEN 'MYR' THEN 3700 WHEN 'JPY' THEN 108 WHEN 'AUD' THEN 10500 \
-            WHEN 'CAD' THEN 12000 WHEN 'CHF' THEN 18600 WHEN 'CNY' THEN 2250 WHEN 'HKD' THEN 2080 \
-            WHEN 'INR' THEN 195 WHEN 'PHP' THEN 290 WHEN 'THB' THEN 470 WHEN 'VND' THEN 0.65 \
-            WHEN 'NZD' THEN 9800 WHEN 'SEK' THEN 1600 WHEN 'NOK' THEN 1530 WHEN 'DKK' THEN 2470 \
-            WHEN 'PLN' THEN 4200 WHEN 'CZK' THEN 720 WHEN 'HUF' THEN 45 WHEN 'BRL' THEN 2850 \
-            WHEN 'MXN' THEN 950 WHEN 'TWD' THEN 510 WHEN 'ILS' THEN 4500 WHEN 'RUB' THEN 185 \
-            ELSE 1 END),0) FROM quotations WHERE user_id=$1",
+    let rates = fetch_exchange_rates_to_idr().await;
+    let quotation_value_rows = db
+        .query_as_maps(
+            "SELECT total, currency, status FROM quotations WHERE user_id=$1",
             &[uid.clone()],
         )
         .await
-        .unwrap_or(0.0);
+        .unwrap_or_default();
+    let mut total_value = 0.0;
+    let mut deal_value = 0.0;
+    for row in &quotation_value_rows {
+        let amount_idr = convert_to_idr(
+            json_number(row, "total"),
+            &json_text(row, "currency"),
+            &rates,
+        );
+        total_value += amount_idr;
+        if matches!(json_text(row, "status").as_str(), "accepted" | "converted") {
+            deal_value += amount_idr;
+        }
+    }
     let conversion_rate = if sent + accepted + converted > 0 {
         ((accepted + converted) as f64 / (sent + accepted + converted) as f64 * 100.0 * 10.0)
             .round()
@@ -453,7 +561,7 @@ pub async fn stats(env: &Env, claims: &JwtClaims) -> Result<Response> {
         0.0
     };
     utils::json_response(
-        &serde_json::json!({"total": total, "draft": draft, "sent": sent, "accepted": accepted, "rejected": rejected, "converted": converted, "total_value": total_value, "conversion_rate": conversion_rate}),
+        &serde_json::json!({"total": total, "draft": draft, "sent": sent, "accepted": accepted, "rejected": rejected, "converted": converted, "total_value": total_value, "deal_value": deal_value, "conversion_rate": conversion_rate}),
         200,
     )
 }
