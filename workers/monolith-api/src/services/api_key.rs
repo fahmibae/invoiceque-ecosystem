@@ -282,7 +282,7 @@ pub async fn create_api_key(
     // Check limit: max 5 active keys per user
     let count: i64 = db
         .query_scalar(
-            "SELECT COUNT(*) FROM api_keys WHERE user_id = $1::uuid AND is_active = true",
+            "SELECT COUNT(*) FROM api_keys WHERE user_id = $1 AND is_active = true",
             &[serde_json::Value::String(claims.user_id.clone())],
         )
         .await
@@ -313,7 +313,7 @@ pub async fn create_api_key(
     let result: Option<InsertedKey> = db
         .query_one(
             "INSERT INTO api_keys (user_id, name, key_hash, key_prefix, scopes, expires_at)
-             VALUES ($1::uuid, $2, $3, $4, $5::text[], $6::timestamptz)
+             VALUES ($1, $2, $3, $4, $5::text[], $6::timestamptz)
              RETURNING id::text, created_at::text",
             &[
                 serde_json::Value::String(claims.user_id.clone()),
@@ -373,7 +373,7 @@ pub async fn list_api_keys(
                     is_active,
                     created_at::text, updated_at::text
              FROM api_keys
-             WHERE user_id = $1::uuid
+             WHERE user_id = $1
              ORDER BY created_at DESC",
             &[serde_json::Value::String(claims.user_id.clone())],
         )
@@ -402,7 +402,7 @@ pub async fn revoke_api_key(
     let affected = db
         .execute(
             "UPDATE api_keys SET is_active = false, updated_at = NOW()
-             WHERE id = $1::uuid AND user_id = $2::uuid",
+             WHERE id = $1::uuid AND user_id = $2",
             &[
                 serde_json::Value::String(key_id.to_string()),
                 serde_json::Value::String(claims.user_id.clone()),
@@ -480,7 +480,7 @@ pub async fn update_api_key(
     let user_idx = idx + 1;
 
     let sql = format!(
-        "UPDATE api_keys SET {} WHERE id = ${}::uuid AND user_id = ${}::uuid",
+        "UPDATE api_keys SET {} WHERE id = ${}::uuid AND user_id = ${}",
         set_parts.join(", "),
         key_idx,
         user_idx,
