@@ -108,7 +108,7 @@ async fn ensure_table(db: &NeonClient) -> Result<()> {
     db.execute(
         "CREATE TABLE IF NOT EXISTS api_keys (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id UUID NOT NULL,
+            user_id VARCHAR(255) NOT NULL,
             name VARCHAR(100) NOT NULL,
             key_hash VARCHAR(256) NOT NULL,
             key_prefix VARCHAR(12) NOT NULL,
@@ -148,14 +148,13 @@ pub async fn validate_api_key(key: &str, env: &Env) -> std::result::Result<ApiKe
 
     let prefix = key_prefix(key);
 
-    // Find keys with matching prefix that are active
+    // Step 1: Find keys with matching prefix (no JOIN to avoid type issues)
     let rows: Vec<ApiKeyRow> = db
         .query_typed(
-            "SELECT k.id::text, k.user_id::text, k.key_hash, k.scopes, k.expires_at::text,
-                    u.email
-             FROM api_keys k
-             JOIN users u ON u.id = k.user_id
-             WHERE k.key_prefix = $1 AND k.is_active = true",
+            "SELECT id::text, user_id::text, key_hash, scopes,
+                    COALESCE(expires_at::text, '') as expires_at
+             FROM api_keys
+             WHERE key_prefix = $1 AND is_active = true",
             &[serde_json::Value::String(prefix)],
         )
         .await
@@ -165,10 +164,9 @@ pub async fn validate_api_key(key: &str, env: &Env) -> std::result::Result<ApiKe
         return Err("Invalid API key".into());
     }
 
-    // Verify hash against each matching row (should typically be 1)
+    // Step 2: Verify hash against each matching row
     for row in &rows {
-        let hash_ok =
-            bcrypt::verify(key, &row.key_hash).unwrap_or(false);
+        let hash_ok = bcrypt::verify(key, &row.key_hash).unwrap_or(false);
 
         if hash_ok {
             // Check expiration
@@ -180,7 +178,19 @@ pub async fn validate_api_key(key: &str, env: &Env) -> std::result::Result<ApiKe
                 }
             }
 
-            // Update last_used_at asynchronously (best-effort, don't block)
+            // Step 3: Fetch user email
+            let email = match db
+                .query_typed::<EmailRow>(
+                    "SELECT email FROM users WHERE id = $1",
+                    &[serde_json::Value::String(row.user_id.clone())],
+                )
+                .await
+            {
+                Ok(emails) if !emails.is_empty() => emails[0].email.clone(),
+                _ => String::new(),
+            };
+
+            // Update last_used_at (best-effort)
             let _ = db
                 .execute(
                     "UPDATE api_keys SET last_used_at = NOW() WHERE id = $1::uuid",
@@ -190,7 +200,7 @@ pub async fn validate_api_key(key: &str, env: &Env) -> std::result::Result<ApiKe
 
             return Ok(ApiKeyContext {
                 user_id: row.user_id.clone(),
-                email: row.email.clone(),
+                email,
                 scopes: row.scopes.clone(),
                 key_id: row.id.clone(),
             });
@@ -212,6 +222,10 @@ struct ApiKeyRow {
     scopes: Vec<String>,
     #[serde(default)]
     expires_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct EmailRow {
     #[serde(default)]
     email: String,
 }
