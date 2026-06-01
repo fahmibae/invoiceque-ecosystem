@@ -503,35 +503,242 @@ export default function ApiKeysPage() {
         </div>
       )}
 
-      {/* Usage Guide */}
-      <div className="card">
-        <h3 className="font-bold text-base mb-4 flex items-center gap-2">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
-          </svg>
-          Cara Menggunakan API Key
-        </h3>
-        <div className="space-y-3 text-sm text-text-secondary">
-          <div className="p-3 rounded-lg bg-bg-main/50 border border-border-light">
-            <p className="font-semibold text-text-primary mb-1">Header Format:</p>
-            <code className="text-xs font-mono text-blue-500 dark:text-blue-400">
-              Authorization: ApiKey iq_live_xxxxxxxx...
+      {/* Developer Integration Hub */}
+      <IntegrationHub copyFn={copyToClipboard} copied={copied} />
+    </div>
+  );
+}
+
+// ── Code Snippets ──
+const SNIPPETS: Record<string, { label: string; lang: string; icon: string; code: string }> = {
+  curl: {
+    label: "cURL",
+    lang: "bash",
+    icon: "⌨️",
+    code: `# List your tasks
+curl -s -H "Authorization: ApiKey YOUR_API_KEY" \\
+  https://api.invoicequ.my.id/api/v1/tasks | jq
+
+# Start time tracking
+curl -X POST -H "Authorization: ApiKey YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"task_id":"TASK_UUID","description":"Coding session"}' \\
+  https://api.invoicequ.my.id/api/v1/time-entries/start
+
+# Stop time tracking
+curl -X POST -H "Authorization: ApiKey YOUR_API_KEY" \\
+  https://api.invoicequ.my.id/api/v1/time-entries/stop`,
+  },
+  javascript: {
+    label: "JavaScript / TypeScript",
+    lang: "typescript",
+    icon: "🟨",
+    code: `const API_KEY = "iq_live_your_key_here";
+const BASE = "https://api.invoicequ.my.id/api/v1";
+
+const headers = {
+  "Authorization": \`ApiKey \${API_KEY}\`,
+  "Content-Type": "application/json",
+};
+
+// Fetch tasks
+const tasks = await fetch(\`\${BASE}/tasks\`, { headers })
+  .then(r => r.json());
+console.log(tasks.data);
+
+// Start time tracking
+await fetch(\`\${BASE}/time-entries/start\`, {
+  method: "POST",
+  headers,
+  body: JSON.stringify({
+    task_id: "TASK_UUID",
+    description: "Working on feature",
+  }),
+});`,
+  },
+  python: {
+    label: "Python",
+    lang: "python",
+    icon: "🐍",
+    code: `import requests
+
+API_KEY = "iq_live_your_key_here"
+BASE = "https://api.invoicequ.my.id/api/v1"
+headers = {"Authorization": f"ApiKey {API_KEY}"}
+
+# Fetch tasks
+tasks = requests.get(f"{BASE}/tasks", headers=headers).json()
+print(tasks["data"])
+
+# Start time tracking
+requests.post(f"{BASE}/time-entries/start", headers=headers, json={
+    "task_id": "TASK_UUID",
+    "description": "Working on feature",
+})
+
+# List clients
+clients = requests.get(f"{BASE}/clients", headers=headers).json()
+print(clients["data"])`,
+  },
+  vscode: {
+    label: "VS Code Settings",
+    lang: "json",
+    icon: "💻",
+    code: `// Add to .vscode/settings.json for REST Client extension
+{
+  "rest-client.environmentVariables": {
+    "invoicequ": {
+      "apiKey": "iq_live_your_key_here",
+      "baseUrl": "https://api.invoicequ.my.id/api/v1"
+    }
+  }
+}
+
+// Then create a .http file:
+// GET {{baseUrl}}/tasks
+// Authorization: ApiKey {{apiKey}}
+//
+// ###
+// GET {{baseUrl}}/time-entries
+// Authorization: ApiKey {{apiKey}}`,
+  },
+};
+
+const API_ENDPOINTS = [
+  { method: "GET", path: "/tasks", scope: "tasks:read", desc: "Daftar semua tasks" },
+  { method: "POST", path: "/tasks", scope: "tasks:write", desc: "Buat task baru" },
+  { method: "GET", path: "/projects", scope: "projects:read", desc: "Daftar projects" },
+  { method: "GET", path: "/time-entries", scope: "time:read", desc: "Daftar time entries" },
+  { method: "POST", path: "/time-entries/start", scope: "time:write", desc: "Mulai tracking" },
+  { method: "POST", path: "/time-entries/stop", scope: "time:write", desc: "Stop tracking" },
+  { method: "GET", path: "/clients", scope: "clients:read", desc: "Daftar clients" },
+  { method: "GET", path: "/invoices", scope: "invoices:read", desc: "Daftar invoices" },
+  { method: "GET", path: "/profile", scope: "profile:read", desc: "Profil user" },
+];
+
+function IntegrationHub({ copyFn, copied }: { copyFn: (t: string) => void; copied: boolean }) {
+  const [activeTab, setActiveTab] = React.useState("curl");
+  const [showEndpoints, setShowEndpoints] = React.useState(false);
+  const snippet = SNIPPETS[activeTab];
+
+  return (
+    <div className="card">
+      <h3 className="font-bold text-base mb-1 flex items-center gap-2">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
+        </svg>
+        Developer Integration Hub
+      </h3>
+      <p className="text-xs text-text-tertiary mb-4">
+        Copy-paste kode di bawah untuk mengintegrasikan InvoiceQu ke aplikasi, script, atau editor Anda.
+      </p>
+
+      {/* Language Tabs */}
+      <div className="flex gap-1 mb-3 overflow-x-auto pb-1">
+        {Object.entries(SNIPPETS).map(([key, s]) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all border ${
+              activeTab === key
+                ? "bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400"
+                : "bg-transparent border-border-light text-text-tertiary hover:border-border-color hover:text-text-secondary"
+            }`}
+          >
+            {s.icon} {s.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Code Block */}
+      <div className="relative group">
+        <pre className="p-4 rounded-xl bg-[#1e1e2e] text-[#cdd6f4] text-xs font-mono overflow-x-auto leading-relaxed border border-[#313244]">
+          <code>{snippet.code}</code>
+        </pre>
+        <button
+          onClick={() => copyFn(snippet.code)}
+          className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white text-[11px] font-semibold transition-all opacity-0 group-hover:opacity-100"
+        >
+          {copied ? "✓ Copied!" : "📋 Copy"}
+        </button>
+      </div>
+
+      {/* Auth Header Info */}
+      <div className="mt-4 p-3 rounded-lg bg-gradient-to-r from-blue-500/5 to-indigo-500/5 border border-blue-500/10">
+        <div className="flex items-start gap-2">
+          <span className="text-blue-500 mt-0.5">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+          </span>
+          <div>
+            <p className="text-xs font-semibold text-text-primary">Format Autentikasi</p>
+            <code className="text-[11px] font-mono text-blue-500 dark:text-blue-400">
+              Authorization: ApiKey iq_live_xxxxxxxxxxxxx
             </code>
-          </div>
-          <div className="p-3 rounded-lg bg-bg-main/50 border border-border-light">
-            <p className="font-semibold text-text-primary mb-1">cURL Example:</p>
-            <code className="text-xs font-mono text-text-tertiary block whitespace-pre-wrap break-all">
-              {`curl -H "Authorization: ApiKey YOUR_KEY" \\
-  https://api.invoicequ.my.id/api/v1/tasks`}
-            </code>
-          </div>
-          <div className="p-3 rounded-lg bg-bg-main/50 border border-border-light">
-            <p className="font-semibold text-text-primary mb-1">VS Code Extension:</p>
-            <p className="text-xs text-text-tertiary">
-              Masukkan API Key di settings VS Code Extension InvoiceQu untuk sinkronisasi tasks dan time tracking langsung dari editor Anda.
+            <p className="text-[11px] text-text-tertiary mt-1">
+              Ganti <code className="font-mono bg-bg-main px-1 rounded">YOUR_API_KEY</code> dengan API key yang sudah dibuat di atas. Jangan share key Anda ke pihak lain.
             </p>
           </div>
         </div>
+      </div>
+
+      {/* API Endpoints Reference */}
+      <div className="mt-4">
+        <button
+          onClick={() => setShowEndpoints(!showEndpoints)}
+          className="flex items-center gap-2 text-sm font-semibold text-text-secondary hover:text-text-primary transition-colors w-full"
+        >
+          <svg
+            width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+            className={`transition-transform ${showEndpoints ? "rotate-90" : ""}`}
+          >
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+          API Endpoints Reference
+          <span className="text-[10px] font-medium text-text-tertiary bg-bg-main px-2 py-0.5 rounded-full">
+            {API_ENDPOINTS.length} endpoints
+          </span>
+        </button>
+
+        {showEndpoints && (
+          <div className="mt-3 border border-border-light rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-bg-main/50 border-b border-border-light">
+                    <th className="px-3 py-2 text-left font-bold text-text-secondary">Method</th>
+                    <th className="px-3 py-2 text-left font-bold text-text-secondary">Endpoint</th>
+                    <th className="px-3 py-2 text-left font-bold text-text-secondary">Scope</th>
+                    <th className="px-3 py-2 text-left font-bold text-text-secondary">Deskripsi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {API_ENDPOINTS.map((ep, i) => (
+                    <tr key={i} className="border-b border-border-light last:border-0 hover:bg-bg-main/30 transition-colors">
+                      <td className="px-3 py-2">
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          ep.method === "GET"
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                            : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                        }`}>
+                          {ep.method}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 font-mono text-blue-500 dark:text-blue-400">/api/v1{ep.path}</td>
+                      <td className="px-3 py-2">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-500/5 text-purple-500 border border-purple-500/10">
+                          {ep.scope}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-text-tertiary">{ep.desc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
