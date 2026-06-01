@@ -1,0 +1,61 @@
+{
+  "name": "invoicequ-tracker",
+  "displayName": "InvoiceQu Time Tracker",
+  "description": "Official time tracking companion for InvoiceQu. Track your coding sessions automatically.",
+  "version": "0.0.1",
+  "publisher": "invoicequ",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "InvoiceQu",
+      "properties": {
+        "invoicequ.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API Key InvoiceQu Anda (dapat dibuat di Pengaturan > API Keys di dashboard InvoiceQu)."
+        },
+        "invoicequ.defaultProjectId": {
+          "type": "string",
+          "default": "",
+          "description": "ID Project default untuk pencatatan waktu."
+        },
+        "invoicequ.defaultTaskId": {
+          "type": "string",
+          "default": "",
+          "description": "ID Task default untuk pencatatan waktu."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "invoicequ.startTracking",
+        "title": "InvoiceQu: Start Time Tracking",
+        "category": "InvoiceQu"
+      },
+      {
+        "command": "invoicequ.stopTracking",
+        "title": "InvoiceQu: Stop Time Tracking",
+        "category": "InvoiceQu"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "18.x",
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.0.4"
+  }
+}
