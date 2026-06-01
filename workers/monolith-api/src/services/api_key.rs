@@ -99,7 +99,7 @@ pub fn has_scope(scopes: &[String], required: &str) -> bool {
 // ── Database helpers ──
 
 fn get_db(env: &Env) -> Result<NeonClient> {
-    let url = utils::get_secret(env, "DATABASE_URL");
+    let url = utils::get_secret(env, "AUTH_DB_URL");
     NeonClient::from_connection_string(&url)
 }
 
