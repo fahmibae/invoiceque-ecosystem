@@ -103,7 +103,7 @@ export default function HeroSection() {
           className="mt-20 relative animate-fade-in-up"
           style={{ animationDelay: "0.7s" }}
         >
-          <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-transparent to-transparent z-10 pointer-events-none rounded-xl" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-transparent to-transparent z-10 pointer-events-none rounded-xl dashboard-preview-fade" />
           <div className="relative bg-white/5 border border-white/10 rounded-2xl p-1 max-w-5xl mx-auto">
             <div className="rounded-xl overflow-hidden bg-[#111113] border border-white/5">
               {/* Browser Chrome */}
@@ -208,7 +208,7 @@ export default function HeroSection() {
       </div>
 
       {/* Bottom gradient fade */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#09090b] to-transparent pointer-events-none" />
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#09090b] to-transparent pointer-events-none hero-bottom-fade" />
     </section>
   );
 }

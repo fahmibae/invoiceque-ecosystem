@@ -586,3 +586,12 @@ html.light .bg-red-500\/10 {
 html.light #mobile-menu-toggle span {
   background-color: #0f172a !important;
 }
+
+/* Custom fades for light mode in hero section */
+html.light .dashboard-preview-fade {
+  background-image: linear-gradient(to top, #f8fafc 5%, rgba(248, 250, 252, 0) 60%) !important;
+}
+
+html.light .hero-bottom-fade {
+  background-image: linear-gradient(to top, #f8fafc, rgba(248, 250, 252, 0)) !important;
+}
