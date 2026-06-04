@@ -21,7 +21,33 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${baseUrl}/keamanan`, priority: 0.4, changeFrequency: "monthly" as const },
   ];
 
-  return staticPages.map((page) => ({
+  const blogSlugs = [
+    "portal-klien-invoicequ",
+    "client-intake-forms-otomatis",
+    "kelola-pengeluaran-expenses-bisnis",
+    "brand-kit-invoice-kustom",
+    "quotation-proposal-online",
+    "penjadwalan-meeting-otomatis",
+    "kontrak-digital-tanda-tangan",
+    "fitur-time-tracking-freelancer",
+    "fitur-chasers-reminder-otomatis",
+    "cara-membuat-invoice-profesional",
+    "tips-mengelola-cashflow",
+    "payment-link-vs-invoice",
+    "fitur-baru-dashboard-analytics",
+    "integrasi-xendit",
+    "pajak-invoice-indonesia",
+  ];
+
+  const blogPages = blogSlugs.map((slug) => ({
+    url: `${baseUrl}/blog/${slug}`,
+    priority: 0.7,
+    changeFrequency: "weekly" as const,
+  }));
+
+  const allPages = [...staticPages, ...blogPages];
+
+  return allPages.map((page) => ({
     url: page.url,
     lastModified: now,
     changeFrequency: page.changeFrequency,
