@@ -15,6 +15,30 @@ const navLinks = [
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    if (typeof window !== "undefined") {
+      const isLight = document.documentElement.classList.contains("light");
+      setTheme(isLight ? "light" : "dark");
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    if (typeof window !== "undefined") {
+      if (nextTheme === "light") {
+        document.documentElement.classList.add("light");
+        localStorage.setItem("theme", "light");
+      } else {
+        document.documentElement.classList.remove("light");
+        localStorage.setItem("theme", "dark");
+      }
+    }
+  };
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -77,6 +101,23 @@ export default function Navbar() {
 
           {/* CTA */}
           <div className="hidden lg:flex items-center gap-3">
+            <button
+              onClick={toggleTheme}
+              className="p-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all text-white cursor-pointer mr-1"
+              aria-label="Toggle theme"
+            >
+              {!mounted ? (
+                <div className="w-5 h-5" />
+              ) : theme === "light" ? (
+                <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+                </svg>
+              )}
+            </button>
             <a
               href="https://app.invoicequ.my.id/login"
               className="text-sm font-medium text-white/70 hover:text-white px-4 py-2 transition-colors"
@@ -91,29 +132,48 @@ export default function Navbar() {
             </a>
           </div>
 
-          {/* Mobile Menu Toggle */}
-          <button
-            id="mobile-menu-toggle"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            className="lg:hidden relative z-50 w-10 h-10 flex items-center justify-center"
-            aria-label="Toggle menu"
-            aria-expanded={mobileOpen}
-          >
-            <div className="w-5 h-4 relative flex flex-col justify-between">
-              <span
-                className={`block w-full h-[2px] bg-white rounded transition-all duration-300 ${mobileOpen ? "rotate-45 translate-y-[7px]" : ""
-                  }`}
-              />
-              <span
-                className={`block w-full h-[2px] bg-white rounded transition-all duration-300 ${mobileOpen ? "opacity-0 scale-0" : ""
-                  }`}
-              />
-              <span
-                className={`block w-full h-[2px] bg-white rounded transition-all duration-300 ${mobileOpen ? "-rotate-45 -translate-y-[7px]" : ""
-                  }`}
-              />
-            </div>
-          </button>
+          {/* Mobile Theme Toggle & Menu Toggle */}
+          <div className="flex lg:hidden items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              className="p-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all text-white cursor-pointer"
+              aria-label="Toggle theme"
+            >
+              {!mounted ? (
+                <div className="w-5 h-5" />
+              ) : theme === "light" ? (
+                <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+                </svg>
+              )}
+            </button>
+            <button
+              id="mobile-menu-toggle"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="relative z-50 w-10 h-10 flex items-center justify-center"
+              aria-label="Toggle menu"
+              aria-expanded={mobileOpen}
+            >
+              <div className="w-5 h-4 relative flex flex-col justify-between">
+                <span
+                  className={`block w-full h-[2px] bg-white rounded transition-all duration-300 ${mobileOpen ? "rotate-45 translate-y-[7px]" : ""
+                    }`}
+                />
+                <span
+                  className={`block w-full h-[2px] bg-white rounded transition-all duration-300 ${mobileOpen ? "opacity-0 scale-0" : ""
+                    }`}
+                />
+                <span
+                  className={`block w-full h-[2px] bg-white rounded transition-all duration-300 ${mobileOpen ? "-rotate-45 -translate-y-[7px]" : ""
+                    }`}
+                />
+              </div>
+            </button>
+          </div>
         </nav>
       </header>
 
