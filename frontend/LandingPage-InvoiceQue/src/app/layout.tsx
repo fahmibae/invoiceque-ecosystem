@@ -3,6 +3,7 @@ import { Sora } from "next/font/google";
 import "./globals.css";
 import IdleDetector from "@/components/IdleDetector";
 import AntiInspect from "@/components/AntiInspect";
+import Script from "next/script";
 
 const sora = Sora({
   variable: "--font-sora",
@@ -144,9 +145,29 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const gaId = process.env.NEXT_PUBLIC_GA_ID;
+
   return (
     <html lang="id" className={`${sora.variable} antialiased overflow-x-hidden`} suppressHydrationWarning>
       <head>
+        {gaId && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
+              strategy="afterInteractive"
+            />
+            <Script id="google-analytics" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${gaId}', {
+                  page_path: window.location.pathname,
+                });
+              `}
+            </Script>
+          </>
+        )}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(webSiteJsonLd) }}
