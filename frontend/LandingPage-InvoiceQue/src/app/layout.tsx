@@ -4,7 +4,7 @@ import "./globals.css";
 import IdleDetector from "@/components/IdleDetector";
 import AntiInspect from "@/components/AntiInspect";
 import Script from "next/script";
-import CrispChat from "@/components/CrispChat";
+import TawkChat from "@/components/TawkChat";
 
 const sora = Sora({
   variable: "--font-sora",
@@ -187,7 +187,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-[#09090b] text-white font-[family-name:var(--font-sora)] overflow-x-hidden" suppressHydrationWarning>
         <IdleDetector />
         <AntiInspect />
-        <CrispChat />
+        <TawkChat />
         {children}
       </body>
     </html>
