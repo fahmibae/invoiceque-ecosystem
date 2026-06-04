@@ -14,6 +14,7 @@ interface PageLayoutProps {
   badgeIcon?: React.ReactNode;
   breadcrumbs?: Breadcrumb[];
   children: React.ReactNode;
+  wide?: boolean;
 }
 
 export default function PageLayout({
@@ -23,6 +24,7 @@ export default function PageLayout({
   badgeIcon,
   breadcrumbs,
   children,
+  wide = false,
 }: PageLayoutProps) {
   return (
     <>
@@ -97,7 +99,7 @@ export default function PageLayout({
 
         {/* Page Content */}
         <section className="relative py-16 md:py-20">
-          <div className="relative z-10 max-w-4xl mx-auto px-6 lg:px-8">
+          <div className={`relative z-10 mx-auto px-6 lg:px-8 ${wide ? "max-w-7xl" : "max-w-4xl"}`}>
             {children}
           </div>
         </section>
