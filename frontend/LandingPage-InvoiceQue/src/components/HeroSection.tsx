@@ -104,7 +104,7 @@ export default function HeroSection() {
           style={{ animationDelay: "0.7s" }}
         >
           <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-transparent to-transparent z-10 pointer-events-none rounded-xl" />
-          <div className="relative glass rounded-2xl p-1 max-w-5xl mx-auto">
+          <div className="relative bg-white/5 border border-white/10 rounded-2xl p-1 max-w-5xl mx-auto">
             <div className="rounded-xl overflow-hidden bg-[#111113] border border-white/5">
               {/* Browser Chrome */}
               <div className="flex items-center gap-2 px-4 py-3 border-b border-white/5">
