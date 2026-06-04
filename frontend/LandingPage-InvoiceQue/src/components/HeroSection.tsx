@@ -7,7 +7,7 @@ export default function HeroSection() {
       className="relative min-h-screen flex items-center justify-center overflow-hidden pt-120"
     >
       {/* Background Effects */}
-      <div className="absolute inset-0 pointer-events-none">
+      <div className="absolute inset-0 pointer-events-none overflow-hidden [transform:translate3d(0,0,0)] [backface-visibility:hidden]">
         {/* Radial gradient */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-[radial-gradient(ellipse_at_center,rgba(220,38,38,0.12),transparent_70%)]" />
         {/* Grid pattern */}
@@ -20,9 +20,9 @@ export default function HeroSection() {
           }}
         />
         {/* Floating orbs */}
-        <div className="absolute top-[15%] left-[10%] w-72 h-72 bg-red-600/10 rounded-full blur-[120px] animate-float" />
-        <div className="absolute bottom-[20%] right-[5%] w-96 h-96 bg-red-500/8 rounded-full blur-[150px] animate-float-slow" />
-        <div className="absolute top-[40%] right-[20%] w-48 h-48 bg-orange-500/6 rounded-full blur-[100px] animate-float" />
+        <div className="absolute top-[15%] left-[10%] w-72 h-72 bg-red-600/10 rounded-full blur-[120px] animate-float [transform:translate3d(0,0,0)]" />
+        <div className="absolute bottom-[20%] right-[5%] w-96 h-96 bg-red-500/8 rounded-full blur-[150px] animate-float-slow [transform:translate3d(0,0,0)]" />
+        <div className="absolute top-[40%] right-[20%] w-48 h-48 bg-orange-500/6 rounded-full blur-[100px] animate-float [transform:translate3d(0,0,0)]" />
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-8 text-center">

@@ -347,17 +347,12 @@ html {
  * classes and animation performance on WebKit.
  */
 
-/* Hardware-accelerated animations for Safari */
-.animate-fade-in-up,
-.animate-fade-in-down,
-.animate-fade-in,
-.animate-slide-in-left,
-.animate-slide-in-right,
+/* Hardware-accelerated animations for Safari & performance */
 .animate-float,
 .animate-float-slow {
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
-  will-change: transform, opacity;
+  will-change: transform;
 }
 
 /* Section divider with explicit rgba fallback for Safari */
