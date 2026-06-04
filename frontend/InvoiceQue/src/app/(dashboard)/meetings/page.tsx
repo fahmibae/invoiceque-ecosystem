@@ -1004,15 +1004,22 @@ function MeetingsContent() {
                     </label>
                     <input
                       type="url"
-                      value={form.meeting_url}
+                      value={form.provider === "google_meet" && !editingMeeting ? "" : form.meeting_url}
+                      disabled={form.provider === "google_meet" && !editingMeeting}
                       onChange={(event) =>
                         setForm((prev) => ({
                           ...prev,
                           meeting_url: event.target.value,
                         }))
                       }
-                      className="w-full rounded-md border border-border-color bg-bg-input px-4 py-3 text-sm outline-none focus:border-red-400"
-                      placeholder="https://..."
+                      className={`w-full rounded-md border border-border-color bg-bg-input px-4 py-3 text-sm outline-none focus:border-red-400 ${
+                        form.provider === "google_meet" && !editingMeeting ? "opacity-70 cursor-not-allowed" : ""
+                      }`}
+                      placeholder={
+                        form.provider === "google_meet" && !editingMeeting
+                          ? t("meetings.form.googleMeetAuto")
+                          : "https://..."
+                      }
                     />
                   </div>
 

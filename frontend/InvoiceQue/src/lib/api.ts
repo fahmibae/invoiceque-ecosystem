@@ -900,9 +900,13 @@ export interface PortalDashboard {
     name: string;
     email: string;
     company: string;
+    country?: string;
     business_name: string;
     business_logo: string;
     accent_color: string;
+    business_email?: string;
+    business_phone?: string;
+    business_website?: string;
   };
   invoices: {
     id: string;
@@ -927,6 +931,7 @@ export interface PortalDashboard {
     accept_token: string;
     created_at: string;
   }[];
+  contracts?: ToolkitItem[];
   stats: {
     total_invoices: number;
     total_paid: number;
@@ -955,6 +960,11 @@ export const portalApi = {
     }),
   /** Public — no auth needed */
   getPortal: (token: string) => request<PortalDashboard>(`/portal/${token}`),
+  signContract: (token: string, contractId: string, signature: string) =>
+    request<{ success: boolean; message: string }>(`/portal/${token}/contracts/${contractId}/sign`, {
+      method: "POST",
+      body: JSON.stringify({ signature }),
+    }),
 };
 
 // ── Public Quotation API (no auth) ────────────────────
@@ -1433,6 +1443,7 @@ export type ToolkitType =
   | "note"
   | "contract_template"
   | "rate_card"
+  | "visual_reference"
   | "link";
 
 export interface ToolkitItem {
@@ -1712,4 +1723,33 @@ export const apiKeyApi = {
     request<{ data: string[]; meta: { total: number; description: string } }>(
       "/api-keys/scopes",
     ),
+};
+
+// ── Google Meet / Calendar Integration API ────────────
+export const googleApi = {
+  getAuthUrl: (redirectUri?: string) => {
+    const params = new URLSearchParams();
+    if (redirectUri) params.set("redirect_uri", redirectUri);
+    const query = params.toString();
+    return request<{ url: string }>(`/integrations/google/oauth-url${query ? `?${query}` : ""}`);
+  },
+
+  connect: (code: string, redirectUri?: string) => {
+    const params = new URLSearchParams();
+    if (redirectUri) params.set("redirect_uri", redirectUri);
+    const query = params.toString();
+    return request<{ success: boolean }>(
+      `/integrations/google/connect${query ? `?${query}` : ""}`,
+      {
+        method: "POST",
+        body: JSON.stringify({ code }),
+      },
+    );
+  },
+
+  getStatus: () => request<{ connected: boolean }>("/integrations/google/status"),
+
+  disconnect: () => request<{ success: boolean }>("/integrations/google/disconnect", {
+    method: "POST",
+  }),
 };

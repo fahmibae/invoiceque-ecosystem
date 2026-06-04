@@ -275,6 +275,21 @@ function IntakeFormsContent() {
     };
   }, [getForms]);
 
+  // Close action menu when clicking outside
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest(".menu-trigger")) {
+        return;
+      }
+      setMenuOpen(null);
+    };
+    document.addEventListener("click", handleOutsideClick);
+    return () => {
+      document.removeEventListener("click", handleOutsideClick);
+    };
+  }, []);
+
   const resetForm = () => {
     setTitle("");
     setDescription("");
@@ -527,10 +542,13 @@ function IntakeFormsContent() {
               >
                 <div className="absolute top-3 right-3">
                   <button
-                    className="p-1.5 rounded-lg hover:bg-bg-hover transition-colors opacity-0 group-hover:opacity-100"
-                    onClick={() =>
-                      setMenuOpen(menuOpen === item.id ? null : item.id)
-                    }
+                    className={`p-1.5 rounded-lg hover:bg-bg-hover transition-colors menu-trigger ${
+                      menuOpen === item.id ? "opacity-100" : "opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuOpen(menuOpen === item.id ? null : item.id);
+                    }}
                   >
                     <MoreVerticalIcon width={16} height={16} />
                   </button>

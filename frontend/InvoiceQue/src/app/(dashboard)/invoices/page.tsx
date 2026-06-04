@@ -106,6 +106,11 @@ export default function InvoicesPage() {
     setSelected(new Set());
   }, [statusFilter]);
 
+  const handleShowDeleteModal = (invoiceId: string) => {
+    setSelected(new Set([invoiceId]));
+    setShowBulkDeleteModal(true);
+  };
+
   // Fetch live exchange rates
   useEffect(() => {
     fetchExchangeRates().then(setExchangeRates);
@@ -770,7 +775,15 @@ export default function InvoicesPage() {
                           invoiceApi.downloadPdf(inv.id, inv.number + ".pdf")
                         }
                       >
-                        <Download02Icon className="dark:text-white text-black" />
+                        <Download02Icon height={20} width={20} className="dark:text-blue-300 text-blue-600" />
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-sm hover:text-red-500"
+                        title={t("common.delete")}
+                        onClick={() => handleShowDeleteModal(inv.id)}
+                        disabled={bulkDeleting}
+                      >
+                        <Delete02Icon height={20} width={20} className="dark:text-red-300 text-red-600" />
                       </button>
                     </div>
                   </td>

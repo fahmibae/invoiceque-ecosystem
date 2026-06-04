@@ -16,6 +16,7 @@ import {
   LegalDocument01Icon,
   StarIcon,
   UserAdd01Icon,
+  CodeIcon
 } from "hugeicons-react";
 import { toolkitApi, expenseApi, type ExpenseStats } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
@@ -101,6 +102,23 @@ const UNIVERSAL_TOOLS = [
 
 const PROFESSION_PACKS = [
   {
+    id: "developer",
+    titleKey: "toolkit.pack.developer.title",
+    descriptionKey: "toolkit.pack.developer.desc",
+    color: "#3733ffff",
+    gradient: "from-blue-500 to-purple-600",
+    bgLight: "bg-blue-50 dark:bg-violet-900/20",
+    icon: CodeIcon,
+    tools: [
+      {
+        href: "/toolkit/api-keys",
+        labelKey: "toolkit.pack.developer.label",
+        descKey: "toolkit.pack.developer.desc",
+        statKey: "api_key",
+      },
+    ],
+  },
+  {
     id: "designer",
     titleKey: "toolkit.pack.designer.title",
     descriptionKey: "toolkit.pack.designer.desc",
@@ -120,6 +138,12 @@ const PROFESSION_PACKS = [
         labelKey: "toolkit.pack.brandKit.label",
         descKey: "toolkit.pack.brandKit.desc",
         statKey: "brand_kit",
+      },
+      {
+        href: "/toolkit/visual-references",
+        labelKey: "toolkit.pack.visualReference.label",
+        descKey: "toolkit.pack.visualReference.desc",
+        statKey: "visual_reference",
       },
     ],
   },
@@ -404,7 +428,7 @@ export default function ToolkitHubPage() {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-5">
           {PROFESSION_PACKS.map((pack) => {
             const Icon = pack.icon;
             const packCount = pack.tools.reduce(

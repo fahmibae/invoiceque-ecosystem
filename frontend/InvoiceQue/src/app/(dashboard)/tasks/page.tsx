@@ -141,6 +141,21 @@ export default function TasksKanbanPage() {
       .catch(() => {});
   }, []);
 
+  // Close action menu when clicking outside
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest(".menu-trigger")) {
+        return;
+      }
+      setMenuOpen(null);
+    };
+    document.addEventListener("click", handleOutsideClick);
+    return () => {
+      document.removeEventListener("click", handleOutsideClick);
+    };
+  }, []);
+
   const totalTasks = Object.values(tasksByStatus).reduce(
     (sum, col) => sum + col.length,
     0,
@@ -395,10 +410,13 @@ export default function TasksKanbanPage() {
                         </span>
                         <div className="relative">
                           <button
-                            className="w-6 h-6 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 hover:bg-bg-hover transition-all text-text-tertiary"
-                            onClick={() =>
-                              setMenuOpen(menuOpen === task.id ? null : task.id)
-                            }
+                            className={`w-6 h-6 flex items-center justify-center rounded-md hover:bg-bg-hover transition-all text-text-tertiary menu-trigger ${
+                              menuOpen === task.id ? "opacity-100" : "opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+                            }`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMenuOpen(menuOpen === task.id ? null : task.id);
+                            }}
                           >
                             <MoreVerticalIcon width={14} height={14} />
                           </button>

@@ -152,6 +152,21 @@ function BriefsContent() {
     };
   }, [fetchBriefs]);
 
+  // Close action menu when clicking outside
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest(".menu-trigger")) {
+        return;
+      }
+      setMenuOpen(null);
+    };
+    document.addEventListener("click", handleOutsideClick);
+    return () => {
+      document.removeEventListener("click", handleOutsideClick);
+    };
+  }, []);
+
   const resetForm = () => {
     setForm({
       title: "",
@@ -420,7 +435,7 @@ function BriefsContent() {
                     >
                       <div className="relative">
                         <button
-                          className="p-1 rounded-lg hover:bg-bg-hover"
+                          className="p-1 rounded-lg hover:bg-bg-hover menu-trigger"
                           onClick={() =>
                             setMenuOpen(menuOpen === brief.id ? null : brief.id)
                           }

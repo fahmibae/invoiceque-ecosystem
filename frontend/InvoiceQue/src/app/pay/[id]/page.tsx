@@ -287,9 +287,9 @@ export default function PublicPaymentPage() {
               className={`flex flex-col sm:flex-row justify-between items-start mb-12 gap-6`}
             >
               <div>
-                <div className="flex items-start gap-3 mb-3">
+                <div className="flex items-start gap-4">
                   {companyLogo ? (
-                    <div className="w-12 h-12 flex items-start justify-center shrink-0">
+                    <div className="w-12 h-12 flex items-center justify-center shrink-0">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={companyLogo}
@@ -301,23 +301,32 @@ export default function PublicPaymentPage() {
                       />
                     </div>
                   ) : (
-                    <div className="w-10 h-10 bg-gradient-to-br from-red-600 to-red-500 rounded-sm flex items-center justify-center font-extrabold text-sm text-white shadow-md shadow-red-500/20">
+                    <div className="w-10 h-10 bg-gradient-to-br from-red-600 to-red-500 rounded-sm flex items-center justify-center font-extrabold text-sm text-white shadow-md shadow-red-500/20 shrink-0 font-sans">
                       {companyInitial || "IQ"}
                     </div>
                   )}
-                  <div className="flex flex-col">
-                    <span className="text-2xl font-extrabold text-text-primary tracking-tight">
+                  <div className="flex flex-col text-left">
+                    <span className="text-2xl font-extrabold text-text-primary tracking-tight mb-1">
                       {companyName || "InvoiceQu"}
                     </span>
-                    <span className="text-sm font-medium text-text-tertiary tracking-tight">
-                      {companyEmail || ""}
-                    </span>
-                    <span className="text-sm font-medium text-text-tertiary tracking-tight">
-                      {companyPhone || ""}
-                    </span>
-                    <span className="text-sm font-medium text-text-tertiary tracking-tight">
-                      {companyAddress || ""}
-                    </span>
+                    {companyEmail && (
+                      <span className="flex items-center gap-1.5 mb-0.5">
+                        <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Email:</span>
+                        <span className="text-text-secondary text-[11px] font-medium">{companyEmail}</span>
+                      </span>
+                    )}
+                    {companyPhone && (
+                      <span className="flex items-center gap-1.5 mb-0.5">
+                        <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Phone:</span>
+                        <span className="text-text-secondary text-[11px] font-medium">{companyPhone}</span>
+                      </span>
+                    )}
+                    {companyAddress && (
+                      <span className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Address:</span>
+                        <span className="text-text-secondary text-[11px] font-medium">{companyAddress}</span>
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

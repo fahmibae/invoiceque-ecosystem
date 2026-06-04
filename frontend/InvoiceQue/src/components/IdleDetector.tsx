@@ -59,14 +59,9 @@ export default function IdleDetector() {
       }}
     >
       <div
+      className="text-center max-w-[420px] w-[90%] border border-red-500 rounded-md bg-gradient-to-r from-red-500 to-rose-500 shadow-lg"
         style={{
-          textAlign: "center",
           padding: "3rem 2rem",
-          borderRadius: "1rem",
-          background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          maxWidth: "420px",
-          width: "90%",
         }}
       >
         <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>💤</div>
@@ -97,23 +92,23 @@ export default function IdleDetector() {
             padding: "0.75rem 2rem",
             borderRadius: "0.5rem",
             border: "none",
-            background: "linear-gradient(135deg, #dc2626 0%, #ef4444 100%)",
-            color: "#fff",
+            background: "white",
+            color: "red",
             fontSize: "1rem",
             fontWeight: 600,
             cursor: "pointer",
             transition: "transform 0.2s, box-shadow 0.2s",
-            boxShadow: "0 4px 14px rgba(220, 38, 38, 0.4)",
+            boxShadow: "0 4px 14px rgba(255, 255, 255, 0.4)",
           }}
           onMouseOver={(e) => {
             e.currentTarget.style.transform = "translateY(-2px)";
             e.currentTarget.style.boxShadow =
-              "0 6px 20px rgba(220, 38, 38, 0.5)";
+              "0 6px 20px rgba(255, 255, 255, 0.5)";
           }}
           onMouseOut={(e) => {
             e.currentTarget.style.transform = "translateY(0)";
             e.currentTarget.style.boxShadow =
-              "0 4px 14px rgba(220, 38, 38, 0.4)";
+              "0 4px 14px rgba(255, 255, 255, 0.4)";
           }}
         >
           Aktifkan Kembali
