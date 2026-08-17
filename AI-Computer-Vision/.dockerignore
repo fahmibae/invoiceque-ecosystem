@@ -1,0 +1,11 @@
+.env
+.env.*
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+model_weights/
+*.pt
+*.onnx
+*.keras
+*.h5

@@ -50,3 +50,5 @@ rabbitmq_data/
 render-monolith/target/
 .vercel
 .env*
+!.env.example
+!.env.production.example
